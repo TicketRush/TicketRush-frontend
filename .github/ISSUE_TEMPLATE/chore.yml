@@ -1,0 +1,33 @@
+name: Chore Template
+description: 설정, 빌드, 의존성, 환경 정리 등 기타 작업용 템플릿
+labels: ["chore"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: "📦 어떤 작업인가요?"
+      description: "작업 내용을 간단히 적어주세요."
+      placeholder: "ex. GitHub Actions 배포 워크플로 수정"
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: "📌 작업 상세 내용"
+      description: "구체적인 작업 내용을 작성해주세요."
+      placeholder: |
+        ex.
+        - 배포 환경 변수 주입 방식 수정
+        - 불필요한 job 제거
+        - 캐시 전략 변경
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: "👀 참고 사항"
+      description: "관련 배경이나 참고할 내용을 작성해주세요."
+      placeholder: |
+        ex. dev 환경에서만 우선 적용
+    validations:
+      required: true
