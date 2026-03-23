@@ -41,4 +41,4 @@ body:
         - [ ] 문서 내용이 최신 상태로 반영된다
         - [ ] 팀원이 보고 이해할 수 있다
     validations:
-      required: true
+      required: false

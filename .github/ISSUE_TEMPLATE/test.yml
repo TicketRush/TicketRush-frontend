@@ -41,4 +41,4 @@ body:
         - [ ] 주요 시나리오 테스트가 추가된다
         - [ ] 테스트가 모두 통과한다
     validations:
-      required: true
+      required: false

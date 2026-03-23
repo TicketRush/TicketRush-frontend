@@ -45,4 +45,4 @@ body:
         - [ ] 테스트가 모두 통과한다
         - [ ] 가독성이 개선되었다
     validations:
-      required: true
+      required: false

@@ -52,4 +52,4 @@ body:
         - [ ] 동일한 요청에서 오류가 발생하지 않는다
         - [ ] 관련 테스트가 통과한다
     validations:
-      required: true
+      required: false

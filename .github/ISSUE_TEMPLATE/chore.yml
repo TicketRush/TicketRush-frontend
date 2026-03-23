@@ -30,7 +30,7 @@ body:
       placeholder: |
         ex. dev 환경에서만 우선 적용
     validations:
-      required: true
+      required: false
   - type: textarea
     id: done
     attributes:
@@ -42,4 +42,4 @@ body:
         - [ ] 예외 케이스 테스트를 통과한다
         - [ ] Swagger 문서가 반영된다
     validations:
-      required: true
+      required: false
