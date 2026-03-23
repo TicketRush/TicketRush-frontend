@@ -23,11 +23,23 @@ body:
     validations:
       required: true
   - type: textarea
-    id: tasks
+    id: additional
     attributes:
       label: "👀 참고 사항"
       description: "관련 배경이나 참고할 내용을 작성해주세요."
       placeholder: |
         ex. dev 환경에서만 우선 적용
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: "✅ 완료 조건"
+      description: "어떤 상태가 되면 이 이슈가 완료인지 작성해주세요."
+      placeholder: |
+        ex.
+        - [ ] 게시글 조회 API가 동작한다
+        - [ ] 예외 케이스 테스트를 통과한다
+        - [ ] Swagger 문서가 반영된다
     validations:
       required: true
