@@ -32,6 +32,8 @@ body:
       placeholder: 
         - 피그마 디자인 참고
         - react로 시범 화면 먼저 구성
+      validations:
+        required: true
 
   - type: textarea
     attributes:
