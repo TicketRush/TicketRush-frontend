@@ -1,7 +1,7 @@
 name: Character Page
-description: Feature 작업용 이슈 템플릿
+description: 캐릭터 커스터마이징 페이지 제작
 title: "[FE] "
-labels: ["feature"]
+labels: ["ya_characterpage"]
 assignees: []
 
 body:
