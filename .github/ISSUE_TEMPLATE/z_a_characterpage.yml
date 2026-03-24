@@ -29,7 +29,7 @@ body:
     attributes:
       label: 👀 참고 사항
       description: 참고할 내용이 있다면 작성해주세요.
-      placeholder: 
+      placeholder: |
         - 피그마 디자인 참고
         - react로 시범 화면 먼저 구성
     validations:
