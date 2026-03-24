@@ -39,6 +39,5 @@ body:
       placeholder: |
         - [ ] UI가 정상적으로 표시된다.
         - [ ] 사용자 입력이 가능하다.
-        - [ ] 실제 기존 캐릭터에 적용이 된다.
     validations:
       required: true
