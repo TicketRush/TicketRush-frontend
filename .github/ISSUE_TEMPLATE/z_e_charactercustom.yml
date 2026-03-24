@@ -1,7 +1,7 @@
-name: Apply Customization
+name: charactercustom
 description: 3D 캐릭터에 커스터마이징 적용
 title: "[FE] "
-labels: ["feature"]
+labels: ["z_e_charactercustom"]
 assignees: []
 
 body:
