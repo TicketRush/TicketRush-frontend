@@ -1,5 +1,6 @@
 // src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import CharacterCustomizePage from "./pages/CharacterCustomizePage";
 
 function App() {
   return (
@@ -50,7 +51,7 @@ function App() {
         <Route path="/admin/concerts/register" element={<div>공연 등록</div>} />
         <Route
           path="/admin/concerts/register/character"
-          element={<div>3D 캐릭터 제작소</div>}
+          element={<CharacterCustomizePage />}
         />
         <Route path="/admin/refunds" element={<div>환불 내역 관리</div>} />
 
