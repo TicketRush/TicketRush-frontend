@@ -13,8 +13,6 @@ import { ApiError, isUnauthorizedError } from "./errors/errorMapper";
 
 // -------------------------------------------------------
 // TODO: 프로젝트에서 사용하는 toast 라이브러리로 교체
-// 예시: import { toast } from 'react-hot-toast';
-//       import { toast } from 'sonner';
 // -------------------------------------------------------
 const toast = {
   error: (message: string) => {

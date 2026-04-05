@@ -2,8 +2,7 @@
 // errorMapper: 백엔드 에러 코드 → 프론트 UI 메시지 변환
 //
 // 역할: 백엔드 스펙 변경으로부터 프론트 UI를 보호하는 안정 레이어
-// - 백엔드 message를 기본값으로 활용하되,
-//   프론트에서 재정의가 필요한 경우 여기서 오버라이드
+// - 백엔드 message를 기본값으로 활용하되 프론트에서 재정의가 필요한 경우 여기서 오버라이드
 // -------------------------------------------------------
 
 import { ERROR_CODES, type ErrorCode } from "./errorCodes";
@@ -40,7 +39,6 @@ const ERROR_MESSAGE_OVERRIDES: Partial<Record<ErrorCode, string>> = {
   // [ERROR_CODES.FORBIDDEN]: '접근 권한이 없습니다.',
 };
 
-/** 알 수 없는 에러 코드일 때 사용할 기본 메시지 */
 const FALLBACK_MESSAGE =
   "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
 
@@ -48,14 +46,11 @@ const FALLBACK_MESSAGE =
 // 매핑 함수
 // -------------------------------------------------------
 
-/**
- * 에러 코드와 백엔드 메시지를 받아 UI에 표시할 최종 메시지를 반환
- *
- * 우선순위:
- * 1. ERROR_MESSAGE_OVERRIDES에 정의된 프론트 오버라이드 메시지
- * 2. 백엔드에서 내려준 message
- * 3. FALLBACK_MESSAGE
- */
+// 우선순위:
+// 1. ERROR_MESSAGE_OVERRIDES에 정의된 프론트 오버라이드 메시지
+// 2. 백엔드에서 내려준 message
+// 3. FALLBACK_MESSAGE
+//
 export function mapErrorToMessage(
   code: string,
   backendMessage?: string,

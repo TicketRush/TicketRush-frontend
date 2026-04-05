@@ -1,17 +1,11 @@
-// -------------------------------------------------------
-// 백엔드 에러/성공 코드 상수
-// @see common/.../status/ErrorStatus.java
-// @see common/.../status/SuccessStatus.java
-// -------------------------------------------------------
-
-/** 성공 코드 */
+// 성공 코드
 export const SUCCESS_CODES = {
   OK: "COMMON_200",
   CREATED: "COMMON_201",
   NO_CONTENT: "COMMON_204",
 } as const;
 
-/** 에러 코드 */
+// 에러 코드
 export const ERROR_CODES = {
   // 공통
   BAD_REQUEST: "COMMON_400",
@@ -25,10 +19,6 @@ export const ERROR_CODES = {
 
   // --------------------------------------------------
   // TODO: 도메인별 에러 코드 추가 (백엔드 확정 후)
-  // 예시:
-  // CONCERT_NOT_FOUND: 'CONCERT_404',
-  // SEAT_ALREADY_RESERVED: 'SEAT_409',
-  // PAYMENT_FAILED: 'PAYMENT_500',
   // --------------------------------------------------
 } as const;
 
