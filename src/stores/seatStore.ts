@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { sessionStorageAdapter } from "../utils/sessionStorageAdapter";
 
+// sessionStorage 사용 — 탭별 독립 예매 플로우 보장 (스토리지 전략 상세: authStore.ts 참고)
+
 interface Seat {
   id: string;
   label: string;
@@ -15,7 +17,7 @@ interface SeatState {
   clearSeat: () => void;
 }
 
-const useSeatStore = create<SeatState>()(
+export const useSeatStore = create<SeatState>()(
   devtools(
     persist(
       (set) => ({
@@ -29,9 +31,3 @@ const useSeatStore = create<SeatState>()(
     ),
   ),
 );
-
-// 사용 시:
-// const selectedSeat = useSeatStore((s) => s.selectedSeat);
-// const hasSeat = useSeatStore((s) => !!s.selectedSeat);
-// const totalPrice = selectedSeat ? concertPrice : 0;
-export default useSeatStore;

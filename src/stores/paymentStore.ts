@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { sessionStorageAdapter } from "../utils/sessionStorageAdapter";
 
+// sessionStorage 사용 — 탭별 독립 예매 플로우 보장 (스토리지 전략 상세: authStore.ts 참고)
+
 type PaymentStatus =
   | "IDLE"
   | "CONFIRMING"
@@ -22,13 +24,19 @@ interface PaymentState {
   reset: () => void;
 }
 
-const usePaymentStore = create<PaymentState>()(
+export const usePaymentStore = create<PaymentState>()(
   devtools(
     persist(
       (set) => ({
         status: "IDLE",
         errorMessage: null,
         updatedAt: null,
+        confirmPayment: () =>
+          set({
+            status: "CONFIRMING",
+            errorMessage: null,
+            updatedAt: Date.now(),
+          }),
         startPayment: () =>
           set({
             status: "PROCESSING",
@@ -56,5 +64,3 @@ const usePaymentStore = create<PaymentState>()(
     ),
   ),
 );
-
-export default usePaymentStore;
