@@ -8,6 +8,7 @@ export default {
           DEFAULT: "#6C5CE7",
           light: "#A19BE8",
         },
+        secondary: "#f8f9fa",
         teal: "#02D4D5",
         danger: "#FF4757",
         kakao: {
