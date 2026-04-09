@@ -5,17 +5,11 @@
 /* ── 글로벌 리셋 ── */
 
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  font-family:
-    "Pretendard",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
+  @apply font-pretendard;
   color: #2d3436;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
