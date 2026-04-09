@@ -1,73 +1,28 @@
-# React + TypeScript + Vite
+# 🎫 TicketRush Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> 콘서트 티켓 예매 플랫폼 — 프론트엔드 레포지토리
 
-Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 📎 문서 링크
 
-## React Compiler
+| 문서 | 링크 |
+|------|------|
+| 기획서 | [Notion에서 보기](https://www.notion.so/2ab09a0b0e3e80d2ab1dc0de5fe7b809?source=copy_link) |
+| 화면 명세서 | [Notion에서 보기](https://www.notion.so/2d809a0b0e3e808bad6cdd61fdb39106?source=copy_link) |
+| 컨벤션 | [Notion에서 보기](https://www.notion.so/33509a0b0e3e80afb9e2f248abf654e5?source=copy_link) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## Expanding the ESLint configuration
+## 🚀 시작하기
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+# 의존성 설치
+npm install
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 개발 서버 실행
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🗓 Sprint & Milestones
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1주 단위 스프린트로 진행하며, [GitHub Milestones](https://github.com/TicketRush/TicketRush-frontend/milestones)로 관리합니다.
