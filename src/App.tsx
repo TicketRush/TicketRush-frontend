@@ -1,16 +1,14 @@
 // src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-// import LoginPage from "./pages/Auth/LoginPage";
-import SignupPage from "./pages/Auth/SignupPage";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* 인증 */}
-        {/* <Route path="/login" element={<LoginPage />} /> */}
         <Route path="/login" element={<div>로그인</div>} />
-        {<Route path="/signup" element={<SignupPage />} />}
+        <Route path="/signup" element={<div>회원가입</div>} />
+
         <Route path="/guest-verify" element={<div>비회원 예매 인증</div>} />
         {/* 공연 */}
         <Route path="/" element={<div>공연 목록(메인 화면)</div>} />
