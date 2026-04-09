@@ -1,5 +1,7 @@
 // src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import LoginPage from "./pages/Auth/LoginPage";
 import SignupPage from "./pages/Auth/SignupPage";
 
@@ -38,6 +40,8 @@ function App() {
           element={<div>티켓 상세</div>}
         />
 
+        {/* 비회원 관련 라우트(/guest-verify, /reservations, /reservations/guest)는 비회원 개념 삭제로 제거 예정 */}
+
         {/* 관리자 */}
         <Route path="/admin" element={<div>관리자 대시보드(메인 화면)</div>} />
         <Route path="/admin/reservations" element={<div>예매 내역 확인</div>} />
@@ -59,6 +63,17 @@ function App() {
         {/* 404 */}
         <Route path="*" element={<div>페이지를 찾을 수 없습니다</div>} />
       </Routes>
+
+      {/* 글로벌 토스트 컨테이너 — 모든 페이지 위에 떠 있는 알림 영역 */}
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+      />
     </BrowserRouter>
   );
 }
