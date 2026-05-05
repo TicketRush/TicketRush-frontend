@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
-import { sessionStorageAdapter } from "../utils/sessionStorageAdapter";
+import { sessionStorageAdapter } from "../utils/storage/sessionStorageAdapter";
 
 interface Concert {
   id: string;

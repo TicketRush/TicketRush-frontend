@@ -26,7 +26,7 @@ export default function Skeleton({
 
   const computedHeight =
     height ??
-    (variant === "text" ? "1rem" : variant === "circle" ? "40px" : undefined);
+    (variant === "text" ? "1.5rem" : variant === "circle" ? "40px" : undefined);
 
   const style: CSSProperties = {
     ...(computedWidth !== undefined && { width: computedWidth }),
