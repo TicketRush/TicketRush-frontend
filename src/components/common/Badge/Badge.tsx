@@ -6,7 +6,7 @@ export type BadgeStatus =
   | "결제중"
   | "취소"
   | "환불"
-  | "매진"
+  | "예매불가"
   | "예매가능";
 
 export type BadgeSize = "sm" | "md";
@@ -26,7 +26,7 @@ const statusConfig: Record<BadgeStatus, { label: string; style: string }> = {
   결제중: { label: "결제중", style: "bg-primary/15 text-primary" },
   취소: { label: "취소", style: "bg-danger/15 text-danger" },
   환불: { label: "환불", style: "bg-orange-100 text-orange-600" },
-  매진: { label: "매진", style: "bg-gray-200 text-gray-600" },
+  예매불가: { label: "매진", style: "bg-gray-200 text-gray-600" },
   예매가능: { label: "예매가능", style: "bg-teal/15 text-teal" },
 };
 

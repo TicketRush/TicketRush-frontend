@@ -140,7 +140,7 @@ export default function TestPlayground() {
               <Badge status="결제중" />
               <Badge status="취소" />
               <Badge status="환불" />
-              <Badge status="매진" />
+              <Badge status="예매불가" />
               <Badge status="예매가능" />
             </div>
           </div>

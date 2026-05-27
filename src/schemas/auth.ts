@@ -18,6 +18,10 @@ export const signupSchema = z
       .min(1, "이메일을 입력해주세요")
       .email("올바른 이메일을 입력해주세요"),
     verificationCode: z.string().min(1, "인증 번호를 입력해주세요"),
+    /** 이메일 인증 완료 여부 — UI 상태이지만 폼 검증에 필요 */
+    isEmailVerified: z.boolean().refine((val) => val === true, {
+      message: "이메일 인증을 완료해주세요",
+    }),
     password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다"),
     passwordConfirm: z.string().min(1, "비밀번호 확인을 입력해주세요"),
   })

@@ -1,37 +1,43 @@
-// stores/seatStore.ts
+// 좌석 선택 store — 1인 1석 정책
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
-import { sessionStorageAdapter } from "../utils/sessionStorageAdapter";
+import type { Seat } from "@/types/domain/seat";
 
-interface Seat {
-  id: string;
-  label: string;
-}
+// 호환성을 위한 re-export
+export type { Seat };
 
-interface SeatState {
+interface SeatStoreState {
+  /** 1인 1석 정책 — 최대 1개 선택 가능 */
   selectedSeat: Seat | null;
-  selectSeat: (seat: Seat) => void;
-  deselectSeat: () => void;
-  clearSeat: () => void;
+
+  /**
+   * 좌석 토글
+   * - 같은 좌석 다시 클릭 → 선택 해제
+   * - 다른 좌석 클릭 → 기존 해제 후 새 좌석 선택
+   */
+  toggleSeat: (seat: Seat) => void;
+
+  /** 명시적 선택 (null이면 해제) */
+  selectSeat: (seat: Seat | null) => void;
+
+  /** 예매 플로우 종료 시 초기화 */
+  reset: () => void;
 }
 
-const useSeatStore = create<SeatState>()(
-  devtools(
-    persist(
-      (set) => ({
-        selectedSeat: null,
+const useSeatStore = create<SeatStoreState>((set, get) => ({
+  selectedSeat: null,
 
-        selectSeat: (seat) => set({ selectedSeat: seat }),
-        deselectSeat: () => set({ selectedSeat: null }),
-        clearSeat: () => set({ selectedSeat: null }),
-      }),
-      { name: "seat-storage", storage: sessionStorageAdapter },
-    ),
-  ),
-);
+  toggleSeat: (seat) => {
+    const current = get().selectedSeat;
+    if (current?.id === seat.id) {
+      set({ selectedSeat: null });
+    } else {
+      set({ selectedSeat: seat });
+    }
+  },
 
-// 사용 시:
-// const selectedSeat = useSeatStore((s) => s.selectedSeat);
-// const hasSeat = useSeatStore((s) => !!s.selectedSeat);
-// const totalPrice = selectedSeat ? concertPrice : 0;
+  selectSeat: (seat) => set({ selectedSeat: seat }),
+
+  reset: () => set({ selectedSeat: null }),
+}));
+
 export default useSeatStore;

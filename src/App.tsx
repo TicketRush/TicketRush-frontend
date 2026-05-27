@@ -1,5 +1,4 @@
 // src/App.tsx
-import { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -11,124 +10,124 @@ import AdminRoute from "./components/layout/AdminRoute";
 
 import LoginPage from "./pages/Auth/LoginPage";
 import SignupPage from "./pages/Auth/SignupPage";
-import TestPlayground from "./pages/TestPlayground";
+
+import ConcertListPage from "./pages/Concert/ConcertListPage";
+import ConcertDetailPage from "./pages/Concert/ConcertDetailPage";
+
+import SeatSelectionPage from "./pages/Booking/SeatSelectionPage";
+import ReservationConfirmPage from "./pages/Booking/ReservationConfirmPage";
+
+import PaymentPage from "./pages/Payment/PaymentPage";
+import PaymentCompletePage from "./pages/Payment/PaymentCompletePage";
+import PaymentFailedPage from "./pages/Payment/PaymentFailedPage";
+import ReservationExpiredPage from "./pages/Payment/ReservationExpiredPage";
+
+import ErrorBoundary from "@/components/common/ErrorBoundary/ErrorBoundary";
+import NotFoundPage from "@/pages/Error/NotFoundPage";
+import AdminDashboardPage from "@/pages/Admin/AdminDashboardPage";
+import AdminBookingsPage from "@/pages/Admin/AdminBookingsPage";
+import AdminRefundsPage from "@/pages/Admin/AdminRefundsPage";
+import AdminSeatMonitoringPage from "@/pages/Admin/AdminSeatMonitoringPage";
+import AdminConcertFormPage from "@/pages/Admin/AdminConcertFormPage";
+import DevNavPage from "@/pages/Dev/DevNavPage";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* ────────────────────────────────────────
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          {/* ────────────────────────────────────────
             인증 페이지 — 자체 레이아웃 사용
-        ──────────────────────────────────────── */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+          ──────────────────────────────────────── */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/dev" element={<DevNavPage />} />
 
-        {/* ────────────────────────────────────────
+          {/* ────────────────────────────────────────
             사용자 영역 — UserLayout
-        ──────────────────────────────────────── */}
-        <Route element={<UserLayout />}>
-          {/* 공개 페이지 (로그인 불필요) */}
-          {/* <Route path="/" element={<div>공연 목록(메인 화면)</div>} /> */}
-          <Route path="/" element={<TestPlayground />} />
-          <Route path="/concerts/:id" element={<div>공연 상세</div>} />
+          ──────────────────────────────────────── */}
+          <Route element={<UserLayout />}>
+            {/* 공개 페이지 */}
+            <Route path="/" element={<ConcertListPage />} />
+            <Route path="/concerts" element={<ConcertListPage />} />
+            <Route path="/concerts/:id" element={<ConcertDetailPage />} />
 
-          {/* 회원 전용 페이지 — ProtectedRoute로 보호 */}
-          <Route element={<ProtectedRoute />}>
-            {/* 좌석 선택부터 예매 플로우 전체 보호 */}
-            <Route path="/concerts/:id/seats" element={<div>좌석 선택</div>} />
+            {/* 회원 전용 */}
+            <Route element={<ProtectedRoute />}>
+              <Route
+                path="/concerts/:id/seats"
+                element={<SeatSelectionPage />}
+              />
+              <Route
+                path="/concerts/:id/payment/confirm"
+                element={<ReservationConfirmPage />}
+              />
+              <Route path="/concerts/:id/payment" element={<PaymentPage />} />
+              <Route
+                path="/concerts/:id/payment/expired"
+                element={<ReservationExpiredPage />}
+              />
+              <Route
+                path="/concerts/:id/payment/failed"
+                element={<PaymentFailedPage />}
+              />
 
-            {/* 결제 */}
-            <Route path="/payment/confirm" element={<div>예약 확인</div>} />
-            <Route path="/payment" element={<div>결제</div>} />
-            <Route path="/payment/success" element={<div>결제 완료</div>} />
-            <Route path="/payment/fail" element={<div>결제 실패</div>} />
+              {/* 결제 완료 후 */}
+              <Route
+                path="/reservations/:reservationId"
+                element={<PaymentCompletePage />}
+              />
 
-            {/* 예매 내역 */}
-            <Route
-              path="/reservations/mypage"
-              element={<div>예매 내역(회원)</div>}
-            />
-            <Route
-              path="/reservations/tickets/:id"
-              element={<div>티켓 상세</div>}
-            />
+              {/* 마이페이지 / 티켓 */}
+              <Route
+                path="/reservations/mypage"
+                element={<div>예매 내역</div>}
+              />
+              <Route
+                path="/reservations/tickets/:id"
+                element={<div>티켓 상세</div>}
+              />
+            </Route>
           </Route>
-        </Route>
 
-        {/* ────────────────────────────────────────
+          {/* ────────────────────────────────────────
             관리자 영역 — AdminRoute + AdminLayout
-        ──────────────────────────────────────── */}
-        <Route element={<AdminRoute />}>
-          <Route
-            element={
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center min-h-screen bg-[#0F172A] text-white">
-                    로딩 중...
-                  </div>
-                }
-              >
-                <AdminLayout />
-              </Suspense>
-            }
-          >
-            <Route
-              path="/admin"
-              element={<div>관리자 대시보드(메인 화면)</div>}
-            />
-            <Route
-              path="/admin/reservations"
-              element={<div>예매 내역 확인</div>}
-            />
-            <Route
-              path="/admin/monitoring"
-              element={<div>좌석 현황 실시간 모니터링(목록)</div>}
-            />
-            <Route
-              path="/admin/monitoring/:id"
-              element={<div>좌석 현황 실시간 모니터링(좌석맵)</div>}
-            />
-            <Route
-              path="/admin/concerts/register"
-              element={<div>공연 등록</div>}
-            />
-            <Route
-              path="/admin/concerts/register/character"
-              element={<div>3D 캐릭터 제작소</div>}
-            />
-            <Route path="/admin/refunds" element={<div>환불 내역 관리</div>} />
+          ──────────────────────────────────────── */}
+          <Route element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+              <Route path="/admin/refunds" element={<AdminRefundsPage />} />
+              <Route
+                path="/admin/seat-monitoring"
+                element={<AdminSeatMonitoringPage />}
+              />
+              <Route
+                path="/admin/concerts/new"
+                element={<AdminConcertFormPage mode="create" />}
+              />
+              <Route
+                path="/admin/concerts/:id/edit"
+                element={<AdminConcertFormPage mode="edit" />}
+              />
+            </Route>
           </Route>
-        </Route>
 
-        {/* 404 */}
-        <Route
-          path="*"
-          element={
-            <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-[#f8f9fa]">
-              <h1 className="font-pretendard text-2xl font-bold text-text">
-                페이지를 찾을 수 없습니다
-              </h1>
-              <a
-                href="/"
-                className="font-pretendard text-base text-primary underline"
-              >
-                홈으로 돌아가기
-              </a>
-            </div>
-          }
+          {/* 404 — 가장 마지막 */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+
+        <ToastContainer
+          position="bottom-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnHover
+          draggable
         />
-      </Routes>
-
-      <ToastContainer
-        position="bottom-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        pauseOnHover
-        draggable
-      />
-    </BrowserRouter>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

@@ -1,39 +1,15 @@
-// src/pages/Auth/LoginPage.tsx
 import { useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
 import { loginSchema, type LoginFormData } from "../../schemas/auth";
-import useAuthStore from "../../stores/global/authStore";
+import { useEmailLogin } from "@/hooks/auth/useAuth";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
 
-// TODO: 백엔드 완성 시 apiClient.post로 교체
-const mockLogin = async (data: LoginFormData) => {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  if (data.email === "fail@test.com") {
-    throw { response: { status: 401 } };
-  }
-  return {
-    accessToken: "mock-token",
-    user: {
-      email: data.email,
-      name: "테스트",
-      role: "USER" as const,
-    },
-  };
-};
-
 export default function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const setAuth = useAuthStore((s) => s.setAuth);
-
-  // ProtectedRoute에서 전달한 원래 가려던 경로 (없으면 홈으로)
-  const from =
-    (location.state as { from?: { pathname: string } } | null)?.from
-      ?.pathname || "/";
+  const emailLogin = useEmailLogin();
 
   const {
     register,
@@ -49,27 +25,24 @@ export default function LoginPage() {
     setFocus("email");
   }, [setFocus]);
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: mockLogin, // TODO: (data) => apiClient.post('/api/auth/login', data)
-    onSuccess: (res) => {
-      // authStore에 토큰 + 사용자 정보 저장
-      setAuth(res.accessToken, res.user);
-      // 원래 가려던 페이지로 (또는 홈으로)
-      navigate(from, { replace: true });
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { status?: number } };
-      if (err?.response?.status === 401) {
-        setError("root", {
-          message: "이메일 또는 비밀번호가 올바르지 않습니다",
-        });
-      }
-      // 그 외 에러는 QueryClient onError에서 toast 처리
-    },
-  });
-
   const onSubmit = (data: LoginFormData) => {
-    mutate(data);
+    emailLogin.mutate(data, {
+      onError: (error: unknown) => {
+        const err = error as {
+          response?: { status?: number };
+          message?: string;
+        };
+        if (err?.response?.status === 401) {
+          setError("root", {
+            message: "이메일 또는 비밀번호가 올바르지 않습니다",
+          });
+        } else {
+          setError("root", {
+            message: err?.message ?? "로그인 중 오류가 발생했습니다",
+          });
+        }
+      },
+    });
   };
 
   return (
@@ -123,7 +96,7 @@ export default function LoginPage() {
             variant="primary"
             size="lg"
             fullWidth
-            loading={isPending}
+            loading={emailLogin.isPending}
           >
             로그인
           </Button>

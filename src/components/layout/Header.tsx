@@ -1,7 +1,7 @@
-// components/layout/Header.tsx
 import { Link, useNavigate } from "react-router-dom";
 import useAuthStore from "../../stores/global/authStore";
 import Button from "../common/Button/Button";
+import logo from "@/assets/images/logo.svg";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -17,9 +17,8 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-border">
       <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-        {/* 로고 */}
-        <Link to="/" className="font-pretendard text-xl font-bold text-primary">
-          TicketRush
+        <Link to="/">
+          <img src={logo} alt="TicketRush" className="h-8 w-auto" />
         </Link>
 
         {/* 메뉴 */}
@@ -36,18 +35,11 @@ export default function Header() {
               </Button>
             </>
           ) : (
-            <>
-              <Link to="/reservations/mypage">
-                <Button variant="secondary" size="sm">
-                  내 예매
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button variant="primary" size="sm">
-                  로그인
-                </Button>
-              </Link>
-            </>
+            <Link to="/login">
+              <Button variant="primary" size="sm">
+                로그인
+              </Button>
+            </Link>
           )}
         </nav>
       </div>

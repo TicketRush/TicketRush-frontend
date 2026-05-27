@@ -3,10 +3,8 @@ import clsx from "clsx";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "kakao" | "naver" | "google";
-  // primary: 보라색 | secondary: 흰 배경+테두리 | danger: 빨간색
-  // kakao/naver/google: OAuth 간편 로그인
 
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "oauth";
   fullWidth?: boolean;
   loading?: boolean;
   icon?: ReactNode;
@@ -26,16 +24,18 @@ const variantStyles = {
     "bg-white text-text-secondary font-medium border border-border rounded-button hover:bg-[#f8f9fa]",
   danger: "bg-danger text-white font-bold rounded-button hover:opacity-90",
   kakao:
-    "bg-kakao text-kakao-text font-semibold rounded-button hover:opacity-90",
-  naver: "bg-naver text-white font-semibold rounded-button hover:opacity-90",
+    "bg-kakao text-kakao-text font-semibold border-2 border-kakao-border rounded-input hover:opacity-90",
+  naver:
+    "bg-naver text-naver-text font-semibold border-2 border-naver-border rounded-input hover:opacity-90",
   google:
-    "bg-white text-text font-medium border border-border rounded-button hover:bg-[#f8f9fa]",
+    "bg-google text-google-text font-semibold border-2 border-google-border rounded-input hover:bg-[#f8f9fa]",
 } as const;
 
 const sizeStyles = {
   sm: "h-[42px] px-5 text-sm",
   md: "h-12 px-7 text-base",
   lg: "h-14 px-8 text-lg",
+  oauth: "h-[52px] px-5 text-base",
 } as const;
 
 const stateStyles = {
@@ -86,7 +86,7 @@ export default function Button({
         <>
           {icon && iconPosition === "left" && icon}
           {children}
-          {icon && iconPosition === "left" && icon}
+          {icon && iconPosition === "right" && icon}
         </>
       )}
     </button>
