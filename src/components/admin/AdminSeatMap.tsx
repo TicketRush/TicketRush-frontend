@@ -1,5 +1,3 @@
-// 관리자 좌석 맵 — 사용자 SeatMap과 다른 디자인
-// 좌석 번호 표시, 색상 별도 (사진 6 기준), 깜빡임 애니메이션 적용
 
 import { memo } from "react";
 import type { SeatWithStatus } from "@/types/domain/seat";
@@ -8,20 +6,28 @@ interface AdminSeatMapProps {
   seats: SeatWithStatus[];
   selectedSeatId: number | null;
   onSeatClick: (seat: SeatWithStatus) => void;
+  /** 좌석 크기 배율 (사진 0.7배 요청) */
+  scale?: number;
 }
 
 export default function AdminSeatMap({
   seats,
   selectedSeatId,
   onSeatClick,
+  scale = 0.7,
 }: AdminSeatMapProps) {
-  // 행별로 그룹화 (A행, B행, ...)
+  // 행별로 그룹화
   const rowMap = new Map<string, SeatWithStatus[]>();
   seats.forEach((s) => {
     if (!rowMap.has(s.row)) rowMap.set(s.row, []);
     rowMap.get(s.row)!.push(s);
   });
   const rows = Array.from(rowMap.entries()).sort();
+
+  // 0.7배: 기본 32px → 22px, gap 6px → 4px
+  const seatSize = Math.round(32 * scale);
+  const seatGap = Math.round(6 * scale);
+  const fontSize = Math.round(10 * scale);
 
   return (
     <div className="space-y-3">
@@ -33,20 +39,26 @@ export default function AdminSeatMap({
       </div>
 
       {/* 좌석 행들 */}
-      <div className="space-y-1.5">
-        {rows.map(([row, seats]) => (
-          <div key={row} className="flex items-center gap-2">
+      <div className="space-y-1.5 flex flex-col items-center">
+        {rows.map(([row, seatsInRow]) => (
+          <div
+            key={row}
+            className="flex items-center"
+            style={{ gap: `${seatGap}px` }}
+          >
             <span className="w-6 text-center text-xs font-bold text-admin-text-secondary">
               {row}
             </span>
-            <div className="flex gap-1.5 flex-1">
-              {seats
+            <div className="flex" style={{ gap: `${seatGap}px` }}>
+              {seatsInRow
                 .sort((a, b) => a.col - b.col)
                 .map((seat) => (
                   <AdminSeatItem
                     key={seat.id}
                     seat={seat}
                     isSelected={selectedSeatId === seat.id}
+                    size={seatSize}
+                    fontSize={fontSize}
                     onClick={onSeatClick}
                   />
                 ))}
@@ -61,26 +73,33 @@ export default function AdminSeatMap({
 interface SeatItemProps {
   seat: SeatWithStatus;
   isSelected: boolean;
+  size: number;
+  fontSize: number;
   onClick: (seat: SeatWithStatus) => void;
 }
 
 const AdminSeatItem = memo(
-  function AdminSeatItemImpl({ seat, isSelected, onClick }: SeatItemProps) {
+  function AdminSeatItemImpl({
+    seat,
+    isSelected,
+    size,
+    fontSize,
+    onClick,
+  }: SeatItemProps) {
     const baseClass =
-      "flex-1 aspect-square min-w-0 rounded flex items-center justify-center text-xs font-bold transition-all cursor-pointer";
+      "flex-1 aspect-square min-w-0 rounded flex items-center justify-center font-bold transition-all cursor-pointer";
 
     let stateClass = "";
-    if (seat.status === "AVAILABLE") {
-      stateClass = "bg-seat-available text-gray-700 hover:bg-seat-available-hover";
-    } else if (seat.status === "SOLD") {
-      stateClass = "bg-seat-sold text-gray-700";
-    } else if (seat.status === "HOLD") {
-      // 깜빡임 애니메이션 (tailwind 키프레임)
-      stateClass = "animate-seat-blink text-gray-700";
-    }
+    let bgStyle: React.CSSProperties = {};
 
-    if (isSelected) {
-      stateClass += " ring-2 ring-white ring-offset-2 ring-offset-admin-bg";
+    if (seat.status === "AVAILABLE") {
+      stateClass = "text-gray-800 hover:opacity-90";
+      bgStyle = { backgroundColor: "#B9F8CF" };
+    } else if (seat.status === "SOLD") {
+      stateClass = "text-gray-700";
+      bgStyle = { backgroundColor: "#99A1AF" };
+    } else if (seat.status === "HOLD") {
+      stateClass = "animate-seat-blink text-gray-800";
     }
 
     return (
@@ -88,6 +107,28 @@ const AdminSeatItem = memo(
         type="button"
         onClick={() => onClick(seat)}
         className={`${baseClass} ${stateClass}`}
+        style={{
+          ...bgStyle,
+          minWidth: `${size}px`,
+          minHeight: `${size}px`,
+          maxWidth: `${size}px`,
+          maxHeight: `${size}px`,
+          fontSize: `${fontSize}px`,
+          outline: isSelected ? "2px solid white" : undefined,
+          outlineOffset: isSelected ? "2px" : undefined,
+        }}
+        onMouseEnter={(e) => {
+          if (seat.status === "AVAILABLE") {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+              "#71ECA3";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (seat.status === "AVAILABLE") {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+              "#B9F8CF";
+          }
+        }}
         aria-label={`좌석 ${seat.label} ${seat.status}`}
       >
         {seat.col}
@@ -97,5 +138,6 @@ const AdminSeatItem = memo(
   (prev, next) =>
     prev.seat.id === next.seat.id &&
     prev.seat.status === next.seat.status &&
-    prev.isSelected === next.isSelected,
+    prev.isSelected === next.isSelected &&
+    prev.size === next.size,
 );

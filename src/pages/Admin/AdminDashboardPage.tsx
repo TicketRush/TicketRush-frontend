@@ -1,8 +1,3 @@
-// 관리자 대시보드 — 이미지 1, 2
-//
-// ⚠️ AdminLayout 컴포넌트가 다크 배경(bg-admin-bg)을 적용한다고 가정.
-//    안 그러면 페이지 최상위에 bg-admin-bg 클래스 추가 필요.
-
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
@@ -16,14 +11,18 @@ import {
   Monitor,
   ArrowRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "react-toastify";
 import StatCard from "@/components/admin/StatCard";
 import RevenueChart from "@/components/admin/RevenueChart";
 import GenrePieChart from "@/components/admin/GenrePieChart";
 import SalesChart from "@/components/admin/SalesChart";
 import AdminConcertTable from "@/components/admin/AdminConcertTable";
-import { useAdminDashboard, useDeleteConcert } from "@/hooks/admin/useAdmin";
+import AdminCalendar from "@/components/admin/AdminCalendar";
+import {
+  useAdminDashboard,
+  useDeleteConcert,
+} from "@/hooks/admin/useAdmin";
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
@@ -31,14 +30,17 @@ export default function AdminDashboardPage() {
   const deleteMutation = useDeleteConcert();
 
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date }>(() => {
+  const today = new Date();
+  return { start: today, end: today };
+});
 
-  function handleEdit(id: number) {
-    navigate(`/admin/concerts/${id}/edit`);
-  }
-
-  function handleDelete(id: number) {
-    setDeleteTarget(id);
-  }
+  const filteredRevenue = useMemo(() => {
+  if (!data) return [];
+  const startStr = selectedRange.start.toISOString().split("T")[0];
+  const endStr = selectedRange.end.toISOString().split("T")[0];
+  return data.dailyRevenue.filter((d) => d.date >= startStr && d.date <= endStr);
+}, [data, selectedRange]);
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
@@ -53,7 +55,7 @@ export default function AdminDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="bg-admin-bg min-h-screen text-admin-text p-8">
+      <div className="p-8">
         <div className="text-center py-20 text-admin-text-secondary">
           대시보드 불러오는 중...
         </div>
@@ -63,7 +65,7 @@ export default function AdminDashboardPage() {
 
   if (isError || !data) {
     return (
-      <div className="bg-admin-bg min-h-screen text-admin-text p-8">
+      <div className="p-8">
         <div className="text-center py-20 text-red-400">
           대시보드 데이터를 불러올 수 없습니다.
         </div>
@@ -80,9 +82,7 @@ export default function AdminDashboardPage() {
             ADMIN MODE
           </span>
           <h1 className="text-3xl font-bold mt-2">관리자 대시보드</h1>
-          <p className="text-sm text-admin-text-secondary mt-1">
-            공연 현황 및 통계
-          </p>
+          <p className="text-sm text-admin-text-secondary mt-1">공연 현황 및 통계</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -102,7 +102,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 상단 통계 카드 4개 */}
+      {/* 통계 카드 4개 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<Calendar size={24} />}
@@ -159,36 +159,41 @@ export default function AdminDashboardPage() {
         />
       </div>
 
-      {/* 차트 영역 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RevenueChart data={data.dailyRevenue} />
-        <GenrePieChart data={data.genreRevenue} />
+      {/* 달력 + 매출 차트 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+        <AdminCalendar
+  selectedRange={selectedRange}
+  onRangeChange={setSelectedRange}
+/>
+        <RevenueChart data={filteredRevenue} />
       </div>
+
+      {/* 장르 차트 */}
+      <GenrePieChart data={data.genreRevenue} />
 
       {/* 공연별 판매 현황 */}
       <SalesChart data={data.concertSales} />
 
-      {/* 전체 공연 목록 테이블 */}
-      <div className="bg-admin-card border border-admin-border rounded-xl p-6">
+      {/* 전체 공연 목록 */}
+<div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
         <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
           EVENTS LIST
         </span>
-        <h3 className="text-base font-bold mb-4">전체 공연 목록</h3>
+  <h3 className="text-base font-bold mb-4 text-gray-900">전체 공연 목록</h3>
         <AdminConcertTable
           data={data.concertList}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          onEdit={(id) => navigate(`/admin/concerts/${id}/edit`)}
+          onDelete={(id) => setDeleteTarget(id)}
         />
       </div>
 
-      {/* 삭제 확인 모달 — 간단한 인라인 모달 */}
+      {/* 삭제 확인 모달 */}
       {deleteTarget !== null && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-admin-card border border-admin-border rounded-xl p-6 max-w-md w-full">
             <h3 className="font-bold mb-2">공연을 삭제하시겠습니까?</h3>
             <p className="text-sm text-admin-text-secondary mb-4">
-              삭제된 공연은 복구할 수 없습니다. 진행 중인 예매가 있을 경우 환불
-              절차도 함께 처리됩니다.
+              삭제된 공연은 복구할 수 없습니다.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button

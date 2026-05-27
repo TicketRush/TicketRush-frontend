@@ -57,6 +57,26 @@ export default {
           fanmeeting: "#E679FF",
           ballet: "#C6B5FF",
         },
+        // 관리자 다크 테마
+        "admin-bg": "#000000",
+        "admin-card": "#151B2C",
+        "admin-border": "#252B3D",
+        "admin-text": "#E4E6EB",
+        "admin-text-secondary": "#9CA3AF",
+
+        // 좌석 상태 (사진의 색상 가이드 기준)
+        "seat-available": "#B9F8CF",
+        "seat-available-hover": "#71ECA3",
+        "seat-sold": "#99A1AF",
+        "seat-holding": "#FFF085",
+        "seat-blink": "#898355",
+
+        // 관리자 액션 색상
+        "admin-refund": "#942D12",
+        "admin-resend": "#414B59",
+        "admin-cancel": "#931818",
+        "admin-status-complete": "#00C950",
+        "admin-status-cancelled": "#FB2C36",
       },
       fontFamily: {
         pretendard: [
@@ -73,38 +93,16 @@ export default {
       boxShadow: {
         button: "0 2px 8px rgba(108, 92, 231, 0.3)",
       },
-
-      // 관리자 다크 테마
-      "admin-bg": "#0A0E1A",
-      "admin-card": "#151B2C",
-      "admin-border": "#252B3D",
-      "admin-text": "#E4E6EB",
-      "admin-text-secondary": "#9CA3AF",
-
-      // 좌석 상태 (사진의 색상 가이드 기준)
-      "seat-available": "#B9F8CF",
-      "seat-available-hover": "#71ECA3",
-      "seat-sold": "#99A1AF",
-      "seat-holding": "#FFF085",
-      "seat-blink": "#898355",
-
-      // 관리자 액션 색상
-      "admin-refund": "#942D12",
-      "admin-resend": "#414B59",
-      "admin-cancel": "#931818",
-      "admin-status-complete": "#00C950",
-      "admin-status-cancelled": "#FB2C36",
+      animation: {
+        "seat-blink": "seatBlink 1.2s ease-in-out infinite",
+      },
+      keyframes: {
+        seatBlink: {
+          "0%, 100%": { backgroundColor: "#FFF085" },
+          "50%": { backgroundColor: "#898355" },
+        },
+      },
     },
   },
-  animation: {
-    "seat-blink": "seatBlink 1.2s ease-in-out infinite",
-  },
-  keyframes: {
-    seatBlink: {
-      "0%, 100%": { backgroundColor: "#FFF085" },
-      "50%": { backgroundColor: "#898355" },
-    },
-  },
-
   plugins: [],
 };

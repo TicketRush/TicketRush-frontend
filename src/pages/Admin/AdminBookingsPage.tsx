@@ -126,11 +126,11 @@ export default function AdminBookingsPage() {
       </div>
 
       {/* 테이블 */}
-      <div className="bg-admin-card border border-admin-border rounded-xl p-6">
+<div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
         <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
           ORDERS LIST
         </span>
-        <h3 className="text-base font-bold mb-4">
+        <h3 className="text-base font-bold mb-4 text-gray-900">
           {data
             ? `${data.pagination.totalElements}개의 예매 (${data.items.length}개 중)`
             : "불러오는 중..."}

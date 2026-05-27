@@ -1,4 +1,4 @@
-// 관리자 예매 목록 테이블 — 펼치기/접기로 상세 표시 (이미지 4)
+
 import { useState } from "react";
 import {
   flexRender,
@@ -14,23 +14,11 @@ interface AdminBookingTableProps {
   onRefund: (bookingNumber: string) => void;
 }
 
-const STATUS_LABELS: Record<string, { label: string; bg: string }> = {
-  CONFIRMED: {
-    label: "완료",
-    bg: "bg-[#00C950]/20 text-[#00C950]",
-  },
-  CANCELLED: {
-    label: "취소",
-    bg: "bg-[#FB2C36]/20 text-[#FB2C36]",
-  },
-  PENDING: {
-    label: "대기",
-    bg: "bg-yellow-500/20 text-yellow-300",
-  },
-  EXPIRED: {
-    label: "만료",
-    bg: "bg-gray-500/20 text-gray-300",
-  },
+const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
+  CONFIRMED: { label: "완료", bg: "#00C950" },
+  CANCELLED: { label: "취소", bg: "#FB2C36" },
+  PENDING: { label: "대기", bg: "#FBBF24" },
+  EXPIRED: { label: "만료", bg: "#9CA3AF" },
 };
 
 export default function AdminBookingTable({
@@ -81,9 +69,12 @@ export default function AdminBookingTable({
       accessorKey: "status",
       header: "상태",
       cell: ({ getValue }) => {
-        const s = STATUS_LABELS[getValue() as string] ?? STATUS_LABELS.PENDING;
+        const s = STATUS_STYLES[getValue() as string] ?? STATUS_STYLES.PENDING;
         return (
-          <span className={`px-2 py-1 rounded text-xs font-semibold ${s.bg}`}>
+          <span
+            className="px-3 py-1 rounded-md text-xs font-bold text-white"
+            style={{ backgroundColor: s.bg }}
+          >
             {s.label}
           </span>
         );
@@ -117,7 +108,7 @@ export default function AdminBookingTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left">
+      <table className="w-full text-sm text-left admin-table">
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-admin-border">
@@ -173,14 +164,18 @@ function BookingDetail({
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* 예매자 정보 */}
+      {/* 좌측: 예매자 정보 */}
       <div>
         <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-3">
           예매자 정보
         </p>
         <div className="space-y-3 text-sm">
           <Field icon={<User size={14} />} label="이름" value={booking.userName} />
-          <Field icon={<Mail size={14} />} label="이메일" value={booking.userEmail} />
+          <Field
+            icon={<Mail size={14} />}
+            label="이메일"
+            value={booking.userEmail}
+          />
           <Field
             icon={<CreditCard size={14} />}
             label="결제 수단"
@@ -189,7 +184,7 @@ function BookingDetail({
         </div>
       </div>
 
-      {/* 좌석 정보 + 금액 + 환불 */}
+      {/* 우측: 좌석 정보 + 금액 + 환불 */}
       <div>
         <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-3">
           좌석 정보
@@ -198,15 +193,22 @@ function BookingDetail({
           {booking.seatLabels.map((s) => (
             <span
               key={s}
-              className="px-3 py-1.5 rounded bg-primary text-white text-sm font-bold"
+              className="px-3 py-1.5 rounded text-white text-sm font-bold"
+              style={{ backgroundColor: "#1D7DFF" }}
             >
               {s}
             </span>
           ))}
         </div>
         <div className="bg-admin-bg/70 rounded p-4 space-y-2 text-sm">
-          <Row label="좌석 수" value={`${booking.seatCount}석`} />
-          <Row label="단가" value={`₩${booking.unitPrice.toLocaleString()}`} />
+          <Row
+            label="좌석 수"
+            value={`${booking.seatLabels.length}석`}
+          />
+          <Row
+            label="단가"
+            value={`₩${booking.unitPrice.toLocaleString()}`}
+          />
           <Row
             label="총 금액"
             value={`₩${booking.totalAmount.toLocaleString()}`}

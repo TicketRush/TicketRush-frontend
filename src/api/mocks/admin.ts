@@ -1,8 +1,7 @@
 // Mock 관리자 데이터
 import { mockDelay, mockError } from "./_helpers";
 import { MOCK_CONCERTS } from "./concerts";
-import { _findMockBooking, _updateMockBookingStatus } from "./bookings";
-import type {
+import { _findMockBookingBySeat } from "./bookings";import type {
   AdminDashboardStats,
   DailyRevenue,
   GenreRevenue,
@@ -296,36 +295,44 @@ export async function mockGetAdminSeatDetail(
 ): Promise<AdminSeatDetail> {
   await mockDelay(200);
 
-  // 실제로는 모니터링과 같은 캐시 사용해야 하지만 mock에선 간소화
+  // 좌석 라벨 계산
   const rowIdx = Math.floor((seatId - 1) / 12);
   const colIdx = ((seatId - 1) % 12) + 1;
   const label = `${String.fromCharCode("A".charCodeAt(0) + rowIdx)}-${colIdx}`;
 
-  const r = Math.random();
-  if (r < 0.3) {
-    return {
-      seatId,
-      seatLabel: label,
-      status: "HOLD",
-      reservedBy: "박민수",
-      reservedAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-      holdRemainingSec: 152, // 2:32
-    };
-  } else if (r < 0.7) {
-    return {
-      seatId,
-      seatLabel: label,
-      status: "SOLD",
-      reservedBy: "김철수",
-      reservedAt: "2026-02-01T14:23:00.000Z",
-    };
-  } else {
-    return {
-      seatId,
-      seatLabel: label,
-      status: "AVAILABLE",
-    };
+  // booking store에서 해당 seatId의 예매 정보 조회 (백엔드 패턴 동일)
+  const booking = _findMockBookingBySeat(performanceId, seatId);
+
+  if (booking) {
+    if (booking.status === "PENDING") {
+      // PENDING = HOLD 상태 — 타이머 진행중
+      const elapsedMs = Date.now() - new Date(booking.createdAt).getTime();
+      const remainingSec = Math.max(0, 300 - Math.floor(elapsedMs / 1000)); // 5분
+      return {
+        seatId,
+        seatLabel: label,
+        status: "HOLD",
+        reservedBy: "예매 진행자",
+        reservedAt: booking.createdAt,
+        holdRemainingSec: remainingSec,
+      };
+    }
+    if (booking.status === "CONFIRMED") {
+      return {
+        seatId,
+        seatLabel: label,
+        status: "SOLD",
+        reservedBy: "김철수", // mock: 실제 백엔드에선 booking.userName
+        reservedAt: booking.paidAt ?? booking.createdAt,
+      };
+    }
   }
+
+  return {
+    seatId,
+    seatLabel: label,
+    status: "AVAILABLE",
+  };
 }
 
 export async function mockAdminReleaseSeat(

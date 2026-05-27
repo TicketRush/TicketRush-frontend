@@ -208,3 +208,16 @@ export function _findMockBooking(
 ): BookingDetail | undefined {
   return bookingStore.find((b) => b.bookingNumber === bookingNumber);
 }
+
+/** 좌석 ID로 booking 조회 (mock 내부용 — 좌석 모니터링 패널) */
+export function _findMockBookingBySeat(
+  performanceId: number,
+  seatId: number,
+): BookingDetail | undefined {
+  return bookingStore.find(
+    (b) =>
+      b.performanceId === performanceId &&
+      b.seatId === seatId &&
+      (b.status === "PENDING" || b.status === "CONFIRMED"),
+  );
+}

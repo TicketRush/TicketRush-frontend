@@ -110,7 +110,7 @@ export default function AdminConcertTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left">
+      <table className="w-full text-sm text-left admin-table">
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-admin-border">

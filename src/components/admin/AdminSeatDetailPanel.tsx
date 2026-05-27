@@ -1,6 +1,3 @@
-// 좌석 상세 정보 패널 (사이드 고정)
-// 사진 6의 우측 패널 — 좌석 상태별 다른 UI
-
 import { Clock, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AdminSeatDetail } from "@/types/domain/admin";
