@@ -22,6 +22,9 @@ import PaymentCompletePage from "./pages/Payment/PaymentCompletePage";
 import PaymentFailedPage from "./pages/Payment/PaymentFailedPage";
 import ReservationExpiredPage from "./pages/Payment/ReservationExpiredPage";
 
+import MyBookingsPage from "@/pages/MyPage/MyBookingsPage";
+import TicketDetailPage from "@/pages/MyPage/TicketDetailPage";
+
 import ErrorBoundary from "@/components/common/ErrorBoundary/ErrorBoundary";
 import NotFoundPage from "@/pages/Error/NotFoundPage";
 import AdminDashboardPage from "@/pages/Admin/AdminDashboardPage";
@@ -72,20 +75,19 @@ function App() {
                 element={<PaymentFailedPage />}
               />
 
-              {/* 결제 완료 후 */}
+              {/* 마이페이지 — 내 예매 목록 */}
+              <Route path="/reservations/mypage" element={<MyBookingsPage />} />
+
+              {/* 티켓 확인 — 예약 번호 기준 (mypage 하위) */}
+              <Route
+                path="/reservations/mypage/:bookingNumber"
+                element={<TicketDetailPage />}
+              />
+
+              {/* 결제 완료 후 — 동적 파라미터라 mypage보다 뒤에 둠 */}
               <Route
                 path="/reservations/:reservationId"
                 element={<PaymentCompletePage />}
-              />
-
-              {/* 마이페이지 / 티켓 */}
-              <Route
-                path="/reservations/mypage"
-                element={<div>예매 내역</div>}
-              />
-              <Route
-                path="/reservations/tickets/:id"
-                element={<div>티켓 상세</div>}
               />
             </Route>
           </Route>

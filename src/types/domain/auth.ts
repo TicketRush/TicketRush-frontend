@@ -13,10 +13,12 @@ export interface SocialOauthLoginRequest {
 export interface OauthLoginResponse {
   userId: number;
   name: string;
+  email: string; // ← 추가
+  role: "USER" | "ADMIN"; // ← 추가
+  joinedAt: string;
   isNewUser: boolean;
   accessToken: string;
   refreshToken: string;
-  /** ms 단위로 가정 (swagger int64) */
   accessTokenExpiresIn: number;
   refreshTokenExpiresIn: number;
 }
@@ -27,8 +29,20 @@ export interface EmailLoginRequest {
   password: string;
 }
 
-/** 이메일 로그인 응답은 OauthLoginResponse와 동일 shape 가정 */
-export type EmailLoginResponse = OauthLoginResponse;
+// export type EmailLoginResponse = OauthLoginResponse;
+
+export interface EmailLoginResponse {
+  userId: number;
+  name: string;
+  email: string; // ← 추가
+  role: "USER" | "ADMIN"; // ← 추가
+  joinedAt: string; // ← 추가 (ISO 8601)
+  isNewUser: boolean;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresIn: number;
+  refreshTokenExpiresIn: number;
+}
 
 // ── 토큰 재발급 ─────────────────────────────────────
 export interface TokenReissueRequest {

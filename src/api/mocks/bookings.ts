@@ -143,16 +143,10 @@ export async function mockGetMyBookings(
 ): Promise<MyBookingsResponse> {
   await mockDelay(400);
 
-  let filtered = [...bookingStore];
-  if (params.status && params.status !== "ALL") {
-    filtered = filtered.filter((b) => b.status === params.status);
-  }
+  const size = params.size ?? 100;
+  const sliced = bookingStore.slice(0, size);
 
-  const size = params.size ?? 10;
-  const cursor = params.cursor ?? 0;
-  const slice = filtered.slice(cursor, cursor + size);
-
-  const items: BookingListItem[] = slice.map((b) => ({
+  const items: BookingListItem[] = sliced.map((b) => ({
     bookingId: b.bookingId,
     bookingNumber: b.bookingNumber,
     status: b.status,
@@ -168,11 +162,7 @@ export async function mockGetMyBookings(
 
   return {
     items,
-    pagination: {
-      hasNext: cursor + size < filtered.length,
-      nextCursor: cursor + size,
-      size,
-    },
+    hasNext: bookingStore.length > size,
   };
 }
 

@@ -29,8 +29,9 @@ export function useSocialLogin() {
       setAuth(data.accessToken, {
         userId: data.userId,
         name: data.name,
-        email: "",
-        role: "USER",
+        email,
+        role,
+        joinedAt: data.joinedAt, // ← 추가
       });
       navigate("/");
     },

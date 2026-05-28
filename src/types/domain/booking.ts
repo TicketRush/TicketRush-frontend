@@ -52,6 +52,9 @@ export interface BookingDetail {
 }
 
 // ── 예매 목록 항목 (가상) ────────────────────────────
+
+export type BookingTab = "upcoming" | "past";
+
 export interface BookingListItem {
   bookingId: number;
   bookingNumber: string;
@@ -67,16 +70,12 @@ export interface BookingListItem {
 }
 
 export interface MyBookingsParams {
-  cursor?: number;
+  /** 한 번에 가져올 최대 개수 (전체 조회용 — 예매 내역은 수백 건 이하) */
   size?: number;
-  status?: BookingStatus | "ALL";
 }
 
 export interface MyBookingsResponse {
   items: BookingListItem[];
-  pagination: {
-    hasNext: boolean;
-    nextCursor: number;
-    size: number;
-  };
+  /** 전체 조회 기준 더 받을 데이터가 있는지 (보통 false) */
+  hasNext: boolean;
 }
