@@ -5,7 +5,7 @@ import { devtools, persist } from "zustand/middleware";
 // HttpOnly Cookie 사용 시 수정
 interface AuthState {
   accessToken: string | null;
-  user: { name: string; email: string; role: string } | null;
+  user: { userId: number; name: string; email: string; role: string } | null;
   setAuth: (token: string, user: AuthState["user"]) => void;
   logout: () => void;
 }
