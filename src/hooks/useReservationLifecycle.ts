@@ -1,7 +1,7 @@
 import { toast } from "react-toastify";
 import { useCallback } from "react";
 
-import useConcertStore from "@/stores/reservation/concertStore";
+import { useConcertStore } from "@/stores/reservation/concertStore";
 import useSeatStore from "@/stores/reservation/seatStore";
 import useTimerStore from "@/stores/reservation/timerStore";
 import usePaymentStore from "@/stores/reservation/paymentStore";

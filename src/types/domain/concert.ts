@@ -44,6 +44,7 @@ export interface ConcertDetail extends ConcertSummary {
   facilities: ConcertFacility[];
   galleryUrls: string[];
   notices: string[];
+  gallery?: string[];
 }
 
 export interface ConcertListParams {

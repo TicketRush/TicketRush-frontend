@@ -1,4 +1,4 @@
-import type { Genre } from "../../api/types/domain/concert";
+import type { Genre } from "@/types/domain/concert";
 
 interface GenreBadgeProps {
   genre: Genre;

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Calendar } from "lucide-react";
-import type { ConcertSummary } from "../../api/types/domain/concert";
+import type { ConcertSummary } from "@/types/domain/concert";
 import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";

@@ -1,12 +1,6 @@
 // 장르별 매출 분포 파이 차트
 // 우측 진행률 바: 각 장르 박스로 감싸기 + 영어 라벨
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { GenreRevenue } from "@/types/domain/admin";
 
 interface GenrePieChartProps {
@@ -50,7 +44,7 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
               cx="50%"
               cy="50%"
               outerRadius={100}
-              label={({ genre, percentage }) =>
+              label={({ genre, percentage }: any) =>
                 `${genre} ${percentage.toFixed(0)}%`
               }
               labelLine={false}
@@ -66,10 +60,12 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
                 backgroundColor: "white",
                 border: "1px solid #E5E7EB",
               }}
-              formatter={(value: number) => [
-                `₩${value.toLocaleString()}`,
-                "매출",
-              ]}
+              formatter={
+                ((value: number) => [
+                  `₩${value.toLocaleString()}`,
+                  "매출",
+                ]) as any
+              }
             />
           </PieChart>
         </ResponsiveContainer>

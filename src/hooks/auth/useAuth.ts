@@ -26,12 +26,13 @@ export function useSocialLogin() {
     onSuccess: (data) => {
       // 소셜 로그인은 응답에 email이 없음 → 일반 USER로 처리
       // (관리자 시연은 이메일 로그인으로만)
+
       setAuth(data.accessToken, {
         userId: data.userId,
         name: data.name,
-        email,
-        role,
-        joinedAt: data.joinedAt, // ← 추가
+        email: data.email,
+        role: data.role,
+        joinedAt: data.joinedAt,
       });
       navigate("/");
     },
@@ -45,7 +46,6 @@ export function useEmailLogin() {
   return useMutation({
     mutationFn: emailLoginApi,
     onSuccess: (data, variables) => {
-      // variables = mutationFn에 넘긴 req (이메일 포함)
       const email = variables.email;
       const role = determineRole(email);
 
@@ -54,9 +54,9 @@ export function useEmailLogin() {
         name: data.name,
         email,
         role,
+        joinedAt: data.joinedAt,
       });
 
-      // 관리자면 admin 대시보드로, 일반 사용자는 홈으로
       navigate(role === "ADMIN" ? "/admin" : "/");
     },
   });

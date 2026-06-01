@@ -19,6 +19,9 @@ export async function mockSocialLogin(
   return {
     userId: 1,
     name: `${req.provider}_TestUser`,
+    email: `${req.provider}_user@example.com`,
+    role: "USER",
+    joinedAt: "2025-01-15T00:00:00",
     isNewUser: false,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
@@ -43,6 +46,9 @@ export async function mockEmailLogin(
   return {
     userId: 1,
     name: req.email.split("@")[0],
+    email: req.email,
+    role: "USER",
+    joinedAt: "2025-01-15T00:00:00",
     isNewUser: false,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,

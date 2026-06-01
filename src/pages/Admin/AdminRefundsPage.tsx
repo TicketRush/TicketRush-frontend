@@ -1,15 +1,11 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RotateCcw, CheckCircle, ArrowLeft } from "lucide-react";
-import {
-  useAdminBookings,
-  useAdminBookingStats,
-} from "@/hooks/admin/useAdmin";
+import { useAdminBookings, useAdminBookingStats } from "@/hooks/admin/useAdmin";
 
 export default function AdminRefundsPage() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(0);
+  const [page] = useState(0);
 
   const { data, isLoading } = useAdminBookings({
     page,
@@ -59,10 +55,7 @@ export default function AdminRefundsPage() {
               TOTAL
             </span>
           </div>
-          <p
-            className="text-3xl font-bold mb-1"
-            style={{ color: "#FB2C36" }}
-          >
+          <p className="text-3xl font-bold mb-1" style={{ color: "#FB2C36" }}>
             {totalRefunds}
           </p>
           <p className="text-xs text-admin-text-secondary">전체 환불</p>
@@ -83,10 +76,7 @@ export default function AdminRefundsPage() {
               COMPLETED
             </span>
           </div>
-          <p
-            className="text-3xl font-bold mb-1"
-            style={{ color: "#00C950" }}
-          >
+          <p className="text-3xl font-bold mb-1" style={{ color: "#00C950" }}>
             {completedRefunds}
           </p>
           <p className="text-xs text-admin-text-secondary">완료된 환불</p>
@@ -94,7 +84,7 @@ export default function AdminRefundsPage() {
       </div>
 
       {/* 환불 테이블 */}
-<div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
+      <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
         <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
           ORDERS LIST
         </span>

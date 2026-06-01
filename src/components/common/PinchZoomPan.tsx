@@ -59,13 +59,6 @@ export default function PinchZoomPan({
     moved: 0, // 누적 이동량 (클릭/드래그 판별용)
   });
 
-  // 핀치(터치 2지점) 상태
-  const pinchState = useRef({
-    active: false,
-    startDist: 0,
-    startScale: 1,
-  });
-
   // ── 휠 줌 (마우스 포인터 기준 focal zoom)
   const handleWheel = useCallback(
     (e: WheelEvent<HTMLDivElement>) => {

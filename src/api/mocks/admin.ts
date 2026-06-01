@@ -1,7 +1,12 @@
 // Mock 관리자 데이터
 import { mockDelay, mockError } from "./_helpers";
 import { MOCK_CONCERTS } from "./concerts";
-import { _findMockBookingBySeat } from "./bookings";import type {
+import {
+  _findMockBookingBySeat,
+  _findMockBooking,
+  _updateMockBookingStatus,
+} from "./bookings";
+import type {
   AdminDashboardStats,
   DailyRevenue,
   GenreRevenue,
@@ -232,7 +237,10 @@ export async function mockAdminRefundBooking(
 
 // ── 좌석 모니터링 ─────────────────────────────────────
 // 사용자 mock seats.ts와 동일 패턴 — 별도 함수로 구현
-export async function mockGetAdminSeatMonitoring(performanceId: number): Promise<{
+// price: 행이 앞일수록 비쌈 (사용자 좌석맵과 동일 로직: 50000 + rowIdx * 10000)
+export async function mockGetAdminSeatMonitoring(
+  _performanceId: number,
+): Promise<{
   stats: AdminSeatStats;
   seats: Array<{
     id: number;
@@ -241,6 +249,7 @@ export async function mockGetAdminSeatMonitoring(performanceId: number): Promise
     row: string;
     col: number;
     status: import("@/types/domain/seat").SeatStatus;
+    price: number;
   }>;
 }> {
   await mockDelay(400);
@@ -248,12 +257,20 @@ export async function mockGetAdminSeatMonitoring(performanceId: number): Promise
   // 좌석 상태 mock (간단하게 새로 생성 - 실제로는 seats.ts와 공유)
   const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
   const COLS = 12;
-  const seats: any[] = [];
+  const seats: Array<{
+    id: number;
+    layoutId: number;
+    label: string;
+    row: string;
+    col: number;
+    status: import("@/types/domain/seat").SeatStatus;
+    price: number;
+  }> = [];
   let id = 1;
   let available = 0,
     sold = 0,
     holding = 0;
-  ROWS.forEach((row) => {
+  ROWS.forEach((row, rowIdx) => {
     for (let col = 1; col <= COLS; col++) {
       const r = Math.random();
       let status: import("@/types/domain/seat").SeatStatus = "AVAILABLE";
@@ -273,6 +290,7 @@ export async function mockGetAdminSeatMonitoring(performanceId: number): Promise
         row,
         col,
         status,
+        price: 50000 + rowIdx * 10000, // 앞열일수록 비쌈 (A:50000 ~ J:140000)
       });
       id++;
     }
@@ -336,8 +354,8 @@ export async function mockGetAdminSeatDetail(
 }
 
 export async function mockAdminReleaseSeat(
-  performanceId: number,
-  seatId: number,
+  _performanceId: number,
+  _seatId: number,
 ): Promise<void> {
   await mockDelay(300);
   // 강제 해제 — mock에선 noop
@@ -345,17 +363,17 @@ export async function mockAdminReleaseSeat(
 
 // ── 공연 CRUD ────────────────────────────────────────
 export async function mockCreateConcert(
-  data: ConcertFormData,
+  _data: ConcertFormData,
 ): Promise<{ id: number }> {
   await mockDelay(500);
   const newId = Math.max(...MOCK_CONCERTS.map((c) => c.id)) + 1;
-  // 실제로는 MOCK_CONCERTS에 push해야 함
+  // 실제로는 MOCK_CONCERTS에 push해야 함 (mock에선 ID만 반환)
   return { id: newId };
 }
 
 export async function mockUpdateConcert(
   id: number,
-  data: ConcertFormData,
+  _data: ConcertFormData,
 ): Promise<void> {
   await mockDelay(500);
   const concert = MOCK_CONCERTS.find((c) => c.id === id);
@@ -365,7 +383,7 @@ export async function mockUpdateConcert(
   // mock에선 noop
 }
 
-export async function mockDeleteConcert(id: number): Promise<void> {
+export async function mockDeleteConcert(_id: number): Promise<void> {
   await mockDelay(500);
   // mock에선 noop
 }

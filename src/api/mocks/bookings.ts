@@ -88,7 +88,6 @@ export async function mockCreateBooking(
   }
 
   // 좌석 정보 — mock seats와 같은 로직 (앞열일수록 비쌈)
-  const ROWS_CNT = 10;
   const COLS_CNT = 12;
   const seatId = req.seatId;
   const idx = seatId - 1;
