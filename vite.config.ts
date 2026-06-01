@@ -22,16 +22,20 @@ export default defineConfig({
     },
   },
   build: {
-    // 1031KB 청크가 1개로 묶여 경고가 떠서, 도메인별로 청크 분리.
-    // - admin: 관리자 영역(recharts 포함) 별도 청크
-    // - vendor-charts: recharts는 크기가 커서 단독 분리
-    // - vendor-react-query: tanstack 분리
+    // 1031KB 청크가 1개로 묶여 경고가 떠서, vendor 라이브러리를 별도 청크로 분리.
+    // manualChunks를 함수형으로 작성하면 타입 안전 + 유연한 매칭 가능.
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react-query": ["@tanstack/react-query"],
-          "vendor-charts": ["recharts"],
-          "vendor-qrcode": ["qrcode.react"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("recharts")) return "vendor-charts";
+            if (id.includes("@tanstack/react-query")) {
+              return "vendor-react-query";
+            }
+            if (id.includes("qrcode.react")) return "vendor-qrcode";
+            if (id.includes("html2canvas")) return "vendor-html2canvas";
+          }
+          return undefined;
         },
       },
     },
