@@ -57,7 +57,6 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   // 수정 모드: 기존 데이터 로드 후 form에 채우기
   // 기존 데이터가 있으면 초기값으로 설정
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (existingData) setForm(existingData);
   }, [existingData]);
