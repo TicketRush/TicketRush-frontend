@@ -8,7 +8,8 @@ export type PaymentStatus =
   | "CONFIRMING" // 백엔드 confirm 진행 중
   | "SUCCESS" // 성공
   | "FAILED" // 실패
-  | "EXPIRED"; // 타이머 만료
+  | "EXPIRED" // 타이머 만료
+  | "CANCELLED"; // 사용자가 명시적으로 취소
 
 export type PaymentMethod = "CARD" | "KAKAOPAY" | "NAVERPAY" | "TOSSPAY";
 
