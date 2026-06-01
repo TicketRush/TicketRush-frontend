@@ -19,7 +19,7 @@ export async function mockError(
   status = 400,
 ): Promise<never> {
   await mockDelay(delay);
-  // eslint-disable-next-line @typescript-eslint/no-throw-literal
+  // eslint-disable-next-line no-throw-literal
   throw {
     isSuccess: false,
     code,

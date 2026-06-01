@@ -34,7 +34,9 @@ export default function AdminSeatDetailPanel({
           <AlertCircle size={32} className="mx-auto mb-2" />
           <p className="text-sm">좌석을 선택하여</p>
           <p className="text-sm">상세 정보를 확인하세요</p>
-          <p className="text-[10px] mt-2 opacity-70">(예약 가능한 좌석은 선택 불가)</p>
+          <p className="text-[10px] mt-2 opacity-70">
+            (예약 가능한 좌석은 선택 불가)
+          </p>
         </div>
       </Panel>
     );
@@ -42,7 +44,9 @@ export default function AdminSeatDetailPanel({
 
   // 상태별 분기
   if (detail.status === "HOLD") {
-    return <HoldDetail detail={detail} onRelease={onRelease} />;
+    return (
+      <HoldDetail key={detail.seatId} detail={detail} onRelease={onRelease} />
+    );
   }
   if (detail.status === "SOLD") {
     return (
@@ -74,9 +78,6 @@ function HoldDetail({
   // 카운트다운 (mock의 holdRemainingSec를 실시간으로 줄임)
   const [remaining, setRemaining] = useState(detail.holdRemainingSec ?? 0);
   useEffect(() => {
-    setRemaining(detail.holdRemainingSec ?? 0);
-  }, [detail.holdRemainingSec, detail.seatId]);
-  useEffect(() => {
     if (remaining <= 0) return;
     const t = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
     return () => clearInterval(t);
@@ -91,7 +92,9 @@ function HoldDetail({
         <div className="inline-block bg-seat-holding text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
           {detail.seatLabel}
         </div>
-        <p className="text-xs text-admin-text-secondary">예약 진행중 (타이머)</p>
+        <p className="text-xs text-admin-text-secondary">
+          예약 진행중 (타이머)
+        </p>
       </div>
 
       {/* 타이머 박스 */}
@@ -106,10 +109,7 @@ function HoldDetail({
       </div>
 
       <Field label="예약자" value={detail.reservedBy ?? "-"} />
-      <Field
-        label="예약 시간"
-        value={detail.reservedAt ?? "-"}
-      />
+      <Field label="예약 시간" value={detail.reservedAt ?? "-"} />
 
       <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2 mt-4">
         관리자 작업

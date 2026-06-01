@@ -19,10 +19,7 @@ import GenrePieChart from "@/components/admin/GenrePieChart";
 import SalesChart from "@/components/admin/SalesChart";
 import AdminConcertTable from "@/components/admin/AdminConcertTable";
 import AdminCalendar from "@/components/admin/AdminCalendar";
-import {
-  useAdminDashboard,
-  useDeleteConcert,
-} from "@/hooks/admin/useAdmin";
+import { useAdminDashboard, useDeleteConcert } from "@/hooks/admin/useAdmin";
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
@@ -30,17 +27,22 @@ export default function AdminDashboardPage() {
   const deleteMutation = useDeleteConcert();
 
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
-const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date }>(() => {
-  const today = new Date();
-  return { start: today, end: today };
-});
+  const [selectedRange, setSelectedRange] = useState<{
+    start: Date;
+    end: Date;
+  }>(() => {
+    const today = new Date();
+    return { start: today, end: today };
+  });
 
   const filteredRevenue = useMemo(() => {
-  if (!data) return [];
-  const startStr = selectedRange.start.toISOString().split("T")[0];
-  const endStr = selectedRange.end.toISOString().split("T")[0];
-  return data.dailyRevenue.filter((d) => d.date >= startStr && d.date <= endStr);
-}, [data, selectedRange]);
+    if (!data) return [];
+    const startStr = selectedRange.start.toISOString().split("T")[0];
+    const endStr = selectedRange.end.toISOString().split("T")[0];
+    return data.dailyRevenue.filter(
+      (d) => d.date >= startStr && d.date <= endStr,
+    );
+  }, [data, selectedRange]);
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
@@ -48,8 +50,10 @@ const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date }>((
       await deleteMutation.mutateAsync(deleteTarget);
       toast.success("공연이 삭제되었습니다.");
       setDeleteTarget(null);
-    } catch (err: any) {
-      toast.error(err?.message ?? "삭제에 실패했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("삭제에 실패했습니다.");
+      toast.error(err.message);
     }
   }
 
@@ -82,7 +86,9 @@ const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date }>((
             ADMIN MODE
           </span>
           <h1 className="text-3xl font-bold mt-2">관리자 대시보드</h1>
-          <p className="text-sm text-admin-text-secondary mt-1">공연 현황 및 통계</p>
+          <p className="text-sm text-admin-text-secondary mt-1">
+            공연 현황 및 통계
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -162,9 +168,9 @@ const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date }>((
       {/* 달력 + 매출 차트 */}
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
         <AdminCalendar
-  selectedRange={selectedRange}
-  onRangeChange={setSelectedRange}
-/>
+          selectedRange={selectedRange}
+          onRangeChange={setSelectedRange}
+        />
         <RevenueChart data={filteredRevenue} />
       </div>
 
@@ -175,11 +181,13 @@ const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date }>((
       <SalesChart data={data.concertSales} />
 
       {/* 전체 공연 목록 */}
-<div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
+      <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
         <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
           EVENTS LIST
         </span>
-  <h3 className="text-base font-bold mb-4 text-gray-900">전체 공연 목록</h3>
+        <h3 className="text-base font-bold mb-4 text-gray-900">
+          전체 공연 목록
+        </h3>
         <AdminConcertTable
           data={data.concertList}
           onEdit={(id) => navigate(`/admin/concerts/${id}/edit`)}

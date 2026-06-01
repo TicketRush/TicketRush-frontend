@@ -45,8 +45,10 @@ export default function AdminBookingsPage() {
       await refundMutation.mutateAsync(refundTarget);
       toast.success("환불 처리가 완료되었습니다.");
       setRefundTarget(null);
-    } catch (err: any) {
-      toast.error(err?.message ?? "환불 처리에 실패했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("환불 처리에 실패했습니다.");
+      toast.error(err.message);
     }
   }
 
@@ -126,7 +128,7 @@ export default function AdminBookingsPage() {
       </div>
 
       {/* 테이블 */}
-<div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
+      <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
         <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
           ORDERS LIST
         </span>

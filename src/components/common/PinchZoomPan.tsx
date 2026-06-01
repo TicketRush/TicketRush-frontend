@@ -48,6 +48,7 @@ export default function PinchZoomPan({
 }: PropsWithChildren<PinchZoomPanProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>(INITIAL);
+  const [isDragging, setIsDragging] = useState(false);
 
   // 드래그(팬) 상태는 ref로 — 리렌더 없이 추적
   const dragState = useRef({
@@ -101,6 +102,7 @@ export default function PinchZoomPan({
         originY: transform.y,
         moved: 0,
       };
+      setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     },
     [transform.x, transform.y],
@@ -124,6 +126,7 @@ export default function PinchZoomPan({
   const handlePointerUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
     const d = dragState.current;
     d.active = false;
+    setIsDragging(false);
 
     // 드래그 거리가 임계값 미만이면 클릭으로 간주 → 막지 않음(자식이 처리)
     // 임계값 이상이면 팬이었으므로 클릭 전파를 막아 좌석 오선택 방지
@@ -181,9 +184,7 @@ export default function PinchZoomPan({
           transformOrigin: "0 0",
           width: "fit-content",
           // 드래그 중 부드러움, 그 외엔 즉시
-          transition: dragState.current.active
-            ? "none"
-            : "transform 0.08s ease-out",
+          transition: isDragging ? "none" : "transform 0.08s ease-out",
         }}
       >
         {children}

@@ -1,4 +1,3 @@
-
 import {
   LineChart,
   Line,
@@ -15,7 +14,14 @@ interface RevenueChartProps {
   data: DailyRevenue[];
 }
 
-function CustomTooltip({ active, payload }: any) {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: { fullDate: string; revenue: number; tickets: number };
+  }>;
+}
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
   const data = payload[0].payload;
   return (

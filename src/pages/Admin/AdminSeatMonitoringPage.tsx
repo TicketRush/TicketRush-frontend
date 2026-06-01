@@ -1,13 +1,6 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Users,
-  Square,
-  Clock,
-  ArrowLeft,
-  RefreshCcw,
-} from "lucide-react";
+import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { toast } from "react-toastify";
 import StatCard from "@/components/admin/StatCard";
 import AdminSeatMap from "@/components/admin/AdminSeatMap";
@@ -54,8 +47,10 @@ export default function AdminSeatMonitoringPage() {
       await releaseMutation.mutateAsync(seatId);
       toast.success("예약이 해제되었습니다.");
       setSelectedSeatId(null);
-    } catch (err: any) {
-      toast.error(err?.message ?? "예약 해제에 실패했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("예약 해제에 실패했습니다.");
+      toast.error(err.message);
     }
   }
 
@@ -79,7 +74,9 @@ export default function AdminSeatMonitoringPage() {
             <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
               SEAT MONITORING
             </span>
-            <h1 className="text-3xl font-bold mt-2">좌석 현황 실시간 모니터링</h1>
+            <h1 className="text-3xl font-bold mt-2">
+              좌석 현황 실시간 모니터링
+            </h1>
             <p className="text-sm text-admin-text-secondary mt-1">
               공연별 좌석 상태를 실시간으로 확인하고 관리합니다
             </p>
@@ -94,11 +91,13 @@ export default function AdminSeatMonitoringPage() {
         </div>
 
         {/* 공연 목록 테이블 */}
-<div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
+        <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
           <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
             EVENT LISTS
           </span>
-  <h3 className="text-base font-bold mb-4 text-gray-900">전체 공연 목록</h3>
+          <h3 className="text-base font-bold mb-4 text-gray-900">
+            전체 공연 목록
+          </h3>
 
           {concertList.length === 0 ? (
             <div className="text-center py-12 text-admin-text-secondary">
@@ -214,7 +213,10 @@ export default function AdminSeatMonitoringPage() {
             disabled={isFetching}
             className="px-4 py-2 rounded-lg bg-primary text-white font-semibold flex items-center gap-2 disabled:opacity-50"
           >
-            <RefreshCcw size={14} className={isFetching ? "animate-spin" : ""} />
+            <RefreshCcw
+              size={14}
+              className={isFetching ? "animate-spin" : ""}
+            />
             새로고침
           </button>
         </div>
@@ -231,12 +233,7 @@ export default function AdminSeatMonitoringPage() {
         />
         <StatCard
           icon={
-            <Square
-              size={24}
-              fill="#B9F8CF"
-              stroke="#B9F8CF"
-              strokeWidth={0}
-            />
+            <Square size={24} fill="#B9F8CF" stroke="#B9F8CF" strokeWidth={0} />
           }
           badge="AVAILABLE"
           badgeColor="green"
@@ -245,12 +242,7 @@ export default function AdminSeatMonitoringPage() {
         />
         <StatCard
           icon={
-            <Square
-              size={24}
-              fill="#99A1AF"
-              stroke="#99A1AF"
-              strokeWidth={0}
-            />
+            <Square size={24} fill="#99A1AF" stroke="#99A1AF" strokeWidth={0} />
           }
           badge="SOLD"
           badgeColor="blue"
@@ -318,10 +310,7 @@ export default function AdminSeatMonitoringPage() {
 function LegendRow({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span
-        className="w-4 h-4 rounded"
-        style={{ backgroundColor: color }}
-      />
+      <span className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
       <span className="text-admin-text-secondary">{label}</span>
     </div>
   );

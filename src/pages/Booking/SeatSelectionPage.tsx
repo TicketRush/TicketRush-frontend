@@ -57,8 +57,10 @@ export default function SeatSelectionPage() {
       await holdSeatMutation.mutateAsync(selectedSeat.id);
       startTimer();
       navigate(`/concerts/${performanceId}/payment/confirm`);
-    } catch (err: any) {
-      toast.error(err?.message ?? "좌석 선점에 실패했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("좌석 선점에 실패했습니다.");
+      toast.error(err.message);
     }
   }
 

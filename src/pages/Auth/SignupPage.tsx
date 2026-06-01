@@ -79,8 +79,12 @@ export default function SignupPage() {
       trigger("isEmailVerified"); // 검증 즉시 재실행
       toast.success("이메일이 인증되었습니다.");
     },
-    onError: (err: any) => {
-      toast.error(err?.message ?? "인증번호가 일치하지 않습니다.");
+    onError: (error: unknown) => {
+      const err =
+        error instanceof Error
+          ? error
+          : new Error("인증번호가 일치하지 않습니다.");
+      toast.error(err.message);
     },
   });
 
@@ -97,11 +101,16 @@ export default function SignupPage() {
       navigate("/login");
     },
     onError: (error: unknown) => {
-      const err = error as { response?: { status?: number } };
-      if (err?.response?.status === 409) {
+      const maybeResp = (error as { response?: { status?: number } } | null)
+        ?.response;
+      if (maybeResp?.status === 409) {
         setError("email", { message: "이미 사용 중인 이메일입니다" });
       } else {
-        toast.error("회원가입에 실패했습니다.");
+        const err =
+          error instanceof Error
+            ? error
+            : new Error("회원가입에 실패했습니다.");
+        toast.error(err.message);
       }
     },
   });

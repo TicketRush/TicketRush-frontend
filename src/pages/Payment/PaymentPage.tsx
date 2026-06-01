@@ -107,8 +107,10 @@ export default function PaymentPage() {
       // mock 예매 번호 — 실제로는 백엔드 응답
       const bookingNumber = "X7B29-KLPW1";
       navigate(`/reservations/${bookingNumber}`);
-    } catch (err: any) {
-      fail(err?.message ?? "결제에 실패했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("결제에 실패했습니다.");
+      fail(err.message);
     }
   }
 

@@ -30,11 +30,7 @@ export default function BannerSlider() {
   }, [isPaused, totalSlides]);
 
   // 슬라이드 수가 바뀌었을 때 인덱스 초과 방지
-  useEffect(() => {
-    if (currentIndex >= totalSlides && totalSlides > 0) {
-      setCurrentIndex(0);
-    }
-  }, [currentIndex, totalSlides]);
+  const safeIndex = totalSlides > 0 ? currentIndex % totalSlides : 0;
 
   if (isLoading) {
     return (
@@ -46,7 +42,7 @@ export default function BannerSlider() {
     return null;
   }
 
-  const current = banners[currentIndex];
+  const current = banners[safeIndex];
   const gradient = GRADIENTS[currentIndex % GRADIENTS.length];
   const isClickable = !!current.linkConcertId;
 

@@ -56,6 +56,8 @@ export default function AdminConcertFormPage({ mode }: Props) {
   const [form, setForm] = useState<ConcertFormData>(INITIAL_FORM);
 
   // 수정 모드: 기존 데이터 로드 후 form에 채우기
+  // 기존 데이터가 있으면 초기값으로 설정
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (existingData) setForm(existingData);
   }, [existingData]);
@@ -87,8 +89,10 @@ export default function AdminConcertFormPage({ mode }: Props) {
         toast.success("공연이 수정되었습니다.");
       }
       navigate("/admin");
-    } catch (err: any) {
-      toast.error(err?.message ?? "저장에 실패했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("저장에 실패했습니다.");
+      toast.error(err.message ?? "저장에 실패했습니다.");
     }
   }
 

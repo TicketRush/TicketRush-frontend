@@ -44,9 +44,13 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
               cx="50%"
               cy="50%"
               outerRadius={100}
-              label={({ genre, percentage }: any) =>
-                `${genre} ${percentage.toFixed(0)}%`
-              }
+              label={({
+                genre,
+                percentage,
+              }: {
+                genre: string;
+                percentage: number;
+              }) => `${genre} ${percentage.toFixed(0)}%`}
               labelLine={false}
             >
               {data.map((entry, idx) => (
@@ -60,12 +64,10 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
                 backgroundColor: "white",
                 border: "1px solid #E5E7EB",
               }}
-              formatter={
-                ((value: number) => [
-                  `₩${value.toLocaleString()}`,
-                  "매출",
-                ]) as any
-              }
+              formatter={(value: number) => [
+                `₩${value.toLocaleString()}`,
+                "매출",
+              ]}
             />
           </PieChart>
         </ResponsiveContainer>
