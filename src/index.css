@@ -5,17 +5,11 @@
 /* ── 글로벌 리셋 ── */
 
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  font-family:
-    "Pretendard",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
+  @apply font-pretendard;
   color: #2d3436;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -27,4 +21,60 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 전체 사이트 0.7배율 적용 */
+/* html {
+  width: 142.857%;
+  height: 142.857%;
+} */
+
+html {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* body {
+  transform: scale(0.7);
+  transform-origin: top left;
+} */
+
+body {
+  width: 100%;
+  margin: 0 auto;
+  transform: scale(0.7);
+  transform-origin: top center;
+}
+
+.admin-table {
+  border: 2px solid #D0D0D0;
+  border-collapse: collapse;
+}
+
+.admin-table thead {
+  background-color: #F3F4F6;
+}
+
+.admin-table th {
+  border: 1px solid #D0D0D0;
+  color: #1F2937;
+  font-weight: 600;
+}
+
+.admin-table tbody tr:nth-child(odd) {
+  background-color: #FFFFFF;
+}
+
+.admin-table tbody tr:nth-child(even) {
+  background-color: #F9FAFB;
+}
+
+.admin-table tbody td {
+  border: 1px solid #D0D0D0;
+  color: #1F2937;
+}
+
+.admin-table tbody tr:hover {
+  background-color: #EEF2FF;
 }

@@ -1,11 +1,17 @@
-// stores/authStore.tsx
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 
 // HttpOnly Cookie 사용 시 수정
 interface AuthState {
   accessToken: string | null;
-  user: { name: string; email: string; role: string } | null;
+  user: {
+    userId: number;
+    name: string;
+    email: string;
+    role: string;
+    /** 회원 가입일 (ISO 8601) — 로그인 응답에 포함 */
+    joinedAt: string;
+  } | null;
   setAuth: (token: string, user: AuthState["user"]) => void;
   logout: () => void;
 }
