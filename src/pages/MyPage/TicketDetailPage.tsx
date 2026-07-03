@@ -21,6 +21,9 @@ const COLS_CNT = 12;
 const LONG_PRESS_MS = 500;
 const TOOLTIP_AUTO_HIDE_MS = 3000;
 
+// 팝오버 열린 직후 이 시간 동안은 배경 클릭 무시 (즉시 닫힘 방지)
+const POPOVER_CLICK_GUARD_MS = 200;
+
 export default function TicketDetailPage() {
   const { bookingNumber } = useParams<{ bookingNumber: string }>();
   const navigate = useNavigate();
@@ -161,9 +164,9 @@ export default function TicketDetailPage() {
                 </div>
                 <p className="text-sm font-bold truncate">{data.seatNumber}</p>
 
-                {/* 진입 시 안내 툴팁 */}
+                {/* 진입 시 안내 툴팁 — 좌석 박스 아래로 배치 (body transform으로 위쪽 좌표 밀림 대응) */}
                 {showTooltip && (
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full bg-primary text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap z-10 flex items-center gap-1">
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-primary text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap z-10 flex items-center gap-1">
                     <span>좌석을 길게 눌러 위치를 확인하세요</span>
                     <button
                       type="button"
@@ -278,6 +281,9 @@ export default function TicketDetailPage() {
 
 // ─────────────────────────────────────────────────────
 // 좌석 맵 팝오버 — 10행 × 12열 격자에서 본인 좌석 강조
+//
+// #92 fix: long-press 후 마우스 up 시 배경 클릭으로 팝오버가 즉시 닫히던 문제 수정.
+//   → 팝오버 마운트 후 POPOVER_CLICK_GUARD_MS(200ms) 동안은 배경 클릭 무시
 // ─────────────────────────────────────────────────────
 function SeatMapPopover({
   seatLabel,
@@ -290,10 +296,24 @@ function SeatMapPopover({
   const [rowChar, colStr] = seatLabel.split("-");
   const targetCol = Number(colStr);
 
+  // 마운트 직후 잠깐 배경 클릭 무시 → 팝오버 열자마자 pointerup으로 닫히는 문제 방지
+  const [canClose, setCanClose] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => setCanClose(true),
+      POPOVER_CLICK_GUARD_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, []);
+
+  function handleBackgroundClick() {
+    if (canClose) onClose();
+  }
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4"
-      onClick={onClose}
+      onClick={handleBackgroundClick}
     >
       <div
         className="bg-white rounded-2xl max-w-sm w-full p-5"
