@@ -1,5 +1,15 @@
 // 관리자 도메인 타입
-// 가상 스펙 — 백엔드 admin API swagger 확정 시 정렬 필요
+//
+// ⚠️ 관리자 API는 백엔드 미구현 상태 (2026-06-30 기준)
+// USE_MOCK = true 유지. 백엔드 완성 시 순차 교체.
+//
+// 이번 리팩터링에서는 다른 도메인(concert, seat, booking)의 필드명 변경에 맞춰
+// import 및 필드명만 정렬. mock 데이터 구조는 유지.
+//
+// 주요 변경:
+//   - AdminBookingItem.seatLabels → seatNumbers (seat 도메인 필드명 정렬)
+//   - AdminSeatDetail.seatLabel → seatNumber
+//   - ConcertFormData.artist → performer, duration → durationMinutes 등
 
 import type { Genre, ConcertStatus, ConcertFacility } from "./concert";
 import type { BookingStatus } from "./booking";
@@ -72,8 +82,8 @@ export interface AdminBookingItem {
   bookedAt: string;
   userName: string;
   userEmail: string;
-  /** 좌석 라벨 배열 (사용자는 1인 1석이지만 관리자 표시는 배열로 일반화) */
-  seatLabels: string[];
+  /** 좌석 번호 배열 (사용자는 1인 1석이지만 관리자 표시는 배열로 일반화) */
+  seatNumbers: string[];
   seatCount: number;
   unitPrice: number;
   totalAmount: number;
@@ -111,7 +121,7 @@ export interface AdminSeatStats {
 
 export interface AdminSeatDetail {
   seatId: number;
-  seatLabel: string;
+  seatNumber: string;
   status: SeatStatus;
   /** SOLD or HOLD 상태일 때만 존재 */
   reservedBy?: string;
@@ -122,18 +132,27 @@ export interface AdminSeatDetail {
 }
 
 // ── 공연 등록/수정 ────────────────────────────────────
+/**
+ * 관리자 공연 등록/수정 폼 데이터.
+ *
+ * 사용자 영역의 ConcertDetail과 필드명 정렬:
+ *   - artist → performer
+ *   - duration → durationMinutes
+ *   - posterUrl → imageMainUrl
+ */
 export interface ConcertFormData {
   title: string;
-  artist: string;
+  performer: string;
   genre: Genre;
   venue: string;
   address: string;
   date: string;
   time: string;
   price: number;
-  duration: number;
+  /** 공연 시간 (분) */
+  durationMinutes: number;
   description: string;
-  posterUrl: string;
+  imageMainUrl: string;
   facilities: ConcertFacility[];
   notices: string[];
 }
