@@ -1,3 +1,14 @@
+// 공연 카드
+//
+// 백엔드 스펙 반영 변경:
+//   - concert.artist → concert.performer
+//   - concert.date → concert.showDate
+//   - concert.time → concert.showTime
+//   - concert.posterUrl → concert.imageMainUrl
+//   - concert.remainingSeats optional 처리 (?? 0 fallback)
+//
+// ⚠️ remainingSeats는 백엔드 응답에 없음 (별도 API).
+// 실 API 연동 시 useSeatCounts 훅으로 조회한 값을 상위에서 주입하도록 리팩터링 예정.
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Calendar } from "lucide-react";
@@ -12,17 +23,18 @@ interface ConcertCardProps {
 
 function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
-  const isSoldOut =
-    concert.status === "SOLD_OUT" || concert.remainingSeats === 0;
+
+  // remainingSeats optional 처리 — 없으면 0으로 fallback (매진 취급)
+  const remaining = concert.remainingSeats ?? 0;
+
+  const isSoldOut = concert.status === "SOLD_OUT" || remaining === 0;
   const remainingPercent =
-    concert.totalSeats > 0
-      ? (concert.remainingSeats / concert.totalSeats) * 100
-      : 0;
+    concert.totalSeats > 0 ? (remaining / concert.totalSeats) * 100 : 0;
   const isEndingSoon = !isSoldOut && remainingPercent <= 20;
 
   const formattedPrice = concert.price.toLocaleString("ko-KR");
 
-  const d = new Date(concert.date);
+  const d = new Date(concert.showDate);
   const formattedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   function handleClick() {
@@ -46,7 +58,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
         <img
-          src={concert.posterUrl || samplePoster}
+          src={concert.imageMainUrl || samplePoster}
           alt={`${concert.title} 포스터`}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
@@ -74,7 +86,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
         <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug min-h-[2.5rem]">
           {concert.title}
         </h3>
-        <p className="text-xs text-gray-500 truncate">{concert.artist}</p>
+        <p className="text-xs text-gray-500 truncate">{concert.performer}</p>
 
         <div className="space-y-1 text-xs text-gray-600">
           <p className="flex items-center gap-1.5 truncate">
@@ -84,7 +96,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="flex items-center gap-1.5">
             <Calendar size={14} className="shrink-0 text-gray-400" />
             <span>
-              {formattedDate} {concert.time}
+              {formattedDate} {concert.showTime}
             </span>
           </p>
         </div>
@@ -95,10 +107,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        <SeatGauge
-          remaining={concert.remainingSeats}
-          total={concert.totalSeats}
-        />
+        <SeatGauge remaining={remaining} total={concert.totalSeats} />
 
         <button
           type="button"

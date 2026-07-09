@@ -1,6 +1,12 @@
 // 공연 등록/수정 — 라우트로 mode 구분
 // /admin/concerts/new → 등록
 // /admin/concerts/:id/edit → 수정
+//
+// 백엔드 스펙 반영 변경 (admin ConcertFormData 정렬):
+//   - artist → performer (라벨: 아티스트 → 출연진)
+//   - duration → durationMinutes
+//   - posterUrl → imageMainUrl (라벨: 포스터 URL → 메인 이미지 URL)
+//   - date, time은 admin 도메인 관점 유지 (백엔드 미구현)
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,16 +32,16 @@ const GENRES: { value: Genre; label: string }[] = [
 
 const INITIAL_FORM: ConcertFormData = {
   title: "",
-  artist: "",
+  performer: "", // ← artist → performer
   genre: "CONCERT",
   venue: "",
   address: "",
-  date: "",
-  time: "19:00",
+  date: "", // admin 도메인은 date 유지
+  time: "19:00", // admin 도메인은 time 유지
   price: 50000,
-  duration: 120,
+  durationMinutes: 120, // ← duration → durationMinutes
   description: "",
-  posterUrl: "",
+  imageMainUrl: "", // ← posterUrl → imageMainUrl
   facilities: [],
   notices: [],
 };
@@ -56,7 +62,6 @@ export default function AdminConcertFormPage({ mode }: Props) {
   const [form, setForm] = useState<ConcertFormData>(INITIAL_FORM);
 
   // 수정 모드: 기존 데이터 로드 후 form에 채우기
-  // 기존 데이터가 있으면 초기값으로 설정
   useEffect(() => {
     if (existingData) setForm(existingData);
   }, [existingData]);
@@ -70,7 +75,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   async function handleSubmit() {
     // 간단 validation
-    if (!form.title.trim() || !form.artist.trim() || !form.venue.trim()) {
+    if (!form.title.trim() || !form.performer.trim() || !form.venue.trim()) {
       toast.error("필수 항목을 입력해주세요.");
       return;
     }
@@ -127,10 +132,10 @@ export default function AdminConcertFormPage({ mode }: Props) {
               placeholder="예: BTS World Tour"
             />
           </Field>
-          <Field label="아티스트 *">
+          <Field label="출연진 *">
             <FormInput
-              value={form.artist}
-              onChange={(v) => update("artist", v)}
+              value={form.performer}
+              onChange={(v) => update("performer", v)}
               placeholder="예: BTS"
             />
           </Field>
@@ -166,20 +171,20 @@ export default function AdminConcertFormPage({ mode }: Props) {
           <Field label="러닝 타임 (분)">
             <FormInput
               type="number"
-              value={String(form.duration)}
-              onChange={(v) => update("duration", Number(v))}
+              value={String(form.durationMinutes)}
+              onChange={(v) => update("durationMinutes", Number(v))}
             />
           </Field>
           <Field label="가격 (원) *">
             <FormInput
               type="number"
-              value={String(form.price)}
+              value={String(form)}
               onChange={(v) => update("price", Number(v))}
             />
           </Field>
         </Section>
 
-        {/* 우측: 장소 / 설명 / 포스터 */}
+        {/* 우측: 장소 / 설명 / 이미지 */}
         <Section title="장소 & 상세">
           <Field label="공연장 *">
             <FormInput
@@ -195,10 +200,10 @@ export default function AdminConcertFormPage({ mode }: Props) {
               placeholder="예: 서울특별시 송파구 ..."
             />
           </Field>
-          <Field label="포스터 URL">
+          <Field label="메인 이미지 URL">
             <FormInput
-              value={form.posterUrl}
-              onChange={(v) => update("posterUrl", v)}
+              value={form.imageMainUrl}
+              onChange={(v) => update("imageMainUrl", v)}
               placeholder="https://..."
             />
           </Field>

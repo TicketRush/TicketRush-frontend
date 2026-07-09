@@ -55,7 +55,7 @@ export default function TicketDetailPage() {
   // QR 페이로드 — 티켓마다 고유. 백엔드 qrToken 응답 시 그걸 우선.
   const qrPayload = JSON.stringify({
     reservationId: data.bookingNumber,
-    seatLabel: data.seatLabel,
+    seatLabel: data.seatNumber,
     issuedAt: new Date().toISOString(),
   });
 
@@ -79,9 +79,9 @@ export default function TicketDetailPage() {
       <div className="bg-white border-2 border-border rounded-2xl overflow-hidden mb-6">
         {/* 포스터 영역 */}
         <div className="bg-primary/5 aspect-[5/2] flex items-center justify-center">
-          {data.performancePosterUrl ? (
+          {data.performanceImageMainUrl ? (
             <img
-              src={data.performancePosterUrl}
+              src={data.performanceImageMainUrl}
               alt={data.performanceTitle}
               className="w-full h-full object-cover"
             />
@@ -116,7 +116,7 @@ export default function TicketDetailPage() {
             <InfoBox
               icon={<TicketIcon size={14} />}
               label="좌석"
-              value={data.seatLabel}
+              value={data.seatNumber}
             />
           </div>
 

@@ -3,10 +3,10 @@
 // 백엔드 seat-service swagger (2026-06-30) 스펙 반영
 //
 // 주요 변경:
-//   - Seat.label → seatNumber (백엔드 필드명)
+//   - Seat.seatNumber → seatNumber (백엔드 필드명)
 //   - Seat.row/col → 유지 (프론트에서 좌석맵 렌더링 시 필요, 백엔드 응답의 seatNumber에서 파생)
-//   - Seat.layoutId → seatLayoutId (백엔드 필드명)
-//   - Seat.price → 삭제 (공연 단위 가격 사용)
+//   - Seat.seatLayoutId → seatLayoutId (백엔드 필드명)
+//   - Seat → 삭제 (공연 단위 가격 사용)
 //   - SeatAvailability → SeatCounts로 이름 변경 + 필드 확장 (holdCount, soldCount 추가)
 //   - SeatHoldResponse → 삭제 (백엔드에 별도 HOLD API 없음. 예매 생성이 좌석 HOLD를 겸함 — booking.ts 참고)
 

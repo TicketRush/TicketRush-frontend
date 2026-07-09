@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
+import type { UserRole } from "@/types/domain/auth";
 
 // HttpOnly Cookie 사용 시 수정
 interface AuthState {
@@ -8,7 +9,8 @@ interface AuthState {
     userId: number;
     name: string;
     email: string;
-    role: string;
+    /** 사용자 역할 — 백엔드 응답 그대로. UserRole 타입으로 좁혀 실수 방지 */
+    role: UserRole;
     /** 회원 가입일 (ISO 8601) — 로그인 응답에 포함 */
     joinedAt: string;
   } | null;

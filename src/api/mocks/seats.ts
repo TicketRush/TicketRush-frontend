@@ -3,9 +3,9 @@
 // 백엔드 seat-service swagger (2026-06-30) 스펙 반영.
 //
 // 주요 변경:
-//   - Seat.label → seatNumber (백엔드 필드명)
-//   - Seat.layoutId → seatLayoutId
-//   - Seat.price 제거 (백엔드 스펙엔 좌석 단위 가격 없음. 공연 단위 가격만 사용)
+//   - Seat.seatNumber → seatNumber (백엔드 필드명)
+//   - Seat.seatLayoutId → seatLayoutId
+//   - Seat 제거 (백엔드 스펙엔 좌석 단위 가격 없음. 공연 단위 가격만 사용)
 //   - SeatAvailability → SeatCounts로 이름 변경 + 확장 (holdCount, soldCount 추가)
 //   - SeatHoldResponse 관련 mock 유지 (실 API 연동 시 예매 생성으로 대체 예정)
 //
@@ -185,7 +185,10 @@ export async function mockConfirmSold(
 // ── SSE 시뮬레이터 ─────────────────────────────────────
 type Listener = (event: SeatUpdateEvent) => void;
 const listeners: Map<number, Set<Listener>> = new Map();
-const intervalByPerformance: Map<number, NodeJS.Timeout> = new Map();
+const intervalByPerformance: Map<
+  number,
+  ReturnType<typeof setInterval>
+> = new Map();
 
 function notifyListeners(performanceId: number, event: SeatUpdateEvent) {
   listeners.get(performanceId)?.forEach((l) => l(event));

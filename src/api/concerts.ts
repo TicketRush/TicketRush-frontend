@@ -1,4 +1,14 @@
-// 공연 API — 가상 스펙 (백엔드 performance-service swagger 확정 대기)
+// 공연 API — 백엔드 performance-service swagger (2026-06-30) 스펙 반영
+//
+// 백엔드 endpoint 매핑:
+//   fetchConcerts       → GET /api/v1/performance
+//   fetchConcertDetail  → GET /api/v1/performance/{id}
+//
+// 주의:
+//   - 프론트 관점의 "concert" 도메인은 백엔드 "performance" 서비스와 매핑됨.
+//     파일명/타입명은 프론트 관점 유지 (변경 부담 최소화).
+//   - remainingSeats는 백엔드 응답에 없음. 실 API 연동 시 useSeatCounts로 별도 조회.
+//     mock은 편의상 필드 유지 (optional).
 
 import type {
   ConcertDetail,
@@ -36,7 +46,7 @@ export async function fetchConcerts(
       filtered = filtered.filter(
         (c) =>
           c.title.toLowerCase().includes(kw) ||
-          c.artist.toLowerCase().includes(kw),
+          c.performer.toLowerCase().includes(kw),
       );
     }
 
@@ -47,10 +57,12 @@ export async function fetchConcerts(
       filtered.sort((a, b) => b.price - a.price);
     } else if (params.sort === "POPULAR") {
       // 잔여석 비율이 낮을수록 인기
-      filtered.sort(
-        (a, b) =>
-          a.remainingSeats / a.totalSeats - b.remainingSeats / b.totalSeats,
-      );
+      // remainingSeats가 optional이 됐으므로 nullish coalescing으로 안전 처리
+      filtered.sort((a, b) => {
+        const remA = a.remainingSeats ?? a.totalSeats;
+        const remB = b.remainingSeats ?? b.totalSeats;
+        return remA / a.totalSeats - remB / b.totalSeats;
+      });
     }
     // LATEST는 기본 순서 유지
 
@@ -69,7 +81,7 @@ export async function fetchConcerts(
     };
   }
 
-  // 실 API (가상 엔드포인트)
+  // 실 API — GET /api/v1/performance
   // const res = await apiClient.get<ConcertListResponse>("/api/v1/performance", { params });
   // return res.data;
   throw new Error("Real API not implemented");

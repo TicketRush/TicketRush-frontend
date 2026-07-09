@@ -1,15 +1,18 @@
 // Mock 관리자 데이터
 //
-// ⚠️ 관리자 API는 백엔드 미구현 상태 (2026-06-30 기준).
-// USE_MOCK = true 유지. 백엔드 완성 시 순차 교체.
+// NOTE: 관리자(백오피스) mock은 현재 백엔드 미구현 상태이므로 관리 편의성
+// 차원에서 `date` + `time` 폼 필드를 유지합니다. 퍼블릭 도메인(사용자)
+// 필드(`showDate`/`showTime`)와 네이밍이 다른 것은 의도적이며, 실제 API
+// 연동 시에는 폼 값을 변환하여 전송하도록 어댑터를 적용할 예정입니다.
 //
-// 이번 리팩터링에서는 다른 도메인(concert, seat, booking) 필드명 변경에 맞춰 정렬만.
+// 이번 리팩터링에서는 다른 도메인(concert, seat, booking)의 필드명
+// 변경을 반영해 내부 참조와 타입을 정리했습니다. mock 데이터 구조의
+// 일부 필드명(date/time 등)은 admin 용도에서 의도적으로 보존됩니다.
 //
-// 주요 변경:
-//   - MOCK_CONCERTS 참조: c.artist → c.performer, c.date → c.showDate, c.time → c.showTime
-//   - AdminBookingItem.seatLabels → seatNumbers
-//   - AdminSeatDetail.seatLabel → seatNumber
-//   - ConcertFormData 반환값 필드명 정렬
+// 변경 요약:
+//   - AdminBookingItem.seatNumbers → seatNumbers
+//   - AdminSeatDetail.seatNumber → seatNumber
+//   - ConcertFormData 반환값 필드명 정렬 (artist → performer 등)
 
 import { mockDelay, mockError } from "./_helpers";
 import { MOCK_CONCERTS } from "./concerts";
@@ -110,7 +113,7 @@ export async function mockGetAdminDashboard() {
       concertId: c.id,
       title: c.title,
       genre: c.genre,
-      date: c.showDate, // ← 변경
+      date: c.showDate,
       soldSeats: sold,
       totalSeats: c.totalSeats,
       occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
@@ -126,7 +129,7 @@ export async function mockGetAdminDashboard() {
       id: c.id,
       title: c.title,
       genre: c.genre,
-      date: c.showDate, // ← 변경
+      date: c.showDate,
       soldSeats: sold,
       totalSeats: c.totalSeats,
       occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
@@ -162,11 +165,11 @@ const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
     items.push({
       bookingNumber: `X${7000 + i}-KLPW${i % 10}`,
       concertTitle: concert.title,
-      concertDate: `${concert.showDate} ${concert.showTime}`, // ← 변경
+      concertDate: `${concert.showDate} ${concert.showTime}`,
       bookedAt: new Date(Date.now() - i * 3600 * 1000).toISOString(),
       userName: user.name,
       userEmail: user.email,
-      seatNumbers: [seatNumber], // ← 변경 (seatLabels → seatNumbers)
+      seatNumbers: [seatNumber],
       seatCount: 1,
       unitPrice: concert.price,
       totalAmount: concert.price,
@@ -406,16 +409,16 @@ export async function mockGetConcertForEdit(
   }
   return {
     title: concert!.title,
-    performer: concert!.performer, // ← 변경
+    performer: concert!.performer,
     genre: concert!.genre,
     venue: concert!.venue,
     address: concert!.address,
-    date: concert!.showDate, // ← 변경
-    time: concert!.showTime, // ← 변경
+    date: concert!.showDate,
+    time: concert!.showTime,
     price: concert!.price,
-    durationMinutes: 120, // ← 변경 (duration → durationMinutes)
+    durationMinutes: 120,
     description: "공연 설명...",
-    imageMainUrl: concert!.imageMainUrl, // ← 변경 (posterUrl → imageMainUrl)
+    imageMainUrl: concert!.imageMainUrl,
     facilities: [],
     notices: [],
   };

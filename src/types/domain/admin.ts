@@ -1,15 +1,18 @@
 // 관리자 도메인 타입
 //
-// ⚠️ 관리자 API는 백엔드 미구현 상태 (2026-06-30 기준)
-// USE_MOCK = true 유지. 백엔드 완성 시 순차 교체.
+// NOTE: 관리자(UI/백오피스)는 프론트엔드 입력 편의성 때문에 `date` + `time`
+// 조합 형태를 폼으로 유지하고 있습니다. 사용자 영역(퍼블릭)의 도메인
+// 필드(`showDate`/`showTime`)와 내부 표현이 다르므로, 백엔드가 확정되면
+// 폼 값은 전송시 변환(adapter)을 통해 `showDate`/`showTime`로 매핑됩니다.
 //
-// 이번 리팩터링에서는 다른 도메인(concert, seat, booking)의 필드명 변경에 맞춰
-// import 및 필드명만 정렬. mock 데이터 구조는 유지.
+// 관리자 API(및 mock 데이터)는 2026-06-30 기준 백엔드 미구현이므로
+// `USE_MOCK = true` 상태입니다. 이 파일의 타입·주석은 현재 상태를
+// 명확히 설명하기 위해 정리되어 있으며, 필드 네이밍 차이는 의도적입니다.
 //
-// 주요 변경:
-//   - AdminBookingItem.seatLabels → seatNumbers (seat 도메인 필드명 정렬)
-//   - AdminSeatDetail.seatLabel → seatNumber
-//   - ConcertFormData.artist → performer, duration → durationMinutes 등
+// 변경 요약(리팩터링 관련):
+//   - AdminBookingItem: seatNumbers 배열로 표준화
+//   - AdminSeatDetail: seatNumber 필드 정렬
+//   - ConcertFormData: artist → performer, duration → durationMinutes
 
 import type { Genre, ConcertStatus, ConcertFacility } from "./concert";
 import type { BookingStatus } from "./booking";
