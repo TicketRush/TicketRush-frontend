@@ -21,7 +21,7 @@ import {
 } from "./mocks/seats";
 // import apiClient from "./instance";
 
-const USE_MOCK = true;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 /**
  * mock 전용 HOLD 응답 타입.

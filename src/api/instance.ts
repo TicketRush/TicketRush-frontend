@@ -39,7 +39,7 @@ declare module "axios" {
 }
 
 const rawClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "",
   timeout: 10_000,
   headers: {
     "Content-Type": "application/json",
