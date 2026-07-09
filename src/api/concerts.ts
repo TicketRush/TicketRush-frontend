@@ -85,17 +85,11 @@ export async function fetchConcerts(
     return buildMockConcertListResponse(params);
   }
 
-  try {
-    const res = await apiClient.get<ConcertListResponse>(
-      "/api/v1/performance",
-      {
-        params,
-      },
-    );
-    return res.data;
-  } catch (error) {
-    throw error;
-  }
+  // useless try/catch 제거 — 예외는 자동 전파
+  const res = await apiClient.get<ConcertListResponse>("/api/v1/performance", {
+    params,
+  });
+  return res.data;
 }
 
 export async function fetchConcertDetail(id: number): Promise<ConcertDetail> {
@@ -108,10 +102,7 @@ export async function fetchConcertDetail(id: number): Promise<ConcertDetail> {
     return detail!;
   }
 
-  try {
-    const res = await apiClient.get<ConcertDetail>(`/api/v1/performance/${id}`);
-    return res.data;
-  } catch (error) {
-    throw error;
-  }
+  // useless try/catch 제거 — 예외는 자동 전파
+  const res = await apiClient.get<ConcertDetail>(`/api/v1/performance/${id}`);
+  return res.data;
 }
