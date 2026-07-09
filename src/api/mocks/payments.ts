@@ -1,36 +1,25 @@
 // Mock 결제
+//
+// 백엔드 payment-service swagger (2026-06-30) 스펙 반영.
+//
+// 주요 변경:
+//   - mockPaymentInit 완전 삭제 (백엔드에 별도 init API 없음, SDK가 직접 처리)
+//   - mockPaymentConfirm 시그니처 완전 변경:
+//     Before: { paymentKey, orderId, amount }
+//     After:  { bookingId, seatId, paymentKey, amount, provider }
+//   - PaymentConfirmResponse: { paymentId, status, paidAt, amount }
+//   - 결제 내역 조회 mock 신규 추가 (백엔드 GET /payment/history, /payment/:id)
+
 import { mockDelay, mockError, shouldThrow } from "./_helpers";
 import type {
-  PaymentInitRequest,
-  PaymentInitResponse,
   PaymentConfirmRequest,
   PaymentConfirmResponse,
+  PaymentCancelRequest,
+  PaymentCancelResponse,
+  PaymentHistoryItem,
+  PaymentDetail,
 } from "@/types/domain/payment";
-import { _updateMockBookingStatus, _findMockBooking } from "./bookings";
-
-export async function mockPaymentInit(
-  req: PaymentInitRequest,
-): Promise<PaymentInitResponse> {
-  await mockDelay(300);
-
-  const booking = _findMockBooking(req.bookingNumber);
-  if (!booking) {
-    await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
-  }
-  if (booking!.status !== "PENDING") {
-    await mockError(
-      "BOOKING_INVALID_STATE",
-      "결제 가능한 상태가 아닙니다.",
-    );
-  }
-
-  return {
-    paymentKey: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-    orderId: req.bookingNumber,
-    amount: booking!.price,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-  };
-}
+import { _updateMockBookingStatus, _findMockBookingById } from "./bookings";
 
 export async function mockPaymentConfirm(
   req: PaymentConfirmRequest,
@@ -46,7 +35,8 @@ export async function mockPaymentConfirm(
     );
   }
 
-  const booking = _findMockBooking(req.orderId);
+  // bookingId(숫자)로 예매 조회
+  const booking = _findMockBookingById(req.bookingId);
   if (!booking) {
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
@@ -56,20 +46,60 @@ export async function mockPaymentConfirm(
       "결제 금액이 일치하지 않습니다.",
     );
   }
+  if (booking!.seatId !== req.seatId) {
+    await mockError("PAYMENT_SEAT_MISMATCH", "좌석 정보가 일치하지 않습니다.");
+  }
 
   const paidAt = new Date().toISOString();
-  _updateMockBookingStatus(req.orderId, "CONFIRMED", paidAt);
+  _updateMockBookingStatus(booking!.bookingNumber, "CONFIRMED", paidAt);
 
   return {
-    paymentKey: req.paymentKey,
-    orderId: req.orderId,
-    amount: req.amount,
+    paymentId: Date.now(),
+    status: "COMPLETED",
     paidAt,
-    bookingNumber: req.orderId,
+    amount: req.amount,
   };
 }
 
-export async function mockPaymentCancel(_paymentKey: string): Promise<void> {
+/** 결제 취소(환불) — 백엔드 POST /api/v1/payment/{paymentId}/cancel */
+export async function mockPaymentCancel(
+  paymentId: number,
+  _req: PaymentCancelRequest,
+): Promise<PaymentCancelResponse> {
   await mockDelay(400);
-  // mock에서는 별도 처리 없음 (실 API에선 환불 처리)
+  return {
+    paymentId,
+    status: "CANCELLED",
+    cancelledAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 결제 내역 조회 — GET /payment/history
+ *
+ * ⚠️ mock에서는 booking store 기반으로 결제 내역을 노출.
+ * 실제 백엔드에서는 별도 payment 테이블 조회.
+ */
+export async function mockGetPaymentHistory(): Promise<PaymentHistoryItem[]> {
+  await mockDelay(400);
+  // 실제로는 booking store에서 결제된 항목만 필터. 여기선 간단하게 빈 배열 반환.
+  return [];
+}
+
+/** 결제 단건 상세 — GET /payment/{paymentId} */
+export async function mockGetPaymentDetail(
+  paymentId: number,
+): Promise<PaymentDetail> {
+  await mockDelay(300);
+  return {
+    paymentId,
+    bookingId: 1,
+    bookingNumber: "X7B29-KLPW1",
+    amount: 132000,
+    provider: "TOSS",
+    status: "COMPLETED",
+    paidAt: new Date().toISOString(),
+    cancelledAt: null,
+    method: "CARD",
+  };
 }
