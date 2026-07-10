@@ -1,20 +1,24 @@
-// 인증/사용자 API — 백엔드 auth-service + user-service swagger (2026-07-02) 스펙 반영
+// 인증/사용자 API — 백엔드 auth-service + user-service swagger 스펙 반영
 //
-// 백엔드 endpoint 매핑:
+// 백엔드 endpoint 매핑 (2026-07-10 정정):
 //   ── auth-service ──
 //   socialLoginApi              → POST /api/v1/auth/social/login
 //   emailLoginApi               → POST /api/v1/auth/login
 //   reissueTokenApi             → POST /api/v1/auth/reissue
 //   logoutApi                   → POST /api/v1/auth/logout
 //   getOauthUrlApi              → GET  /api/v1/auth/oauth/{provider}/url
-//   sendEmailVerificationApi    → POST /api/v1/auth/signup/email-auth/send
-//   verifyEmailCodeApi          → POST /api/v1/auth/signup/email-auth/verify
-//   consumeEmailAuthApi         → POST /api/v1/auth/signup/email-auth/consume (신규)
-//   devAuthTokenApi             → POST /api/v1/dev/auth/token (신규, 개발 편의용)
+//   sendEmailVerificationApi    → POST /api/v1/auth/signup/email-verification/send
+//   verifyEmailCodeApi          → POST /api/v1/auth/signup/email-verification/verify
+//   consumeEmailAuthApi         → POST /api/v1/auth/signup/email-verification/consume
+//   devAuthTokenApi             → POST /api/v1/dev/auth/token
 //   ── user-service ──
 //   signupApi                   → POST /api/v1/user/signup
-//   checkEmailApi               → GET  /api/v1/user/exists/email (신규)
-//   getMeApi                    → GET  /api/v1/user/me (신규)
+//   checkEmailApi               → GET  /api/v1/user/exists/email
+//   getMeApi                    → GET  /api/v1/user/me
+//
+// ⚠️ 변경 이력 (2026-07-10):
+//   - endpoint 경로 통일: email-auth → email-verification (백엔드 스펙)
+//   - 프론트 함수명은 유지 (SignupPage.tsx 호출부 파급 최소)
 
 import apiClient from "./instance";
 import type {
@@ -114,7 +118,7 @@ export async function logoutApi(): Promise<void> {
 
 /**
  * 1단계 — 이메일에 인증 코드 발송.
- * 백엔드: POST /api/v1/auth/signup/email-auth/send
+ * 백엔드: POST /api/v1/auth/signup/email-verification/send
  *
  * 함수 이름은 기존 유지 (SignupPage 참조 호환).
  */
@@ -125,12 +129,12 @@ export async function sendEmailVerificationApi(email: string): Promise<void> {
     await mockEmailAuthSend(req);
     return;
   }
-  await apiClient.post("/api/v1/auth/signup/email-auth/send", req);
+  await apiClient.post("/api/v1/auth/signup/email-verification/send", req);
 }
 
 /**
  * 2단계 — 인증 코드 확인.
- * 백엔드: POST /api/v1/auth/signup/email-auth/verify
+ * 백엔드: POST /api/v1/auth/signup/email-verification/verify
  *
  * 백엔드 필드명은 authNumber이지만, 프론트 함수 파라미터는 code로 유지 (호출부 호환).
  */
@@ -144,14 +148,18 @@ export async function verifyEmailCodeApi(
     await mockEmailAuthVerify(req);
     return;
   }
-  await apiClient.post("/api/v1/auth/signup/email-auth/verify", req);
+  await apiClient.post("/api/v1/auth/signup/email-verification/verify", req);
 }
 
 /**
  * 3단계 (신규) — 인증 상태 소비 (회원가입 직전).
- * 백엔드: POST /api/v1/auth/signup/email-auth/consume
+ * 백엔드: POST /api/v1/auth/signup/email-verification/consume
  *
  * signupApi 호출 직전에 반드시 호출해야 함.
+ *
+ * ⚠️ 이 endpoint는 백엔드 InternalApiTokenFilter가 적용됨 (내부 API).
+ * Gateway가 X-Internal-Token 헤더를 자동으로 붙여줘야 함.
+ * 만약 gateway → auth-service forward 시 토큰 주입 안 되면 403 나올 수 있음.
  */
 export async function consumeEmailAuthApi(email: string): Promise<void> {
   const req: EmailAuthConsumeRequest = { email };
@@ -160,16 +168,13 @@ export async function consumeEmailAuthApi(email: string): Promise<void> {
     await mockEmailAuthConsume(req);
     return;
   }
-  await apiClient.post("/api/v1/auth/signup/email-auth/consume", req);
+  await apiClient.post("/api/v1/auth/signup/email-verification/consume", req);
 }
 
 // ── 회원가입 (user-service) ──────────────────────────
 /**
  * 회원가입.
  * 백엔드: POST /api/v1/user/signup
- *
- * 기존 시그니처: { name, email, password }
- * 새 시그니처: { name, email, password, passwordConfirm } (SignupRequest 타입 사용)
  */
 export async function signupApi(req: SignupRequest): Promise<SignupResponse> {
   if (USE_MOCK) {
@@ -180,7 +185,7 @@ export async function signupApi(req: SignupRequest): Promise<SignupResponse> {
   return res.data;
 }
 
-// ── 이메일 중복 확인 (신규) ───────────────────────────
+// ── 이메일 중복 확인 ──────────────────────────────────
 export async function checkEmailApi(
   email: string,
 ): Promise<EmailCheckResponse> {
@@ -195,7 +200,7 @@ export async function checkEmailApi(
   return res.data;
 }
 
-// ── Dev Auth 토큰 (신규 — 개발 편의용) ────────────────
+// ── Dev Auth 토큰 (개발 편의용) ───────────────────────
 /**
  * userId로 즉시 토큰 발급.
  *
@@ -216,7 +221,7 @@ export async function devAuthTokenApi(
   return res.data;
 }
 
-// ── 내 정보 (신규) ────────────────────────────────────
+// ── 내 정보 ───────────────────────────────────────────
 /**
  * 로그인한 사용자 정보 조회.
  * 백엔드: GET /api/v1/user/me
