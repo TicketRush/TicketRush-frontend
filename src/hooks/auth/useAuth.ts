@@ -18,12 +18,12 @@ const ADMIN_EMAIL_WHITELIST = ["admin@ticketrush.com"];
 function determineRole(email: string, backendRole?: string): UserRole {
   // 백엔드가 role을 주면 그게 우선
   if (backendRole === "ADMIN") return "ADMIN";
-  if (backendRole === "USER") return "USER";
+  if (backendRole === "MEMBER") return "MEMBER";
   // 백엔드 role 없을 때 화이트리스트 fallback
   if (ADMIN_EMAIL_WHITELIST.includes(email.toLowerCase().trim())) {
     return "ADMIN";
   }
-  return "USER";
+  return "MEMBER";
 }
 
 export function useSocialLogin() {
