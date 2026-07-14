@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/hooks/admin/useAdmin";
 import type { ConcertFormData } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
+import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
@@ -45,12 +46,59 @@ const INITIAL_FORM: ConcertFormData = {
   notices: [],
 };
 
+const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
+const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+
 interface Props {
   mode: "create" | "edit";
 }
 
+type CharacterSkinTone = "light" | "medium" | "tan" | "dark";
+type CharacterHairStyle =
+  | "short"
+  | "long"
+  | "bun"
+  | "ponytail"
+  | "wave"
+  | "rainbow";
+type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
+
+interface CharacterDraft {
+  skinTone: CharacterSkinTone;
+  hairStyle: CharacterHairStyle;
+  hairColor: string;
+  outfitName: string;
+  outfitColor: string;
+  accessory: string;
+  pose: CharacterPose;
+  background: string;
+}
+
+const CHARACTER_SKIN_COLORS: Record<CharacterSkinTone, string> = {
+  light: "#f7c6a8",
+  medium: "#d9a78c",
+  tan: "#bf7f54",
+  dark: "#8b5a2b",
+};
+
+function loadSavedCharacter(): CharacterDraft | null {
+  const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
+
+  if (!savedCharacter) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(savedCharacter) as CharacterDraft;
+  } catch {
+    localStorage.removeItem(CHARACTER_STORAGE_KEY);
+    return null;
+  }
+}
+
 export default function AdminConcertFormPage({ mode }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const concertId = mode === "edit" && id ? Number(id) : undefined;
 
@@ -64,13 +112,41 @@ export default function AdminConcertFormPage({ mode }: Props) {
   const [totalSeats, setTotalSeats] = useState(0);
   const [mainImage, setMainImage] = useState<File | null>(null);
   const [galleryImages, setGalleryImages] = useState<File[]>([]);
-  const [model3d, setModel3d] = useState<File | null>(null);
+  const [selectedCharacter, setSelectedCharacter] =
+    useState<CharacterDraft | null>(() => loadSavedCharacter());
 
   useEffect(() => {
     if (existingData) {
       setForm(existingData);
     }
   }, [existingData]);
+
+  useEffect(() => {
+    const savedDraft = sessionStorage.getItem(CONCERT_FORM_DRAFT_KEY);
+
+    if (!savedDraft) return;
+
+    try {
+      const parsed = JSON.parse(savedDraft) as {
+        form?: ConcertFormData;
+        totalSeats?: number;
+      };
+
+      if (parsed.form) {
+        setForm(parsed.form);
+      }
+
+      if (typeof parsed.totalSeats === "number") {
+        setTotalSeats(parsed.totalSeats);
+      }
+    } catch {
+      sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    setSelectedCharacter(loadSavedCharacter());
+  }, [location.key]);
 
   function update<K extends keyof ConcertFormData>(
     key: K,
@@ -134,11 +210,20 @@ export default function AdminConcertFormPage({ mode }: Props) {
     setGalleryImages((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleModel3dFiles(files: File[]) {
-    const file = files[0];
-    if (!file) return;
+  function goToCharacterCreator() {
+    sessionStorage.setItem(
+      CONCERT_FORM_DRAFT_KEY,
+      JSON.stringify({
+        form,
+        totalSeats,
+      }),
+    );
 
-    setModel3d(file);
+    navigate(
+      `/admin/character-creator?returnTo=${encodeURIComponent(
+        window.location.pathname,
+      )}`,
+    );
   }
 
   function handleEnterMoveNext(
@@ -179,8 +264,8 @@ export default function AdminConcertFormPage({ mode }: Props) {
     if (!totalSeats || totalSeats <= 0) return "총 좌석 수를 입력해주세요.";
     if (!form.description.trim()) return "공연 상세 설명을 입력해주세요.";
 
-    if (mode === "create" && !model3d) {
-      return "3D 캐릭터/오브젝트 모델을 업로드해주세요.";
+    if (mode === "create" && !selectedCharacter) {
+      return "3D 캐릭터를 제작해주세요.";
     }
 
     if (mode === "create" && !mainImage) {
@@ -434,11 +519,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
         <Section title="이미지 업로드">
           <Field label="3D 캐릭터/오브젝트 모델" required>
-            <UploadBox
-              text={model3d ? model3d.name : "3D 모델 업로드"}
-              description="UpcomingShows3D 영역에 표시될 콘텐츠입니다."
-              accept=".glb,.gltf,.obj,.fbx"
-              onFilesSelected={handleModel3dFiles}
+            <CharacterCreatorLinkBox
+              character={selectedCharacter}
+              onClick={goToCharacterCreator}
             />
           </Field>
 
@@ -702,5 +785,74 @@ function EditableTimeInput({
       inputMode="numeric"
       className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
     />
+  );
+}
+function CharacterCreatorLinkBox({
+  character,
+  onClick,
+}: {
+  character: CharacterDraft | null;
+  onClick: () => void;
+}) {
+  if (!character) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-h-52 w-full flex-col items-center justify-center rounded-lg border border-dashed border-admin-border bg-admin-bg px-4 py-6 text-center text-sm text-admin-text-secondary transition hover:border-primary"
+      >
+        <span className="font-medium text-admin-text">
+          3D 캐릭터 제작소로 이동
+        </span>
+
+        <span className="mt-1 text-xs">
+          클릭하면 3D 캐릭터 제작 페이지로 이동합니다.
+        </span>
+
+        <span className="mt-3 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white">
+          3D 캐릭터 만들러 가기
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
+      <div
+        className="h-80 w-full overflow-hidden"
+        style={{ backgroundColor: character.background }}
+      >
+        <CharacterModelViewer
+          modelUrl="/models/chibi-base.glb"
+          skinColor={CHARACTER_SKIN_COLORS[character.skinTone]}
+          hairColor={character.hairColor}
+          outfitColor={character.outfitColor}
+          hairStyle={character.hairStyle}
+        />
+      </div>
+
+      <div className="border-t border-admin-border px-4 py-4 text-center">
+        <p className="text-sm font-bold text-admin-text">
+          제작된 3D 캐릭터 선택됨
+        </p>
+
+        <p className="mt-1 text-xs text-admin-text-secondary">
+          피부: {character.skinTone} / 헤어: {character.hairStyle} / 포즈:{" "}
+          {character.pose}
+        </p>
+
+        <p className="mt-1 text-xs text-admin-text-secondary">
+          의상: {character.outfitName} / 액세서리: {character.accessory}
+        </p>
+
+        <button
+          type="button"
+          onClick={onClick}
+          className="mt-4 rounded-lg bg-primary px-5 py-2 text-xs font-bold text-white transition hover:opacity-90"
+        >
+          캐릭터 다시 수정하기
+        </button>
+      </div>
+    </div>
   );
 }
