@@ -10,7 +10,7 @@
 //   - User 인터페이스에 email, role, joinedAt 필드 추가
 
 export type OauthProvider = "KAKAO" | "NAVER" | "GOOGLE";
-export type UserRole = "USER" | "ADMIN";
+export type UserRole = "MEMBER" | "ADMIN";
 
 // ── 소셜 로그인 (백엔드 확정) ───────────────────────
 export interface SocialOauthLoginRequest {
