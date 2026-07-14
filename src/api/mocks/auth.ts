@@ -45,7 +45,7 @@ export async function mockSocialLogin(
     userId: 1,
     name: `${req.provider}_TestUser`,
     email: `${req.provider.toLowerCase()}_user@example.com`,
-    role: "USER",
+    role: "MEMBER",
     joinedAt: "2025-01-15T00:00:00",
     isNewUser: false,
     accessToken: `mock-access-${Date.now()}`,
@@ -71,7 +71,7 @@ export async function mockEmailLogin(
 
   // 관리자 테스트용
   const role: UserRole =
-    req.email === "admin@ticketrush.com" ? "ADMIN" : "USER";
+    req.email === "admin@ticketrush.com" ? "ADMIN" : "MEMBER";
 
   return {
     userId: 1,
@@ -194,6 +194,6 @@ export async function mockGetMe(): Promise<MeResponse> {
     email: "user@example.com",
     name: "김철수",
     joinedAt: "2025-01-15T00:00:00",
-    role: "USER", // ⚠️ 백엔드 실제 응답엔 없음. 추가 요청 필요
+    role: "MEMBER", // ⚠️ 백엔드 실제 응답엔 없음. 추가 요청 필요
   };
 }
