@@ -1,40 +1,47 @@
 // 좌석 번호 파싱 유틸
 //
-// 백엔드 응답의 seatNumber ("A-1" 형태)를 프론트 편의용 row/col로 분리.
-// 좌석맵 렌더링, 정렬 등에 사용.
+// 백엔드는 좌석을 "A-1" 형식의 문자열로 반환.
+// 프론트에서 좌석맵 렌더링(SeatMap, SeatItem)에는 row("A"), col(1) 두 파생 필드가 필요.
+//
+// 예: "A-1"  → { row: "A", col: 1 }
+//     "AA-12" → { row: "AA", col: 12 }
+//     "B-3"   → { row: "B", col: 3 }
 
-/** 좌석 파싱 결과 */
+/**
+ * 좌석 번호 파싱 결과
+ */
 export interface ParsedSeatNumber {
-  /** 행 ("A", "B", ..., "J") */
   row: string;
-  /** 열 (1, 2, ..., 12) */
   col: number;
 }
 
 /**
- * seatNumber 문자열을 row/col로 파싱.
+ * "A-1" → { row: "A", col: 1 }
  *
- * @example
- *   parseSeatNumber("A-1")  → { row: "A", col: 1 }
- *   parseSeatNumber("J-12") → { row: "J", col: 12 }
- *   parseSeatNumber("잘못") → null
+ * @throws 형식이 잘못된 경우 (예: "abc", "1-1", "A1")
  */
-export function parseSeatNumber(seatNumber: string): ParsedSeatNumber | null {
-  const match = seatNumber.match(/^([A-Z]+)-(\d+)$/);
-  if (!match) return null;
+export function parseSeatNumber(seatNumber: string): ParsedSeatNumber {
+  const match = seatNumber.match(/^([A-Za-z]+)-(\d+)$/);
+  if (!match) {
+    throw new Error(`Invalid seatNumber format: ${seatNumber}`);
+  }
   return {
-    row: match[1],
-    col: Number(match[2]),
+    row: match[1].toUpperCase(),
+    col: parseInt(match[2], 10),
   };
 }
 
 /**
- * row + col을 seatNumber 문자열로 조립.
- *
- * @example
- *   formatSeatNumber("A", 1)  → "A-1"
- *   formatSeatNumber("J", 12) → "J-12"
+ * 파싱 실패 시 fallback 값 반환.
+ * 좌석맵 렌더링 중 잘못된 데이터로 인해 전체가 깨지지 않도록 방어용.
  */
-export function formatSeatNumber(row: string, col: number): string {
-  return `${row}-${col}`;
+export function safeParseSeatNumber(
+  seatNumber: string,
+  fallback: ParsedSeatNumber = { row: "?", col: 0 },
+): ParsedSeatNumber {
+  try {
+    return parseSeatNumber(seatNumber);
+  } catch {
+    return fallback;
+  }
 }
