@@ -1,18 +1,26 @@
 // 공연 카드
 //
-// 백엔드 스펙 반영 변경:
-//   - concert.artist → concert.performer
-//   - concert.date → concert.showDate
-//   - concert.time → concert.showTime
-//   - concert.posterUrl → concert.imageMainUrl
-//   - concert.remainingSeats optional 처리 (?? 0 fallback)
+// 변경 이력:
+// - 2026-06-30: artist→performer, date→showDate, time→showTime,
+//   posterUrl→imageMainUrl, remainingSeats optional 처리
+// - 2026-07-15 (이슈 #121):
+//   - status enum 정정: SOLD_OUT 참조 제거
+//     매진 판단: status === "CLOSED" OR seatCounts.availableCount === 0
+//   - useSeatCounts 훅으로 잔여 좌석 실 API 조회
+//     (concert.remainingSeats는 mock 호환 fallback만 사용)
+//   - venue optional 처리 (백엔드 venueName 필드 없음, address fallback)
+// - 2026-07-15 (이슈 #122 정리):
+//   - useSeatCounts import 경로 정정: @/hooks/queries/useSeats
+//     (별도 useSeatCounts.ts 파일은 중복이므로 삭제 예정)
 //
-// ⚠️ remainingSeats는 백엔드 응답에 없음 (별도 API).
-// 실 API 연동 시 useSeatCounts 훅으로 조회한 값을 상위에서 주입하도록 리팩터링 예정.
+// ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
+// React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
+// 백엔드에 batch endpoint (e.g. POST /seat-counts?ids=1,2,3) 요청 고려.
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Calendar } from "lucide-react";
 import type { ConcertSummary } from "@/types/domain/concert";
+import { useSeatCounts } from "@/hooks/queries/useSeats";
 import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -24,18 +32,31 @@ interface ConcertCardProps {
 function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
 
-  // remainingSeats optional 처리 — 없으면 0으로 fallback (매진 취급)
-  const remaining = concert.remainingSeats ?? 0;
+  // 실 API로 잔여 좌석 조회 (실패/로딩 시 mock 값 fallback)
+  const { data: seatCounts } = useSeatCounts(concert.id);
 
-  const isSoldOut = concert.status === "SOLD_OUT" || remaining === 0;
-  const remainingPercent =
-    concert.totalSeats > 0 ? (remaining / concert.totalSeats) * 100 : 0;
-  const isEndingSoon = !isSoldOut && remainingPercent <= 20;
+  // 잔여 좌석 우선순위: seatCounts (실 API) > concert.remainingSeats (mock)
+  const remaining = seatCounts?.availableCount ?? concert.remainingSeats ?? 0;
+  const total = seatCounts?.totalCount ?? concert.totalSeats ?? 0;
+
+  // 매진 판단:
+  //   1. status가 CLOSED/CANCELED → 무조건 예매 불가
+  //   2. 잔여 좌석 0 → 매진 (기술적 매진)
+  const isUnavailable =
+    concert.status === "CLOSED" || concert.status === "CANCELED";
+  const isSoldOut = isUnavailable || (total > 0 && remaining === 0);
+
+  const remainingPercent = total > 0 ? (remaining / total) * 100 : 0;
+  const isEndingSoon =
+    !isSoldOut && remainingPercent > 0 && remainingPercent <= 20;
 
   const formattedPrice = concert.price.toLocaleString("ko-KR");
 
   const d = new Date(concert.showDate);
   const formattedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  // venue fallback: venue > address
+  const venueDisplay = concert.venue ?? concert.address ?? "";
 
   function handleClick() {
     if (!isSoldOut) navigate(`/concerts/${concert.id}`);
@@ -91,7 +112,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
         <div className="space-y-1 text-xs text-gray-600">
           <p className="flex items-center gap-1.5 truncate">
             <MapPin size={14} className="shrink-0 text-gray-400" />
-            <span className="truncate">{concert.venue}</span>
+            <span className="truncate">{venueDisplay}</span>
           </p>
           <p className="flex items-center gap-1.5">
             <Calendar size={14} className="shrink-0 text-gray-400" />
@@ -107,7 +128,8 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        <SeatGauge remaining={remaining} total={concert.totalSeats} />
+        {/* 좌석 게이지 - 총 좌석 수 없으면 표시 안 함 */}
+        {total > 0 && <SeatGauge remaining={remaining} total={total} />}
 
         <button
           type="button"
