@@ -1,4 +1,10 @@
 // 공연 상세 페이지 우측 sticky 사이드바
+//
+// 변경 이력:
+// - 2026-07-15 (이슈 #121 fix):
+//   - ConcertStatus 값 정정: "SOLD_OUT" → "CLOSED"/"CANCELED"
+//     매진 판단은 여전히 remaining === 0으로도 유도 (기술적 매진)
+//   - buttonLabel 로직 정정
 import { Ticket, AlertTriangle } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 
@@ -24,9 +30,29 @@ export default function BookingSidebar({
   onBooking,
 }: BookingSidebarProps) {
   const percent = total > 0 ? (remaining / total) * 100 : 0;
-  const isSoldOut = status === "SOLD_OUT" || remaining === 0;
 
-  const buttonLabel = isOnSale ? "예매하기" : isSoldOut ? "매진" : "예매 종료";
+  // 매진 판단:
+  //   status === "CLOSED" → 판매 종료 (매진 포함)
+  //   status === "CANCELED" → 공연 취소
+  //   remaining === 0 → 기술적 매진
+  const isUnavailable = status === "CLOSED" || status === "CANCELED";
+  const isSoldOut = isUnavailable || remaining === 0;
+
+  // buttonLabel:
+  //   CANCELED → "취소된 공연"
+  //   CLOSED or remaining === 0 → "매진"
+  //   ON_SALE 아닌 다른 상태 (UPCOMING 등) → "예매 종료"
+  //   ON_SALE → "예매하기"
+  let buttonLabel: string;
+  if (status === "CANCELED") {
+    buttonLabel = "취소된 공연";
+  } else if (isSoldOut) {
+    buttonLabel = "매진";
+  } else if (isOnSale) {
+    buttonLabel = "예매하기";
+  } else {
+    buttonLabel = "예매 종료";
+  }
 
   return (
     <div className="lg:sticky lg:top-4 space-y-3">
