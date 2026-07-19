@@ -25,6 +25,10 @@
 //   - role: 소셜 로그인 계정은 관리자를 지원하지 않는다는 가정으로 MEMBER 고정
 //     (관리자는 이메일 로그인만 사용 — 백엔드에 소셜 관리자 지원 여부 확인 필요)
 //   - email/name/joinedAt: getMeApi()로 비동기 보강 (실패해도 로그인 자체는 유지)
+//
+// ✅ isNewUser 분기 반영 (2026-07-20):
+//   전용 온보딩 페이지가 없어 신규/기존 회원 모두 "/"로 이동하는 건 동일하지만,
+//   res.isNewUser로 신규 가입 여부를 구분해 환영 토스트 문구만 다르게 노출.
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -101,12 +105,18 @@ export default function OAuthCallbackPage() {
         joinedAt: new Date().toISOString(),
       });
 
-      toast.success(`${getProviderName(provider)}로 로그인되었습니다.`);
+      if (res.isNewUser) {
+        toast.success(
+          `${getProviderName(provider)} 계정으로 가입이 완료되었습니다! TicketRush에 오신 것을 환영해요 🎉`,
+        );
+      } else {
+        toast.success(`${getProviderName(provider)}로 로그인되었습니다.`);
+      }
 
       // ⚠️ 2026-07-18: "/onboarding" 라우트가 App.tsx에 존재하지 않아(전용
       // 온보딩 페이지 미구현) 신규 회원을 그쪽으로 보내면 NotFoundPage로
       // 빠지는 버그가 있었음. 온보딩 페이지가 만들어지기 전까지는 신규/기존
-      // 회원 모두 "/"로 이동. res.isNewUser는 남겨둠(향후 온보딩 도입 시 재사용).
+      // 회원 모두 "/"로 이동(위 토스트 문구로만 구분).
       navigate("/", { replace: true });
 
       // email/name/joinedAt을 /user/me로 비동기 보강 (실패해도 로그인은 유지)
