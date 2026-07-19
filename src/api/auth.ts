@@ -1,6 +1,6 @@
 // 인증/사용자 API — 백엔드 auth-service + user-service swagger 스펙 반영
 //
-// 백엔드 endpoint 매핑 (2026-07-10 정정):
+// 백엔드 endpoint 매핑:
 //   ── auth-service ──
 //   socialLoginApi              → POST /api/v1/auth/social/login
 //   emailLoginApi               → POST /api/v1/auth/login
@@ -9,16 +9,16 @@
 //   getOauthUrlApi              → GET  /api/v1/auth/oauth/{provider}/url
 //   sendEmailVerificationApi    → POST /api/v1/auth/signup/email-verification/send
 //   verifyEmailCodeApi          → POST /api/v1/auth/signup/email-verification/verify
-//   consumeEmailAuthApi         → POST /api/v1/auth/signup/email-verification/consume
-//   devAuthTokenApi             → POST /api/v1/dev/auth/token
+//   devAuthTokenApi             → POST /api/v1/dev/auth/token (신규, 개발 편의용)
+//
+// ⚠️ consumeEmailAuthApi 제거 (2026-07-18, 백엔드 확인):
+//   .../email-verification/consume 엔드포인트는 실제로 존재하지 않음 (404
+//   NoResourceFoundException). send → verify 2단계로 끝나며, 회원가입은
+//   verify 이후 바로 signupApi(→ user-service)를 호출하면 됨.
 //   ── user-service ──
 //   signupApi                   → POST /api/v1/user/signup
-//   checkEmailApi               → GET  /api/v1/user/exists/email
-//   getMeApi                    → GET  /api/v1/user/me
-//
-// ⚠️ 변경 이력 (2026-07-10):
-//   - endpoint 경로 통일: email-auth → email-verification (백엔드 스펙)
-//   - 프론트 함수명은 유지 (SignupPage.tsx 호출부 파급 최소)
+//   checkEmailApi               → GET  /api/v1/user/exists/email (신규)
+//   getMeApi                    → GET  /api/v1/user/me (신규)
 
 import apiClient from "./instance";
 import type {
@@ -31,7 +31,6 @@ import type {
   EmailLoginResponse,
   EmailAuthSendRequest,
   EmailAuthVerifyRequest,
-  EmailAuthConsumeRequest,
   SignupRequest,
   SignupResponse,
   EmailCheckResponse,
@@ -136,7 +135,9 @@ export async function sendEmailVerificationApi(email: string): Promise<void> {
  * 2단계 — 인증 코드 확인.
  * 백엔드: POST /api/v1/auth/signup/email-verification/verify
  *
- * 백엔드 필드명은 authNumber이지만, 프론트 함수 파라미터는 code로 유지 (호출부 호환).
+ * 백엔드 필드명은 auth_number(스네이크케이스, @JsonProperty("auth_number")) 이지만,
+ * apiClient의 axios-case-converter가 요청 본문을 camelCase → snake_case로 자동 변환하므로
+ * 프론트에서는 authNumber로 작성. 함수 파라미터명은 code로 유지 (호출부 호환).
  */
 export async function verifyEmailCodeApi(
   email: string,
@@ -149,26 +150,6 @@ export async function verifyEmailCodeApi(
     return;
   }
   await apiClient.post("/api/v1/auth/signup/email-verification/verify", req);
-}
-
-/**
- * 3단계 (신규) — 인증 상태 소비 (회원가입 직전).
- * 백엔드: POST /api/v1/auth/signup/email-verification/consume
- *
- * signupApi 호출 직전에 반드시 호출해야 함.
- *
- * ⚠️ 이 endpoint는 백엔드 InternalApiTokenFilter가 적용됨 (내부 API).
- * Gateway가 X-Internal-Token 헤더를 자동으로 붙여줘야 함.
- * 만약 gateway → auth-service forward 시 토큰 주입 안 되면 403 나올 수 있음.
- */
-export async function consumeEmailAuthApi(email: string): Promise<void> {
-  const req: EmailAuthConsumeRequest = { email };
-  if (USE_MOCK) {
-    const { mockEmailAuthConsume } = await import("./mocks/auth");
-    await mockEmailAuthConsume(req);
-    return;
-  }
-  await apiClient.post("/api/v1/auth/signup/email-verification/consume", req);
 }
 
 // ── 회원가입 (user-service) ──────────────────────────
