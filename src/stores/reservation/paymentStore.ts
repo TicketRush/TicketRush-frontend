@@ -1,5 +1,6 @@
 // 결제 상태 머신 store
 //
+<<<<<<< HEAD
 // 상태 전이:
 //   IDLE
 //     ├─ startRequest()      → REQUESTING (SDK 호출 시작)
@@ -18,8 +19,14 @@
 //
 //   SUCCESS / FAILED / EXPIRED / CANCELLED
 //     └─ reset()             → IDLE       (새 예매 시작)
+=======
+// ⚠️ Toss 결제창 리다이렉트로 페이지가 완전히 새로 로드되므로, 리다이렉트 복귀 후에도
+// bookingNumber/amount/status를 잃지 않도록 sessionStorage에 persist.
+// (localStorage가 아닌 sessionStorage: 탭 종료 시 예매 컨텍스트 정리)
+>>>>>>> 5590873 ([Fix] #124 예매 생성/취소 UI 연동 마무리 + 타 화면 CANCELED 스펠링 정합)
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { PaymentStatus, PaymentMethod } from "@/types/domain/payment";
 
 interface PaymentStoreState {
@@ -68,16 +75,35 @@ const initial = {
   errorMessage: null,
 };
 
-export const usePaymentStore = create<PaymentStoreState>((set) => ({
-  ...initial,
+export const usePaymentStore = create<PaymentStoreState>()(
+  persist(
+    (set) => ({
+      ...initial,
 
-  startBooking: (bookingNumber, amount) =>
-    set({
-      status: "IDLE",
-      bookingNumber,
-      amount,
-      errorMessage: null,
+      startBooking: (bookingNumber, amount) =>
+        set({
+          status: "IDLE",
+          bookingNumber,
+          amount,
+          errorMessage: null,
+        }),
+
+      setMethod: (method) => set({ method }),
+
+      startRequest: (paymentKey) =>
+        set({ status: "REQUESTING", paymentKey, errorMessage: null }),
+
+      startConfirming: () => set({ status: "CONFIRMING" }),
+
+      succeed: () => set({ status: "SUCCESS" }),
+
+      fail: (message) => set({ status: "FAILED", errorMessage: message }),
+
+      expire: () => set({ status: "EXPIRED" }),
+
+      reset: () => set(initial),
     }),
+<<<<<<< HEAD
 
   setMethod: (method) => set({ method }),
 
@@ -96,5 +122,13 @@ export const usePaymentStore = create<PaymentStoreState>((set) => ({
 
   reset: () => set(initial),
 }));
+=======
+    {
+      name: "payment-storage",
+      storage: createJSONStorage(() => sessionStorage),
+    },
+  ),
+);
+>>>>>>> 5590873 ([Fix] #124 예매 생성/취소 UI 연동 마무리 + 타 화면 CANCELED 스펠링 정합)
 
 export default usePaymentStore;

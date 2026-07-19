@@ -115,11 +115,7 @@ export async function mockCreateBooking(
     performanceId: req.performanceId,
     performanceTitle: concert!.title,
     performancePerformer: concert!.performer,
-<<<<<<< HEAD
     // venue는 optional (백엔드에 없음) → address fallback
-=======
-    // ⚠️ venue optional 대응
->>>>>>> 9887a5f ([Feat] #124 예매 PENDING 생성(좌석 HOLD) + 내 예매 목록/수/취소 실 API 연동)
     performanceVenue: concert!.venue ?? concert!.address,
     performanceDate: concert!.showDate,
     performanceTime: concert!.showTime,
