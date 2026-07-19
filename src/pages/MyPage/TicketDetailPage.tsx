@@ -7,6 +7,11 @@
 //   - 예매자 정보 표시 (이름/이메일 = authStore, 예매일시/결제금액 = BookingDetail)
 //
 // ※ 좌석 long-press 맵 / 이미지 다운로드는 범위가 커서 후속 작업 (TODO).
+//
+// 변경 이력:
+// - 이슈 #127: qrPayload = JSON.stringify(...) mock 제거.
+//   GET /api/v1/ticket/bookings/{bookingId}/qr 실 API(useTicketQr)로 교체.
+//   payload는 발급 후 5분만 유효 — 4분마다 자동 재발급.
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import {
@@ -21,6 +26,8 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useBookingDetail } from "@/hooks/queries/useBookingDetail";
+import { useTicketQr } from "@/hooks/queries/useTicketQr";
+import { useCountdownTo } from "@/hooks/useCountdownTo";
 import useAuthStore from "@/stores/global/authStore";
 
 export default function TicketDetailPage() {
@@ -29,6 +36,8 @@ export default function TicketDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
+  const { data: qrData, isLoading: isQrLoading } = useTicketQr(data?.bookingId);
+  const remainingMs = useCountdownTo(qrData?.expiresAt);
 
   if (!bookingNumber) return <Navigate to="/reservations/mypage" replace />;
 
@@ -52,15 +61,14 @@ export default function TicketDetailPage() {
     );
   }
 
-  // QR 페이로드 — 티켓마다 고유. 백엔드 qrToken 응답 시 그걸 우선.
-  const qrPayload = JSON.stringify({
-    reservationId: data.bookingNumber,
-    seatLabel: data.seatNumber,
-    issuedAt: new Date().toISOString(),
-  });
+  const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
+  const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
+  const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
+    Math.floor((remainingMs % 60000) / 1000),
+  ).padStart(2, "0")}`;
 
   function handleDownload() {
-    // TODO: html2canvas로 티켓 영역 캡처 후 이미지 다운로드 (Image 4 레이아웃)
+    // TODO: html2canvas로 티켓 영역 캡처 후 이미지 다운로드
     alert("티켓 다운로드 기능은 추후 구현 예정입니다.");
   }
 
@@ -136,19 +144,49 @@ export default function TicketDetailPage() {
       <div className="bg-white border-2 border-border rounded-2xl p-6 mb-6">
         <p className="text-center text-sm font-semibold mb-4">입장 QR 코드</p>
         <div className="flex items-center justify-center mb-4">
-          <div className="w-44 h-44 bg-white border-2 border-primary rounded-xl flex items-center justify-center p-3">
-            <QRCodeSVG
-              value={qrPayload}
-              size={152}
-              level="M"
-              bgColor="#FFFFFF"
-              fgColor="#6C5CE7"
-            />
+          <div className="w-44 h-44 bg-white border-2 border-primary rounded-xl flex items-center justify-center p-3 relative">
+            {isQrLoading && !qrData ? (
+              <span className="text-xs text-text-secondary">QR 발급 중...</span>
+            ) : qrData ? (
+              <QRCodeSVG
+                value={qrData.payload}
+                size={152}
+                level="M"
+                bgColor="#FFFFFF"
+                fgColor="#6C5CE7"
+              />
+            ) : (
+              <span className="text-xs text-error">
+                QR 코드를 불러올 수 없습니다.
+              </span>
+            )}
+            {!isTicketUsable && (
+              <div className="absolute inset-0 bg-white/85 rounded-xl flex items-center justify-center">
+                <span className="text-sm font-bold text-text-secondary">
+                  {qrData?.ticketStatus === "USED"
+                    ? "입장 완료된 티켓"
+                    : "취소된 티켓"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <p className="text-center text-xs text-text-secondary mb-3">
           공연장 입장 시 스캔하세요
         </p>
+        {qrData && isTicketUsable && (
+          <p
+            className={`text-center text-xs mb-3 ${
+              isExpiringSoon
+                ? "text-red-500 font-semibold"
+                : "text-text-secondary"
+            }`}
+          >
+            {remainingMs > 0
+              ? `QR 갱신까지 ${remainingLabel}`
+              : "QR 코드 갱신 중..."}
+          </p>
+        )}
         <div className="text-center">
           <p className="text-xs text-text-secondary">예매 번호</p>
           <p className="text-sm font-bold font-mono text-primary">
