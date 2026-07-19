@@ -1,32 +1,48 @@
 // OAuth 콜백 페이지 - 카카오/네이버/구글 공용
 //
-// 예상 flow (Flow B, 백엔드가 토큰까지 처리 후 프론트로 리다이렉트):
-//   1. 사용자가 LoginPage에서 소셜 버튼 클릭
-//   2. getOauthUrlApi(provider) → 백엔드가 OAuth 로그인 URL 반환
+// ✅ 콜백 경로 확정 (2026-07-18, 백엔드 협의):
+//   - 운영: https://ticketrush.store/oauth/callback/{provider}
+//   - 로컬: http://localhost:5173/oauth/callback/{provider}
+//   → 현재 라우트(/oauth/callback/:provider, App.tsx)와 일치, 변경 불필요.
+//
+// ✅ Flow A로 확정 (2026-07-18, 백엔드 로그로 실증):
+//   소셜 제공자가 백엔드가 아니라 "프론트" 콜백 URL로 code를 직접 리다이렉트하므로,
+//   프론트가 그 code를 받아 백엔드에 로그인 요청을 보내야 함.
+//   1. 사용자가 LoginPage/SignupPage에서 소셜 버튼 클릭
+//   2. getOauthUrlApi(provider) → 백엔드가 OAuth 로그인 URL(소셜 제공자 authorize URL) 반환
 //   3. window.location.href로 카카오/네이버/구글로 리다이렉트
 //   4. 사용자가 소셜 로그인 성공
-//   5. 소셜 → 백엔드 (예: localhost:8082/login/oauth2/code/{provider})
-//   6. 백엔드가 code 처리 → 토큰 발급 → 프론트 콜백으로 리다이렉트
-//      예상 URL: /oauth/callback/{provider}?access_token=xxx&refresh_token=yyy...
-//   7. 이 페이지가 URL param 파싱 → authStore 저장 → 메인 이동
+//   5. 소셜 제공자 → 프론트 콜백(/oauth/callback/{provider}?code=xxx&state=yyy)으로 직접 리다이렉트
+//   6. (이 페이지) code를 꺼내서 POST /api/v1/auth/social/login { provider, code } 호출
+//   7. 응답(OauthLoginResponse)의 토큰 + 사용자 정보를 authStore에 저장 → 메인/온보딩 이동
 //
-// ★ 세부 파라미터 이름 및 전달 방식은 백엔드 확정 후 조정 필요:
-//   - Query params(?) vs Fragment(#) vs Cookie
-//   - 필드명: access_token vs accessToken (snake_case vs camelCase)
-//   - isNewUser 여부와 필드명
+// ※ 이전에는 백엔드가 토큰까지 처리해 콜백 URL에 access_token 등을 실어 보내는 Flow B로
+//   잘못 구현되어 있었음 (실제로는 /api/v1/auth/social/login 요청이 전혀 발생하지 않는 버그).
 //
-// Flow A (백엔드가 code만 넘겨줌)로 확정되면 아래 processCallback 함수 수정 필요:
-//   - URL에서 code, state만 파싱
-//   - socialLoginApi({ provider, code, state }) 호출
-//   - 응답에서 토큰과 사용자 정보 획득
+// ✅ 응답 필드 보정 (2026-07-18, swagger-ui 실측):
+//   socialLoginApi 응답(OauthLoginResponse)에는 email/role/joinedAt이 없음
+//   (userId, name, isNewUser, accessToken, refreshToken, ...expiresIn 뿐).
+//   - role: 소셜 로그인 계정은 관리자를 지원하지 않는다는 가정으로 MEMBER 고정
+//     (관리자는 이메일 로그인만 사용 — 백엔드에 소셜 관리자 지원 여부 확인 필요)
+//   - email/name/joinedAt: getMeApi()로 비동기 보강 (실패해도 로그인 자체는 유지)
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import useAuthStore from "@/stores/global/authStore";
-import type { UserRole } from "@/types/domain/auth";
+import { socialLoginApi, getMeApi } from "@/api/auth";
+import type { OauthProvider, UserRole } from "@/types/domain/auth";
 
 const VALID_PROVIDERS = ["kakao", "naver", "google"] as const;
+
+const PROVIDER_TO_BACKEND: Record<
+  (typeof VALID_PROVIDERS)[number],
+  OauthProvider
+> = {
+  kakao: "KAKAO",
+  naver: "NAVER",
+  google: "GOOGLE",
+};
 
 export default function OAuthCallbackPage() {
   const { provider } = useParams<{ provider: string }>();
@@ -53,19 +69,7 @@ export default function OAuthCallbackPage() {
         throw new Error("유효하지 않은 로그인 방식입니다.");
       }
 
-      // ★ 백엔드 flow 확정 후 여기 파라미터 이름 조정 필요
-      // 현재는 Flow B 유력 시나리오로 구현
-      const accessToken = searchParams.get("access_token");
-      const refreshToken = searchParams.get("refresh_token");
-      const userIdStr = searchParams.get("user_id");
-      const name = searchParams.get("name") ?? "";
-      const email = searchParams.get("email") ?? "";
-      const roleStr = searchParams.get("role");
-      const isNewUser = searchParams.get("is_new_user") === "true";
-      const joinedAt =
-        searchParams.get("joined_at") ?? new Date().toISOString();
-
-      // 에러 파라미터 확인 (OAuth 실패 시 백엔드가 error 필드로 전달할 수도)
+      // 소셜 제공자가 인가 실패/취소 시 error 파라미터로 전달
       const errorParam = searchParams.get("error");
       if (errorParam) {
         throw new Error(
@@ -74,30 +78,49 @@ export default function OAuthCallbackPage() {
         );
       }
 
-      if (!accessToken || !refreshToken) {
-        throw new Error("인증 정보를 받지 못했습니다. 다시 시도해주세요.");
+      // Flow A: 소셜 제공자가 프론트 콜백 URL로 code(+state)를 직접 전달
+      const code = searchParams.get("code");
+      if (!code) {
+        throw new Error("인증 코드를 받지 못했습니다. 다시 시도해주세요.");
       }
 
-      // authStore에 저장
-      const userId = userIdStr ? Number(userIdStr) : 0;
-      const role: UserRole = roleStr === "ADMIN" ? "ADMIN" : "MEMBER";
+      const backendProvider =
+        PROVIDER_TO_BACKEND[provider as (typeof VALID_PROVIDERS)[number]];
 
-      setAuth(accessToken, refreshToken, {
-        userId,
-        name,
-        email,
+      // POST /api/v1/auth/social/login { provider, code } → 토큰 + 사용자 정보 발급
+      const res = await socialLoginApi({ provider: backendProvider, code });
+
+      // 응답에 role이 없어 MEMBER로 고정 (관리자는 이메일 로그인만 지원한다는 가정)
+      const role: UserRole = "MEMBER";
+
+      setAuth(res.accessToken, res.refreshToken, {
+        userId: res.userId,
+        name: res.name,
+        email: "",
         role,
-        joinedAt,
+        joinedAt: new Date().toISOString(),
       });
 
-      toast.success(`${getProviderName(provider!)}로 로그인되었습니다.`);
+      toast.success(`${getProviderName(provider)}로 로그인되었습니다.`);
 
-      // 신규 회원 여부에 따라 리다이렉트
-      if (isNewUser) {
-        navigate("/onboarding", { replace: true });
-      } else {
-        navigate(role === "ADMIN" ? "/admin" : "/", { replace: true });
-      }
+      // ⚠️ 2026-07-18: "/onboarding" 라우트가 App.tsx에 존재하지 않아(전용
+      // 온보딩 페이지 미구현) 신규 회원을 그쪽으로 보내면 NotFoundPage로
+      // 빠지는 버그가 있었음. 온보딩 페이지가 만들어지기 전까지는 신규/기존
+      // 회원 모두 "/"로 이동. res.isNewUser는 남겨둠(향후 온보딩 도입 시 재사용).
+      navigate("/", { replace: true });
+
+      // email/name/joinedAt을 /user/me로 비동기 보강 (실패해도 로그인은 유지)
+      getMeApi()
+        .then((me) => {
+          setAuth(res.accessToken, res.refreshToken, {
+            userId: res.userId,
+            name: me.name,
+            email: me.email,
+            role,
+            joinedAt: me.createdAt,
+          });
+        })
+        .catch(() => {});
     } catch (error) {
       const message =
         error instanceof Error
