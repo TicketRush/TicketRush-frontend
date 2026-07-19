@@ -167,3 +167,43 @@ export interface MyBookingsResponse {
 export interface MyBookingCountResponse {
   count: number;
 }
+
+// ── 관리자: 환불 모니터링 (백엔드 확정, 2026-07-18 swagger-ui 실측) ────
+// 백엔드 endpoint:
+//   GET  /api/v1/booking/admin/bookings/refund-failed    (환불 처리 자체가 실패한 건)
+//   GET  /api/v1/booking/admin/bookings/refunding-stuck  (REFUNDING 상태로 오래 멈춰있는 건)
+//   POST /api/v1/booking/admin/{bookingNumber}/refund-retry (재시도)
+
+// 응답은 BookingSummaryResponse와 동일 shape + userId/refundFailedAt/updatedAt.
+// ⚠️ 사용자 이름/이메일/공연명/좌석번호는 이 응답에 없음
+// userId만 있고
+// 프론트에서 조회 가능한 "userId → 사용자 정보" API가 없어(내부 전용 API만 존재)
+// 사용자 식별 정보는 표시 불가.
+// 공연명/좌석번호는 performance/seat 서비스에서 aggregation.
+export interface AdminRefundBookingItem {
+  bookingId: number;
+  bookingNumber: string;
+  userId: number;
+  performanceId: number;
+  seatId: number;
+  status: BookingStatus;
+  confirmedAt: string | null;
+  refundFailedAt: string | null;
+  updatedAt: string;
+}
+
+/** AdminRefundBookingItem + performance/seat aggregation (프론트 표시용) */
+export interface AdminRefundBookingListItem extends AdminRefundBookingItem {
+  performanceTitle: string;
+  seatNumber: string;
+}
+
+export interface AdminRefundBookingListParams {
+  page?: number;
+  size?: number;
+}
+
+export interface AdminRefundBookingListResponse {
+  items: AdminRefundBookingListItem[];
+  hasNext: boolean;
+}
