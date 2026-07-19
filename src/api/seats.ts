@@ -24,7 +24,7 @@ import {
   mockSubscribeSeats,
 } from "./mocks/seats";
 import { mockDelay } from "./mocks/_helpers";
-import { parseSeatNumber } from "@/utils/seat/parseSeatNumber";
+import { safeParseSeatNumber } from "@/utils/seat/parseSeatNumber";
 import apiClient from "./instance";
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
@@ -58,7 +58,8 @@ interface BackendSeatNumberResponse {
  * seatNumber "A-1"에서 row("A"), col(1) 파생.
  */
 function mapSeatLayout(item: BackendSeatLayoutResponse): SeatWithStatus {
-  const { row, col } = parseSeatNumber(item.seatNumber);
+  // 잘못된 형식의 seatNumber가 와도 좌석맵 전체가 깨지지 않도록 안전 파싱 사용
+  const { row, col } = safeParseSeatNumber(item.seatNumber);
   return {
     id: item.seatId,
     seatLayoutId: item.seatLayoutId,

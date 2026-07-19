@@ -38,11 +38,20 @@ import type {
 import type { Genre } from "@/types/domain/concert";
 
 /**
+ * MOCK_CONCERTS 항목에서 총 좌석 수 파생.
+ * totalSeats가 optional이 됐으므로(목록엔 없음, 상세에만 있음) safe 접근 필요.
+ * mock 데이터는 전부 값을 채워두었으므로 fallback은 방어용.
+ */
+function getTotalSeats(c: (typeof MOCK_CONCERTS)[number]): number {
+  return c.totalSeats ?? 0;
+}
+
+/**
  * MOCK_CONCERTS 항목에서 판매된 좌석 수 파생.
  * remainingSeats가 optional이 됐으므로 safe 접근 필요.
  */
 function getSold(c: (typeof MOCK_CONCERTS)[number]): number {
-  return c.totalSeats - (c.remainingSeats ?? 0);
+  return getTotalSeats(c) - (c.remainingSeats ?? 0);
 }
 
 // ── 대시보드 ───────────────────────────────────────────
@@ -50,7 +59,10 @@ export async function mockGetAdminDashboard() {
   await mockDelay(500);
 
   const totalSold = MOCK_CONCERTS.reduce((sum, c) => sum + getSold(c), 0);
-  const totalSeats = MOCK_CONCERTS.reduce((sum, c) => sum + c.totalSeats, 0);
+  const totalSeats = MOCK_CONCERTS.reduce(
+    (sum, c) => sum + getTotalSeats(c),
+    0,
+  );
   const totalRevenue = MOCK_CONCERTS.reduce(
     (sum, c) => sum + getSold(c) * c.price,
     0,
@@ -109,30 +121,33 @@ export async function mockGetAdminDashboard() {
   // 공연별 판매 현황
   const concertSales: ConcertSalesStatus[] = MOCK_CONCERTS.map((c) => {
     const sold = getSold(c);
+    const totalSeats = getTotalSeats(c);
     return {
       concertId: c.id,
       title: c.title,
       genre: c.genre,
       date: c.showDate,
       soldSeats: sold,
-      totalSeats: c.totalSeats,
-      occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
+      totalSeats,
+      occupancyRate: totalSeats > 0 ? sold / totalSeats : 0,
       revenue: sold * c.price,
-      isSoldOut: c.status === "SOLD_OUT",
+      // ⚠️ ConcertStatus에 SOLD_OUT 없음(이슈 #121) — 매진 여부는 잔여석으로 판단
+      isSoldOut: (c.remainingSeats ?? 0) === 0,
     };
   });
 
   // 전체 공연 목록 (관리자 테이블용)
   const concertList: AdminConcertItem[] = MOCK_CONCERTS.map((c) => {
     const sold = getSold(c);
+    const totalSeats = getTotalSeats(c);
     return {
       id: c.id,
       title: c.title,
       genre: c.genre,
       date: c.showDate,
       soldSeats: sold,
-      totalSeats: c.totalSeats,
-      occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
+      totalSeats,
+      occupancyRate: totalSeats > 0 ? sold / totalSeats : 0,
       revenue: sold * c.price,
       status: c.status,
     };
@@ -173,7 +188,7 @@ const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
       seatCount: 1,
       unitPrice: concert.price,
       totalAmount: concert.price,
-      status: isCancelled ? "CANCELLED" : "CONFIRMED",
+      status: isCancelled ? "CANCELED" : "CONFIRMED",
       paymentMethod: PAYMENT_METHODS[i % PAYMENT_METHODS.length],
     });
   }
@@ -229,7 +244,7 @@ export async function mockGetAdminBookingStats(): Promise<AdminBookingStats> {
       (sum, b) => sum + b.totalAmount,
       0,
     ),
-    cancelledBookings: ADMIN_BOOKINGS.filter((b) => b.status === "CANCELLED")
+    cancelledBookings: ADMIN_BOOKINGS.filter((b) => b.status === "CANCELED")
       .length,
   };
 }
@@ -242,15 +257,15 @@ export async function mockAdminRefundBooking(
   if (!booking) {
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
-  if (booking!.status === "CANCELLED") {
+  if (booking!.status === "CANCELED") {
     await mockError("ALREADY_CANCELLED", "이미 취소된 예매입니다.");
   }
-  booking!.status = "CANCELLED";
+  booking!.status = "CANCELED";
 
   // 사용자 mock bookings 저장소도 함께 동기화 (있다면)
   const userSide = _findMockBooking(bookingNumber);
   if (userSide) {
-    _updateMockBookingStatus(bookingNumber, "CANCELLED");
+    _updateMockBookingStatus(bookingNumber, "CANCELED");
   }
 }
 
@@ -411,7 +426,7 @@ export async function mockGetConcertForEdit(
     title: concert!.title,
     performer: concert!.performer,
     genre: concert!.genre,
-    venue: concert!.venue,
+    venue: concert!.venue ?? concert!.address,
     address: concert!.address,
     date: concert!.showDate,
     time: concert!.showTime,
