@@ -1,17 +1,18 @@
 // 좌석 API — 백엔드 seat-service swagger (2026-07-07) 스펙 반영
 //
 // 백엔드 endpoint 매핑:
-//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts  (이슈 #121)
-//   fetchSeats            → GET /api/v1/seat/{performanceId}/seat-layouts (이슈 #122)
-//   fetchSeatNumbers      → GET /api/v1/seat/numbers                      (이슈 #122)
-//   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (이슈 #123 SSE)
+//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts
+//   fetchSeats            → GET /api/v1/seat/{performanceId}/seat-layouts
+//   fetchSeatNumbers      → GET /api/v1/seat/numbers
+//   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (SSE)
 //
 // ⚠️ 백엔드 응답이 snake_case (total_count 등) 이지만
 // instance.ts의 axios-case-converter가 camelCase로 자동 변환.
 //
-// ⚠️ SSE 이벤트 payload 스펙 미확정 (백엔드 swagger에 SseEmitter만 있음).
-// 현재 프론트는 { seatId, status, timestamp } 가정 스펙 사용.
-// 실제 스펙 확정 시 매핑 로직 조정 필요.
+// 변경 이력:
+// - 2026-07-15 (이슈 #121 fix):
+//   - parseSeatNumber → safeParseSeatNumber로 변경 (throw 대신 fallback 반환)
+//     seatNumber 형식이 예외적일 때 좌석 배치 전체가 깨지지 않도록 방어
 import type {
   SeatCounts,
   SeatStatus,
@@ -24,7 +25,7 @@ import {
   mockSubscribeSeats,
 } from "./mocks/seats";
 import { mockDelay } from "./mocks/_helpers";
-import { parseSeatNumber } from "@/utils/seat/parseSeatNumber";
+import { safeParseSeatNumber } from "@/utils/seat/parseSeatNumber";
 import apiClient from "./instance";
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
@@ -56,15 +57,18 @@ interface BackendSeatNumberResponse {
 /**
  * 백엔드 SeatLayoutResponse → 프론트 SeatWithStatus.
  * seatNumber "A-1"에서 row("A"), col(1) 파생.
+ *
+ * safeParseSeatNumber 사용: 파싱 실패 시 { row: "?", col: 0 } fallback.
+ * (전체 좌석맵이 깨지지 않도록 방어)
  */
 function mapSeatLayout(item: BackendSeatLayoutResponse): SeatWithStatus {
-  const { row, col } = parseSeatNumber(item.seatNumber);
+  const parsed = safeParseSeatNumber(item.seatNumber);
   return {
     id: item.seatId,
     seatLayoutId: item.seatLayoutId,
     seatNumber: item.seatNumber,
-    row,
-    col,
+    row: parsed.row,
+    col: parsed.col,
     status: item.seatStatus,
   };
 }
@@ -178,7 +182,6 @@ export function subscribeSeatStream(
 
   // ⚠️ EventSource는 브라우저 표준 API. 인증 헤더 미지원 (쿠키만 자동 포함).
   // 백엔드가 JWT 헤더 인증을 요구한다면 EventSourcePolyfill 등 라이브러리 필요.
-  // 이 부분은 백엔드 인증 방식 확정 후 조정.
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
   const url = `${baseUrl}/api/v1/seat/${performanceId}/seat-status/stream`;
 
@@ -187,7 +190,6 @@ export function subscribeSeatStream(
   eventSource.onmessage = (message) => {
     try {
       const parsed = JSON.parse(message.data);
-      // ⚠️ 백엔드 payload 스펙 확정 후 필드 매핑 조정
       onEvent({
         seatId: parsed.seatId,
         status: parsed.status ?? parsed.seatStatus,
@@ -200,7 +202,6 @@ export function subscribeSeatStream(
 
   eventSource.onerror = (error) => {
     console.error("[SSE] 연결 오류:", error);
-    // EventSource는 자동 재연결 시도. 로깅만 남기고 그대로 유지.
   };
 
   return () => {
