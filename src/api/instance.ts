@@ -129,7 +129,12 @@ let refreshingPromise: Promise<string | null> | null = null;
  * 실제 refresh API 호출.
  * 성공 시 새 access token 반환, 실패 시 null 반환.
  *
- * raw axios 사용 (interceptor 미적용) — 무한 루프 방지 + case 변환 없이 snake_case 그대로.
+ * raw axios 사용 (interceptor 미적용) — 무한 루프 방지.
+ *
+ * ⚠️ 2026-07-18 실제 백엔드 스펙 확인(swagger-ui) 결과, 요청/응답 필드 모두
+ *   camelCase임이 확인됨 (TokenReissueRequest.refreshToken,
+ *   TokenReissueResponse.accessToken/refreshToken). 이전에는 snake_case로
+ *   잘못 가정되어 있어 refresh가 항상 실패(→ 강제 로그아웃)하는 버그였음.
  */
 async function performTokenRefresh(): Promise<string | null> {
   const currentRefreshToken = useAuthStore.getState().refreshToken;
@@ -138,22 +143,19 @@ async function performTokenRefresh(): Promise<string | null> {
   try {
     const res = await axios.post(
       `${API_BASE_URL}/api/v1/auth/reissue`,
-      { refresh_token: currentRefreshToken },
+      { refreshToken: currentRefreshToken },
       { headers: { "Content-Type": "application/json" } },
     );
 
-    // 백엔드 응답 예상: { is_success, code, result: { access_token, refresh_token } }
+    // 백엔드 응답: { isSuccess, code, result: { accessToken, refreshToken, ... } }
     const result = res.data?.result;
-    if (!result?.access_token) return null;
+    if (!result?.accessToken) return null;
 
     useAuthStore
       .getState()
-      .setTokens(
-        result.access_token,
-        result.refresh_token ?? currentRefreshToken,
-      );
+      .setTokens(result.accessToken, result.refreshToken ?? currentRefreshToken);
 
-    return result.access_token;
+    return result.accessToken;
   } catch (error) {
     // refresh 실패 원인 파악용 로깅
     // (프로덕션에서는 Sentry 등 모니터링 도구 연동 검토)
