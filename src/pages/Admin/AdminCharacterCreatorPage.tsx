@@ -17,7 +17,15 @@ interface CharacterConfig {
   background: string;
 }
 
+interface BackgroundPreset {
+  id: string;
+  label: string;
+  color: string;
+  category: "pastel" | "performance" | "dark";
+}
+
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const HEX_COLOR_PATTERN = /^#?[0-9A-Fa-f]{6}$/;
 
 const SKIN_TONES: { value: SkinTone; label: string; color: string }[] = [
   { value: "light", label: "Light", color: "#f7c6a8" },
@@ -85,14 +93,31 @@ const POSES: { value: Pose; label: string; icon: string }[] = [
   { value: "sing", label: "노래하기", icon: "🎤" },
 ];
 
-const BACKGROUNDS = [
-  { label: "라벤더", color: "#e9ddff" },
-  { label: "핑크톤", color: "#ffd6e8" },
-  { label: "블루빛", color: "#dbeafe" },
-  { label: "재즈", color: "#f59e0b" },
-  { label: "페스티벌", color: "#10b981" },
-  { label: "뮤지컬", color: "#ddd6fe" },
-  { label: "팬미팅", color: "#f0abfc" },
+const BACKGROUNDS: BackgroundPreset[] = [
+  { id: "lavender", label: "라벤더", color: "#E9DDFF", category: "pastel" },
+  { id: "pink", label: "핑크", color: "#FFD6E8", category: "pastel" },
+  { id: "sky-blue", label: "스카이블루", color: "#DBEAFE", category: "pastel" },
+  { id: "mint", label: "민트", color: "#D9F5EC", category: "pastel" },
+  { id: "cream", label: "크림", color: "#FFF3D6", category: "pastel" },
+  { id: "coral", label: "코랄", color: "#FFD2C8", category: "pastel" },
+  { id: "concert", label: "콘서트", color: "#4C3D91", category: "performance" },
+  { id: "magic-show", label: "마술쇼", color: "#24123D", category: "dark" },
+  { id: "opera", label: "오페라", color: "#6B1F2B", category: "dark" },
+  {
+    id: "festival",
+    label: "페스티벌",
+    color: "#10B981",
+    category: "performance",
+  },
+  { id: "musical", label: "뮤지컬", color: "#8B5CF6", category: "performance" },
+  {
+    id: "fan-meeting",
+    label: "팬미팅",
+    color: "#F0ABFC",
+    category: "performance",
+  },
+  { id: "classic", label: "클래식", color: "#D6C6A5", category: "pastel" },
+  { id: "dark-gray", label: "다크 그레이", color: "#343A40", category: "dark" },
 ];
 
 const DEFAULT_CHARACTER: CharacterConfig = {
@@ -103,8 +128,19 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   outfitColor: "#60a5fa",
   accessory: "none",
   pose: "standing",
-  background: "#e9ddff",
+  background: "#E9DDFF",
 };
+
+function normalizeHexColor(value: string): string | null {
+  const trimmed = value.trim();
+  if (!HEX_COLOR_PATTERN.test(trimmed)) return null;
+  const normalized = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+  return normalized.toUpperCase();
+}
+
+function isSameHexColor(first: string, second: string) {
+  return first.toUpperCase() === second.toUpperCase();
+}
 
 export default function AdminCharacterCreatorPage() {
   const navigate = useNavigate();
@@ -112,10 +148,19 @@ export default function AdminCharacterCreatorPage() {
 
   const [character, setCharacter] =
     useState<CharacterConfig>(DEFAULT_CHARACTER);
+  const [backgroundHexInput, setBackgroundHexInput] = useState(
+    DEFAULT_CHARACTER.background,
+  );
+  const [backgroundHexError, setBackgroundHexError] = useState("");
 
   const selectedSkinTone = SKIN_TONES.find(
     (skinTone) => skinTone.value === character.skinTone,
   );
+
+  const selectedBackgroundPreset = BACKGROUNDS.find((background) =>
+    isSameHexColor(background.color, character.background),
+  );
+  const isCustomBackground = !selectedBackgroundPreset;
 
   function update<K extends keyof CharacterConfig>(
     key: K,
@@ -127,25 +172,82 @@ export default function AdminCharacterCreatorPage() {
     }));
   }
 
+  function applyBackgroundColor(value: string) {
+    const normalized = normalizeHexColor(value);
+    if (!normalized) return false;
+
+    update("background", normalized);
+    setBackgroundHexInput(normalized);
+    setBackgroundHexError("");
+    return true;
+  }
+
+  function handleBackgroundHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setBackgroundHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+    if (normalized) {
+      update("background", normalized);
+      setBackgroundHexError("");
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setBackgroundHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setBackgroundHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setBackgroundHexError("");
+  }
+
+  function handleBackgroundHexBlur() {
+    const normalized = normalizeHexColor(backgroundHexInput);
+
+    if (normalized) {
+      applyBackgroundColor(normalized);
+      return;
+    }
+
+    setBackgroundHexError(
+      "예: #E9DDFF처럼 6자리 HEX 색상 코드를 입력해주세요.",
+    );
+  }
+
   function handleReset() {
     setCharacter(DEFAULT_CHARACTER);
+    setBackgroundHexInput(DEFAULT_CHARACTER.background);
+    setBackgroundHexError("");
   }
 
   function handleApply() {
-    localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(character));
+    if (!normalizeHexColor(backgroundHexInput)) {
+      setBackgroundHexError(
+        "배경색을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
 
+    localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(character));
     const returnTo = searchParams.get("returnTo") ?? "/admin/concerts/new";
     navigate(returnTo);
   }
 
   function handleBack() {
     const returnTo = searchParams.get("returnTo");
-
     if (returnTo) {
       navigate(returnTo);
       return;
     }
-
     navigate(-1);
   }
 
@@ -294,15 +396,19 @@ export default function AdminCharacterCreatorPage() {
             </CreatorSection>
 
             <CreatorSection title="배경 강조 색상">
-              <div className="grid grid-cols-3 gap-3 md:grid-cols-7">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7">
                 {BACKGROUNDS.map((background) => (
                   <OptionCard
-                    key={background.label}
-                    selected={character.background === background.color}
-                    onClick={() => update("background", background.color)}
+                    key={background.id}
+                    selected={isSameHexColor(
+                      character.background,
+                      background.color,
+                    )}
+                    onClick={() => applyBackgroundColor(background.color)}
+                    ariaLabel={`${background.label} 배경 선택`}
                   >
                     <div
-                      className="mx-auto h-10 w-16 rounded"
+                      className="mx-auto h-10 w-16 rounded border border-slate-200"
                       style={{ backgroundColor: background.color }}
                     />
                     <p className="mt-2 text-xs font-bold text-slate-800">
@@ -311,27 +417,123 @@ export default function AdminCharacterCreatorPage() {
                   </OptionCard>
                 ))}
               </div>
+
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      사용자 지정 배경색
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
+                    </p>
+                  </div>
+
+                  {isCustomBackground && (
+                    <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+                      CUSTOM 선택됨
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+                  <div>
+                    <label
+                      htmlFor="custom-background-color-picker"
+                      className="mb-2 block text-xs font-bold text-slate-700"
+                    >
+                      컬러 피커
+                    </label>
+                    <input
+                      id="custom-background-color-picker"
+                      type="color"
+                      value={character.background}
+                      onChange={(event) =>
+                        applyBackgroundColor(event.target.value)
+                      }
+                      className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                      aria-label="사용자 지정 배경색 선택"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="custom-background-hex"
+                      className="mb-2 block text-xs font-bold text-slate-700"
+                    >
+                      HEX 색상 코드
+                    </label>
+                    <input
+                      id="custom-background-hex"
+                      type="text"
+                      value={backgroundHexInput}
+                      onChange={(event) =>
+                        handleBackgroundHexChange(event.target.value)
+                      }
+                      onBlur={handleBackgroundHexBlur}
+                      placeholder="#E9DDFF"
+                      maxLength={7}
+                      spellCheck={false}
+                      aria-invalid={Boolean(backgroundHexError)}
+                      aria-describedby="custom-background-hex-help custom-background-hex-error"
+                      className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                        backgroundHexError
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-slate-300 focus:border-primary"
+                      }`}
+                    />
+                    <p
+                      id="custom-background-hex-help"
+                      className="mt-1 text-[11px] text-slate-500"
+                    >
+                      # 없이 6자리만 입력해도 자동으로 적용됩니다.
+                    </p>
+                    {backgroundHexError && (
+                      <p
+                        id="custom-background-hex-error"
+                        className="mt-1 text-xs font-medium text-red-600"
+                      >
+                        {backgroundHexError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-bold text-slate-700">
+                      현재 적용 색상
+                    </p>
+                    <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+                      <span
+                        className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                        style={{ backgroundColor: character.background }}
+                      />
+                      <code className="text-xs font-bold text-slate-700">
+                        {character.background.toUpperCase()}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CreatorSection>
           </div>
 
-          <aside className="h-fit rounded-xl bg-white p-5 text-slate-900">
+          <aside className="h-fit rounded-xl bg-white p-5 text-slate-900 lg:sticky lg:top-6">
             <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
               PREVIEW
             </span>
-
             <h2 className="mt-4 text-sm font-bold">미리보기</h2>
 
             <div
-                className="mt-4 h-72 overflow-hidden rounded-lg"
-                style={{ backgroundColor: character.background }}
+              className="mt-4 h-72 overflow-hidden rounded-lg border border-slate-200"
+              style={{ backgroundColor: character.background }}
             >
-                <CharacterModelViewer
-                    modelUrl="/models/chibi-base.glb"
-                    skinColor={selectedSkinTone?.color ?? "#f7c6a8"}
-                    hairColor={character.hairColor}
-                    outfitColor={character.outfitColor}
-                    hairStyle={character.hairStyle}
-                />
+              <CharacterModelViewer
+                modelUrl="/models/chibi-base.glb"
+                skinColor={selectedSkinTone?.color ?? "#f7c6a8"}
+                hairColor={character.hairColor}
+                outfitColor={character.outfitColor}
+                hairStyle={character.hairStyle}
+              />
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
@@ -340,6 +542,7 @@ export default function AdminCharacterCreatorPage() {
               <p>의상: {character.outfitName}</p>
               <p>액세서리: {character.accessory}</p>
               <p>포즈: {character.pose}</p>
+              <p>배경: {character.background.toUpperCase()}</p>
             </div>
 
             <button
@@ -392,18 +595,22 @@ function OptionCard({
   selected,
   onClick,
   children,
+  ariaLabel,
 }: {
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  ariaLabel?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={ariaLabel}
+      aria-pressed={selected}
       className={`rounded-lg border bg-white p-3 text-center transition ${
         selected
-          ? "border-slate-900 shadow-sm"
+          ? "border-slate-900 shadow-sm ring-1 ring-slate-900"
           : "border-slate-200 hover:border-slate-400"
       }`}
     >
@@ -424,7 +631,8 @@ function ColorButton({
   return (
     <button
       type="button"
-      aria-label={color}
+      aria-label={`${color} 색상 선택`}
+      aria-pressed={selected}
       onClick={onClick}
       className={`h-12 rounded-lg border transition ${
         selected ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200"
