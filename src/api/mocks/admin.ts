@@ -38,11 +38,15 @@ import type {
 import type { Genre } from "@/types/domain/concert";
 
 /**
- * MOCK_CONCERTS 항목에서 판매된 좌석 수 파생.
- * remainingSeats가 optional이 됐으므로 safe 접근 필요.
+ * MOCK_CONCERTS 항목에서 totalSeats / 판매 좌석 수 파생.
+ * totalSeats·remainingSeats가 optional이므로 safe 접근 필요.
  */
+function getTotalSeats(c: (typeof MOCK_CONCERTS)[number]): number {
+  return c.totalSeats ?? 0;
+}
+
 function getSold(c: (typeof MOCK_CONCERTS)[number]): number {
-  return c.totalSeats - (c.remainingSeats ?? 0);
+  return getTotalSeats(c) - (c.remainingSeats ?? 0);
 }
 
 // ── 대시보드 ───────────────────────────────────────────
@@ -50,7 +54,10 @@ export async function mockGetAdminDashboard() {
   await mockDelay(500);
 
   const totalSold = MOCK_CONCERTS.reduce((sum, c) => sum + getSold(c), 0);
-  const totalSeats = MOCK_CONCERTS.reduce((sum, c) => sum + c.totalSeats, 0);
+  const totalSeats = MOCK_CONCERTS.reduce(
+    (sum, c) => sum + getTotalSeats(c),
+    0,
+  );
   const totalRevenue = MOCK_CONCERTS.reduce(
     (sum, c) => sum + getSold(c) * c.price,
     0,
@@ -107,32 +114,35 @@ export async function mockGetAdminDashboard() {
     .sort((a, b) => b.revenue - a.revenue);
 
   // 공연별 판매 현황
+  // ⚠️ ConcertStatus에 SOLD_OUT 없음 → remainingSeats === 0으로 매진 판단
   const concertSales: ConcertSalesStatus[] = MOCK_CONCERTS.map((c) => {
     const sold = getSold(c);
+    const total = getTotalSeats(c);
     return {
       concertId: c.id,
       title: c.title,
       genre: c.genre,
       date: c.showDate,
       soldSeats: sold,
-      totalSeats: c.totalSeats,
-      occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
+      totalSeats: total,
+      occupancyRate: total > 0 ? sold / total : 0,
       revenue: sold * c.price,
-      isSoldOut: c.status === "SOLD_OUT",
+      isSoldOut: (c.remainingSeats ?? 0) === 0,
     };
   });
 
   // 전체 공연 목록 (관리자 테이블용)
   const concertList: AdminConcertItem[] = MOCK_CONCERTS.map((c) => {
     const sold = getSold(c);
+    const total = getTotalSeats(c);
     return {
       id: c.id,
       title: c.title,
       genre: c.genre,
       date: c.showDate,
       soldSeats: sold,
-      totalSeats: c.totalSeats,
-      occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
+      totalSeats: total,
+      occupancyRate: total > 0 ? sold / total : 0,
       revenue: sold * c.price,
       status: c.status,
     };
@@ -411,7 +421,8 @@ export async function mockGetConcertForEdit(
     title: concert!.title,
     performer: concert!.performer,
     genre: concert!.genre,
-    venue: concert!.venue,
+    // venue는 optional (백엔드에 없음) → address fallback
+    venue: concert!.venue ?? concert!.address,
     address: concert!.address,
     date: concert!.showDate,
     time: concert!.showTime,

@@ -208,3 +208,42 @@ export function subscribeSeatStream(
     eventSource.close();
   };
 }
+
+// -------------------------------------------------------
+// Deprecated stubs — 백엔드 seat-service에 HOLD/RELEASE API 없음
+// (#121 CI: useHoldSeat/useReleaseSeat가 아직 import하므로 stub 유지)
+// 실 연동은 #124에서 createBooking / cancelBooking으로 대체.
+// -------------------------------------------------------
+
+/**
+ * @deprecated 백엔드에 좌석 HOLD API 없음. POST /api/v1/booking 사용 (#124).
+ * Mock에서만 캐시 갱신용으로 seatId를 반환한다.
+ */
+export async function holdSeat(
+  _performanceId: number,
+  seatId: number,
+): Promise<{ seatId: number }> {
+  if (USE_MOCK) {
+    await mockDelay(300);
+    return { seatId };
+  }
+  throw new Error(
+    "holdSeat is not supported by backend. Use POST /api/v1/booking (#124).",
+  );
+}
+
+/**
+ * @deprecated 백엔드에 좌석 RELEASE API 없음. DELETE /api/v1/booking/{bookingNumber} 사용 (#124).
+ */
+export async function releaseSeat(
+  _performanceId: number,
+  _seatId: number,
+): Promise<void> {
+  if (USE_MOCK) {
+    await mockDelay(200);
+    return;
+  }
+  throw new Error(
+    "releaseSeat is not supported by backend. Use DELETE /api/v1/booking/{bookingNumber} (#124).",
+  );
+}
