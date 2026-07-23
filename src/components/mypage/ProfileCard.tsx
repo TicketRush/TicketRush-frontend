@@ -21,7 +21,9 @@ export function ProfileCard({
   joinedAt,
   totalBookings,
 }: ProfileCardProps) {
-  const formattedJoinDate = joinedAt.split("T")[0]; // YYYY-MM-DD
+  // ⚠️ joinedAt이 API 실패 등으로 비어있을 수 있어 방어적으로 처리
+  // (undefined.split()으로 페이지 전체가 죽는 것 방지)
+  const formattedJoinDate = joinedAt ? joinedAt.split("T")[0] : "-"; // YYYY-MM-DD
 
   return (
     <div
