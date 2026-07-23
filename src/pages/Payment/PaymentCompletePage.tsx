@@ -1,5 +1,6 @@
-// 결제 완료 페이지 — `/reservations/:bookingNumber` 라우트
+// 결제 완료 페이지 — `/reservations/:reservationId` 라우트
 // 결제 직후 진입 + 마이페이지에서 예매 상세로도 진입
+// ※ App.tsx 파라미터명은 reservationId (bookingNumber와 동일 값)
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -11,7 +12,10 @@ import usePaymentStore from "@/stores/reservation/paymentStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 
 export default function PaymentCompletePage() {
-  const { bookingNumber } = useParams<{ bookingNumber: string }>();
+  // App.tsx: path="/reservations/:reservationId"
+  const { reservationId: bookingNumber } = useParams<{
+    reservationId: string;
+  }>();
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
