@@ -25,11 +25,7 @@ import emailIcon from "@/assets/icons/email.svg";
 import checkIcon from "@/assets/icons/check.svg";
 import lockIcon from "@/assets/icons/lock.svg";
 
-import { getOauthUrlApi } from "@/api/auth";
-
 export default function SignupPage() {
-  type SocialProvider = "kakao" | "naver" | "google";
-
   const navigate = useNavigate();
 
   // 이메일 인증 상태
@@ -145,27 +141,6 @@ export default function SignupPage() {
   const onSubmit = (data: SignupFormData) => {
     signupMutation.mutate(data);
   };
-
-  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
-    null,
-  );
-
-  async function handleSocialLogin(provider: SocialProvider) {
-    if (pendingProvider) return;
-
-    setPendingProvider(provider);
-    try {
-      const { url } = await getOauthUrlApi(provider);
-      window.location.href = url;
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "소셜 로그인 요청에 실패했습니다.";
-      toast.error(message);
-      setPendingProvider(null);
-    }
-  }
 
   // 이메일 입력 변경 시 인증 상태 초기화
   useEffect(() => {
@@ -345,34 +320,13 @@ export default function SignupPage() {
 
         {/* OAuth */}
         <div className="flex gap-3">
-          <Button
-            variant="kakao"
-            size="oauth"
-            className="flex-1"
-            loading={pendingProvider === "kakao"}
-            disabled={pendingProvider !== null}
-            onClick={() => handleSocialLogin("kakao")}
-          >
+          <Button variant="kakao" size="oauth" className="flex-1">
             카카오
           </Button>
-          <Button
-            variant="naver"
-            size="oauth"
-            className="flex-1"
-            loading={pendingProvider === "naver"}
-            disabled={pendingProvider !== null}
-            onClick={() => handleSocialLogin("naver")}
-          >
+          <Button variant="naver" size="oauth" className="flex-1">
             네이버
           </Button>
-          <Button
-            variant="google"
-            size="oauth"
-            className="flex-1"
-            loading={pendingProvider === "google"}
-            disabled={pendingProvider !== null}
-            onClick={() => handleSocialLogin("google")}
-          >
+          <Button variant="google" size="oauth" className="flex-1">
             구글
           </Button>
         </div>
