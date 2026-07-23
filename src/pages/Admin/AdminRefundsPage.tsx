@@ -83,7 +83,9 @@ export default function AdminRefundsPage() {
           <p className="text-3xl font-bold mb-1" style={{ color: "#FB2C36" }}>
             {failed.data?.items.length ?? 0}
           </p>
-          <p className="text-xs text-admin-text-secondary">환불 처리 실패</p>
+          <p className="text-xs text-admin-text-secondary">
+            환불 처리 실패 (현재 페이지)
+          </p>
         </div>
 
         <div className="bg-admin-card border border-admin-border rounded-xl p-6">
@@ -104,7 +106,9 @@ export default function AdminRefundsPage() {
           <p className="text-3xl font-bold mb-1" style={{ color: "#F59E0B" }}>
             {stuck.data?.items.length ?? 0}
           </p>
-          <p className="text-xs text-admin-text-secondary">환불 지연(멈춤)</p>
+          <p className="text-xs text-admin-text-secondary">
+            환불 지연(멈춤) (현재 페이지)
+          </p>
         </div>
       </div>
 
@@ -112,6 +116,8 @@ export default function AdminRefundsPage() {
         title="환불 처리 실패"
         subtitle="환불 요청 자체가 실패해 재시도가 필요한 예매입니다"
         isLoading={failed.isLoading}
+        isError={failed.isError}
+        onReload={() => void failed.refetch()}
         items={failed.data?.items ?? []}
         dateColumnLabel="실패 시각"
         dateAccessor={(item) => item.refundFailedAt}
@@ -126,6 +132,8 @@ export default function AdminRefundsPage() {
         title="환불 지연 (REFUNDING 멈춤)"
         subtitle="환불 진행 중 상태(REFUNDING)로 오래 멈춰있는 예매입니다"
         isLoading={stuck.isLoading}
+        isError={stuck.isError}
+        onReload={() => void stuck.refetch()}
         items={stuck.data?.items ?? []}
         dateColumnLabel="최종 업데이트"
         dateAccessor={(item) => item.updatedAt}
@@ -143,6 +151,8 @@ function RefundTable({
   title,
   subtitle,
   isLoading,
+  isError,
+  onReload,
   items,
   dateColumnLabel,
   dateAccessor,
@@ -155,6 +165,8 @@ function RefundTable({
   title: string;
   subtitle: string;
   isLoading: boolean;
+  isError: boolean;
+  onReload: () => void;
   items: AdminRefundBookingListItem[];
   dateColumnLabel: string;
   dateAccessor: (item: AdminRefundBookingListItem) => string | null;
@@ -175,6 +187,20 @@ function RefundTable({
       {isLoading ? (
         <div className="text-center py-12 text-admin-text-secondary">
           불러오는 중...
+        </div>
+      ) : isError ? (
+        <div className="text-center py-12 space-y-3">
+          <p className="text-admin-text-secondary">
+            목록을 불러오지 못했습니다.
+          </p>
+          <button
+            type="button"
+            onClick={onReload}
+            className="px-4 py-2 rounded-md text-xs font-bold text-white inline-flex items-center gap-1"
+            style={{ backgroundColor: "#2563EB" }}
+          >
+            <RotateCcw size={12} /> 다시 시도
+          </button>
         </div>
       ) : items.length === 0 ? (
         <div className="text-center py-12 text-admin-text-secondary">

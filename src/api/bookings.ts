@@ -323,10 +323,15 @@ async function toAdminRefundListResponse(
   );
 
   const seatIds = Array.from(new Set(items.map((i) => i.seatId)));
-  const seatNumbersArr = await fetchSeatNumbers(seatIds);
-  const seatNumberMap = new Map(
-    seatNumbersArr.map((s) => [s.seatId, s.seatNumber]),
-  );
+  let seatNumberMap = new Map<number, string>();
+  try {
+    const seatNumbersArr = await fetchSeatNumbers(seatIds);
+    seatNumberMap = new Map(
+      seatNumbersArr.map((s) => [s.seatId, s.seatNumber]),
+    );
+  } catch (error) {
+    console.warn("Failed to fetch seat numbers for refund list:", error);
+  }
 
   const richItems = items.map((i) => ({
     ...i,
