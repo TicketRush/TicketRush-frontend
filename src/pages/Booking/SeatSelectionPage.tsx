@@ -4,6 +4,12 @@
 //   - handleSeatClick의 seat 객체 필드명 변경 (label→seatNumber, layoutId→seatLayoutId)
 //   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
+//
+// ⚠️ 아키텍처 변경 (이슈 #124):
+//   백엔드에 별도 좌석 HOLD API 없음. 예매 생성(POST /booking, PENDING 상태)이
+//   좌석 HOLD를 겸함. useHoldSeat(seatId만 전달) → useCreateBooking(performanceId+seatId)로 교체.
+//   생성 응답의 bookingNumber를 paymentStore.startBooking()에 전달해야
+//   결제 페이지/예매 확인 페이지에서 결제·취소 시 사용 가능.
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { useMemo } from "react";
@@ -11,10 +17,11 @@ import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
 import { useSeats } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
-import { useHoldSeat } from "@/hooks/mutations/useHoldSeat";
+import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
+import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { toast } from "react-toastify";
 import type { SeatWithStatus } from "@/types/domain/seat";
 
@@ -29,7 +36,7 @@ export default function SeatSelectionPage() {
   const currentConcert = useConcertStore((s) => s.currentConcert);
 
   const { data: seats, isLoading, isError } = useSeats(performanceId);
-  const holdSeatMutation = useHoldSeat(performanceId ?? 0);
+  const createBookingMutation = useCreateBooking();
 
   // SSE 구독
   useSeatEventStream(performanceId);
@@ -61,7 +68,12 @@ export default function SeatSelectionPage() {
   async function handleConfirm() {
     if (!selectedSeat || !performanceId) return;
     try {
-      await holdSeatMutation.mutateAsync(selectedSeat.id);
+      // 예매(PENDING) 생성 = 좌석 HOLD. 응답의 bookingNumber를 결제 플로우 전체에서 사용.
+      const booking = await createBookingMutation.mutateAsync({
+        performanceId,
+        seatId: selectedSeat.id,
+      });
+      usePaymentStore.getState().startBooking(booking.bookingNumber, totalAmount);
       startTimer();
       navigate(`/concerts/${performanceId}/payment/confirm`);
     } catch (error: unknown) {
@@ -92,15 +104,15 @@ export default function SeatSelectionPage() {
         </div>
         <button
           type="button"
-          disabled={!selectedSeat || holdSeatMutation.isPending}
+          disabled={!selectedSeat || createBookingMutation.isPending}
           onClick={handleConfirm}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-            selectedSeat && !holdSeatMutation.isPending
+            selectedSeat && !createBookingMutation.isPending
               ? "bg-primary text-white hover:opacity-90"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
-          {holdSeatMutation.isPending ? "선점 중..." : "좌석 확인"}
+          {createBookingMutation.isPending ? "선점 중..." : "좌석 확인"}
         </button>
       </div>
 

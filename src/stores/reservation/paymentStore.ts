@@ -1,9 +1,12 @@
 // 결제 상태 머신 store
 // 상태 전이: IDLE → REQUESTING → CONFIRMING → SUCCESS / FAILED / EXPIRED
 //
-// ⚠️ 기존 paymentStore가 있다면 인터페이스 비교 후 마이그레이션 필요
+// ⚠️ Toss 결제창 리다이렉트로 페이지가 완전히 새로 로드되므로, 리다이렉트 복귀 후에도
+// bookingNumber/amount/status를 잃지 않도록 sessionStorage에 persist.
+// (localStorage가 아닌 sessionStorage: 탭 종료 시 예매 컨텍스트 정리)
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { PaymentStatus, PaymentMethod } from "@/types/domain/payment";
 
 interface PaymentStoreState {
@@ -49,31 +52,39 @@ const initial = {
   errorMessage: null,
 };
 
-export const usePaymentStore = create<PaymentStoreState>((set) => ({
-  ...initial,
+export const usePaymentStore = create<PaymentStoreState>()(
+  persist(
+    (set) => ({
+      ...initial,
 
-  startBooking: (bookingNumber, amount) =>
-    set({
-      status: "IDLE",
-      bookingNumber,
-      amount,
-      errorMessage: null,
+      startBooking: (bookingNumber, amount) =>
+        set({
+          status: "IDLE",
+          bookingNumber,
+          amount,
+          errorMessage: null,
+        }),
+
+      setMethod: (method) => set({ method }),
+
+      startRequest: (paymentKey) =>
+        set({ status: "REQUESTING", paymentKey, errorMessage: null }),
+
+      startConfirming: () => set({ status: "CONFIRMING" }),
+
+      succeed: () => set({ status: "SUCCESS" }),
+
+      fail: (message) => set({ status: "FAILED", errorMessage: message }),
+
+      expire: () => set({ status: "EXPIRED" }),
+
+      reset: () => set(initial),
     }),
-
-  setMethod: (method) => set({ method }),
-
-  startRequest: (paymentKey) =>
-    set({ status: "REQUESTING", paymentKey, errorMessage: null }),
-
-  startConfirming: () => set({ status: "CONFIRMING" }),
-
-  succeed: () => set({ status: "SUCCESS" }),
-
-  fail: (message) => set({ status: "FAILED", errorMessage: message }),
-
-  expire: () => set({ status: "EXPIRED" }),
-
-  reset: () => set(initial),
-}));
+    {
+      name: "payment-storage",
+      storage: createJSONStorage(() => sessionStorage),
+    },
+  ),
+);
 
 export default usePaymentStore;

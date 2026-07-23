@@ -18,7 +18,7 @@ interface BookingCardProps {
  * ─ 운영 정책 ─
  * [상태 태그 디자인]
  *  - 예매 확정(CONFIRMED): #00C950
- *  - 취소됨(CANCELLED)/기타: #FB2C36
+ *  - 취소됨(CANCELED)/기타: #FB2C36
  *
  * [환불 정책]
  *  - 공연 7일 전까지: [환불 신청] 활성화
@@ -52,7 +52,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   const statusBadge =
     booking.status === "CONFIRMED"
       ? { label: "예매 확정", bg: "bg-[#00C950]/15", text: "text-[#00C950]" }
-      : booking.status === "CANCELLED"
+      : booking.status === "CANCELED"
         ? { label: "취소됨", bg: "bg-[#FB2C36]/15", text: "text-[#FB2C36]" }
         : booking.status === "PENDING"
           ? { label: "결제 대기", bg: "bg-amber-100", text: "text-amber-700" }
@@ -137,7 +137,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       {isPastTab ? (
         // 지난 공연: 티켓 보기만 (운영 정책: 환불 기능 제공 X)
         // 단, 취소된 예매는 티켓 보기도 비활성
-        booking.status === "CANCELLED" ? null : (
+        booking.status === "CANCELED" ? null : (
           <button
             type="button"
             onClick={handleViewTicket}
@@ -155,7 +155,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           <button
             type="button"
             onClick={handleViewTicket}
-            disabled={booking.status === "CANCELLED"}
+            disabled={booking.status === "CANCELED"}
             className="flex items-center justify-center gap-2
                        bg-primary text-white
                        py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors
@@ -185,7 +185,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
                          py-3 rounded-lg font-medium cursor-not-allowed"
             >
               <AlertCircle className="w-4 h-4" />
-              {booking.status === "CANCELLED"
+              {booking.status === "CANCELED"
                 ? "취소된 예매"
                 : "환불 불가 (D-7 미만)"}
             </button>
