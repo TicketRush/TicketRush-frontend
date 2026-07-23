@@ -1,15 +1,64 @@
 // 인증 관련 mutation 훅들
 //
-// 변경사항 (2026-07-19, 실 API 스펙 반영):
-//   - useSocialLogin 훅 제거 — 실제 OAuth 콜백 처리(code 교환)는
-//     OAuthCallbackPage에서 socialLoginApi를 직접 호출하므로 이 훅은 미사용 dead code.
-//     (기존 useSocialLogin은 code 교환 없이 토큰을 바로 받는 Flow B를 가정한 잘못된 구현)
-//   - useEmailLogin: EmailLoginResponse에 name/joinedAt이 없으므로,
-//     로그인 성공 후 getMeApi()로 프로필을 비동기 보강.
+// 변경사항:
+//   - setAuth 호출부에 refreshToken 매개변수 추가 (refresh 토큰 자동 재발급 지원)
+//   - 소셜 로그인 응답에 email/role/joinedAt 없음 반영 (백엔드 OauthLoginResponse)
+//   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
+//   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt) 보강
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
+import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
 import useAuthStore from "@/stores/global/authStore";
+import type { UserRole } from "@/types/domain/auth";
+
+// ⚠️ Dev/데모용 — 관리자 계정 화이트리스트 (backend role 없을 때 fallback)
+// 백엔드에서 응답에 role 필드가 확정되면 이 화이트리스트는 제거
+const ADMIN_EMAIL_WHITELIST = ["admin@ticketrush.com"];
+
+function determineRole(email: string | undefined, backendRole?: string): UserRole {
+  if (backendRole === "ADMIN") return "ADMIN";
+  if (backendRole === "MEMBER") return "MEMBER";
+  if (email && ADMIN_EMAIL_WHITELIST.includes(email.toLowerCase().trim())) {
+    return "ADMIN";
+  }
+  return "MEMBER";
+}
+
+export function useSocialLogin() {
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const navigate = useNavigate();
+
+  return useMutation({
+    mutationFn: socialLoginApi,
+    onSuccess: async (data) => {
+      // 소셜 로그인 응답에는 email/role 없음 → MEMBER 고정, /me로 프로필 보강
+      const role: UserRole = "MEMBER";
+
+      setAuth(data.accessToken, data.refreshToken, {
+        userId: data.userId,
+        name: data.name ?? "",
+        email: "",
+        role,
+        joinedAt: new Date().toISOString(),
+      });
+
+      try {
+        const me = await getMeApi();
+        setAuth(data.accessToken, data.refreshToken, {
+          userId: data.userId,
+          name: me.name ?? data.name ?? "",
+          email: me.email ?? "",
+          role,
+          joinedAt: me.createdAt ?? new Date().toISOString(),
+        });
+      } catch {
+        // /me 실패해도 로그인 자체는 유지
+      }
+
+      navigate("/");
+    },
+  });
+}
 
 export function useEmailLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -17,29 +66,32 @@ export function useEmailLogin() {
 
   return useMutation({
     mutationFn: emailLoginApi,
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
+      const role = determineRole(variables.email, data.role);
+
+      // 이메일 로그인 응답에 name/joinedAt 없음 → 임시값 후 /me 보강
       setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
-        name: variables.email.split("@")[0],
-        email: data.email,
-        role: data.role,
+        name: "",
+        email: variables.email,
+        role,
         joinedAt: new Date().toISOString(),
       });
 
-      navigate(data.role === "ADMIN" ? "/admin" : "/");
+      try {
+        const me = await getMeApi();
+        setAuth(data.accessToken, data.refreshToken, {
+          userId: data.userId,
+          name: me.name ?? "",
+          email: me.email ?? variables.email,
+          role,
+          joinedAt: me.createdAt ?? new Date().toISOString(),
+        });
+      } catch {
+        // /me 실패해도 로그인 자체는 유지
+      }
 
-      // 로그인 응답에 name/joinedAt이 없어 /user/me로 비동기 보강 (실패해도 로그인은 유지)
-      getMeApi()
-        .then((me) => {
-          setAuth(data.accessToken, data.refreshToken, {
-            userId: data.userId,
-            name: me.name,
-            email: me.email,
-            role: data.role,
-            joinedAt: me.createdAt,
-          });
-        })
-        .catch(() => {});
+      navigate(role === "ADMIN" ? "/admin" : "/");
     },
   });
 }
@@ -55,7 +107,6 @@ export function useLogout() {
       navigate("/login");
     },
     onError: () => {
-      // 서버 로그아웃 실패해도 클라이언트 세션은 정리
       logout();
       navigate("/login");
     },
