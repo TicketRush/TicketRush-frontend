@@ -183,7 +183,7 @@ export default function TicketDetailPage() {
             }`}
           >
             {remainingMs > 0
-              ? `QR 갱신까지 ${remainingLabel}`
+              ? `QR 만료까지 ${remainingLabel}`
               : "QR 코드 갱신 중..."}
           </p>
         )}

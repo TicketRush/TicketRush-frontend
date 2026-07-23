@@ -1,10 +1,11 @@
-// 결제 완료 페이지 — `/reservations/:bookingNumber` 라우트
+// 결제 완료 페이지 — `/reservations/:reservationId` 라우트
 // 결제 직후 진입 + 마이페이지에서 예매 상세로도 진입
+// ※ App.tsx 파라미터명은 reservationId (bookingNumber와 동일 값)
 //
 // 변경 이력:
 // - 이슈 #127: qrPayload = JSON.stringify(...) mock 제거.
 //   GET /api/v1/ticket/bookings/{bookingId}/qr 실 API(useTicketQr)로 교체.
-//   payload는 발급 후 5분만 유효 — 4분마다 자동 재발급.
+//   payload는 발급 후 5분만 유효 — 4분마다 자동 재발급 + expiresAt 도달 시 refetch.
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -18,7 +19,10 @@ import usePaymentStore from "@/stores/reservation/paymentStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 
 export default function PaymentCompletePage() {
-  const { bookingNumber } = useParams<{ bookingNumber: string }>();
+  // App.tsx: path="/reservations/:reservationId"
+  const { reservationId: bookingNumber } = useParams<{
+    reservationId: string;
+  }>();
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
@@ -187,7 +191,7 @@ export default function PaymentCompletePage() {
             }`}
           >
             {remainingMs > 0
-              ? `QR 갱신까지 ${remainingLabel}`
+              ? `QR 만료까지 ${remainingLabel}`
               : "QR 코드 갱신 중..."}
           </p>
         )}

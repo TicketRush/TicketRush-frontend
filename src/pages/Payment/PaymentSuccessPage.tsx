@@ -33,7 +33,10 @@ export default function PaymentSuccessPage() {
     useReservationLifecycle();
 
   const paymentKey = searchParams.get("paymentKey");
+  const orderId = searchParams.get("orderId");
   const amount = searchParams.get("amount");
+
+  const startConfirming = usePaymentStore((s) => s.startConfirming);
 
   // StrictMode 이중 마운트/리렌더로 confirm이 중복 호출되는 것을 방지
   const requestedRef = useRef(false);
@@ -42,19 +45,23 @@ export default function PaymentSuccessPage() {
     if (requestedRef.current) return;
 
     // 직접 URL 진입, 세션 만료 등으로 필요한 정보가 없으면 처리 불가
+    // orderId는 Toss가 bookingNumber로 돌려주므로 store 값과 일치해야 함
     if (
       !paymentKey ||
       !amount ||
+      !orderId ||
       bookingId == null ||
       seatId == null ||
       !provider ||
-      !bookingNumber
+      !bookingNumber ||
+      orderId !== bookingNumber
     ) {
       navigate(`/concerts/${id}/payment/failed`, { replace: true });
       return;
     }
 
     requestedRef.current = true;
+    startConfirming();
 
     paymentConfirmMutation
       .mutateAsync({
