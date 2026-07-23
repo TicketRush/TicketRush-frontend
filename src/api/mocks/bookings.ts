@@ -116,7 +116,8 @@ export async function mockCreateBooking(
     performanceId: req.performanceId,
     performanceTitle: concert!.title,
     performancePerformer: concert!.performer,
-    performanceVenue: concert!.venue,
+    // venue는 optional (백엔드에 없음) → address fallback
+    performanceVenue: concert!.venue ?? concert!.address,
     performanceDate: concert!.showDate,
     performanceTime: concert!.showTime,
     performanceImageMainUrl: concert!.imageMainUrl,
