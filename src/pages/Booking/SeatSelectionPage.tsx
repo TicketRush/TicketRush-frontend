@@ -5,6 +5,10 @@
 //   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
 //
+// 이슈 #122:
+//   - 좌석맵: useSeats (seat-layouts)
+//   - 잔여/상태별 통계: useSeatCounts (seat-counts) — layouts 배열을 직접 집계하지 않음
+//
 // ⚠️ 아키텍처 변경 (이슈 #124):
 //   백엔드에 별도 좌석 HOLD API 없음. 예매 생성(POST /booking, PENDING 상태)이
 //   좌석 HOLD를 겸함. useHoldSeat(seatId만 전달) → useCreateBooking(performanceId+seatId)로 교체.
@@ -12,10 +16,9 @@
 //   결제 페이지/예매 확인 페이지에서 결제·취소 시 사용 가능.
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { useMemo } from "react";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
-import { useSeats } from "@/hooks/queries/useSeats";
+import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
 import useSeatStore from "@/stores/reservation/seatStore";
@@ -35,21 +38,20 @@ export default function SeatSelectionPage() {
   const startTimer = useTimerStore((s) => s.startTimer);
   const currentConcert = useConcertStore((s) => s.currentConcert);
 
+  // #122: layouts → 좌석맵, counts → 하단 잔여/상태 통계
   const { data: seats, isLoading, isError } = useSeats(performanceId);
+  const { data: seatCounts } = useSeatCounts(performanceId);
   const createBookingMutation = useCreateBooking();
 
-  // SSE 구독
+  // SSE 구독 (#123에서 polling fallback 보강)
   useSeatEventStream(performanceId);
 
-  const stats = useMemo(() => {
-    if (!seats) return { total: 0, available: 0, holding: 0, sold: 0 };
-    return {
-      total: seats.length,
-      available: seats.filter((s) => s.status === "AVAILABLE").length,
-      holding: seats.filter((s) => s.status === "HOLD").length,
-      sold: seats.filter((s) => s.status === "SOLD").length,
-    };
-  }, [seats]);
+  const stats = {
+    total: seatCounts?.totalCount ?? 0,
+    available: seatCounts?.availableCount ?? 0,
+    holding: seatCounts?.holdCount ?? 0,
+    sold: seatCounts?.soldCount ?? 0,
+  };
 
   // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
   const totalAmount = currentConcert?.price ?? 0;
