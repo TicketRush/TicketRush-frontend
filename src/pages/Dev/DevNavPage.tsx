@@ -86,7 +86,12 @@ export default function DevNavPage() {
         useTimerStore.getState().startTimer();
         usePaymentStore
           .getState()
-          .startBooking("X7B29-KLPW1", MOCK_CONCERT.price);
+          .startBooking(
+            "X7B29-KLPW1",
+            1,
+            MOCK_SEAT.id,
+            MOCK_CONCERT.price,
+          );
       },
     },
     {
@@ -97,7 +102,12 @@ export default function DevNavPage() {
         useTimerStore.getState().startTimer(10_000);
         usePaymentStore
           .getState()
-          .startBooking("X7B29-KLPW1", MOCK_CONCERT.price);
+          .startBooking(
+            "X7B29-KLPW1",
+            1,
+            MOCK_SEAT.id,
+            MOCK_CONCERT.price,
+          );
       },
     },
     {

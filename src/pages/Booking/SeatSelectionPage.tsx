@@ -75,7 +75,14 @@ export default function SeatSelectionPage() {
         performanceId,
         seatId: selectedSeat.id,
       });
-      usePaymentStore.getState().startBooking(booking.bookingNumber, totalAmount);
+      usePaymentStore
+        .getState()
+        .startBooking(
+          booking.bookingNumber,
+          booking.bookingId,
+          selectedSeat.id,
+          totalAmount,
+        );
       startTimer();
       navigate(`/concerts/${performanceId}/payment/confirm`);
     } catch (error: unknown) {
