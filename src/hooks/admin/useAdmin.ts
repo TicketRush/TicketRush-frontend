@@ -1,6 +1,7 @@
 // 관리자 hooks — 도메인별로 작아서 한 파일로 통합
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/admin";
+import { queryKeys } from "@/constants/queryKeys";
 import type {
   AdminBookingListParams,
   ConcertFormData,
@@ -57,6 +58,11 @@ export function useAdminRefundBooking() {
 }
 
 // ── 좌석 모니터링 ─────────────────────────────────────
+// #169: KPI/맵은 useSeatCounts + useSeats(seat-layouts)로 선연동.
+//       아래 useAdminSeatMonitoring은 레거시(전용 admin monitoring API) — 미사용.
+//       상세/강제해제는 BE #562까지 admin mock API 유지.
+
+/** @deprecated #169 — AdminSeatMonitoringPage는 useSeatCounts/useSeats 사용 */
 export function useAdminSeatMonitoring(performanceId: number | undefined) {
   return useQuery({
     queryKey: performanceId
@@ -65,7 +71,6 @@ export function useAdminSeatMonitoring(performanceId: number | undefined) {
     queryFn: () => api.fetchAdminSeatMonitoring(performanceId!),
     enabled: !!performanceId,
     staleTime: 0,
-    refetchInterval: 10_000,
   });
 }
 
@@ -88,7 +93,13 @@ export function useAdminReleaseSeat(performanceId: number) {
       api.adminReleaseSeatApi(performanceId, seatId),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: adminKeys.seatMonitoring(performanceId),
+        queryKey: ["admin", "seat-detail", performanceId],
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.seats.byPerformance(performanceId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.seats.counts(performanceId),
       });
     },
   });

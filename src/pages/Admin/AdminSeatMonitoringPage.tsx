@@ -1,3 +1,9 @@
+// 관리자 좌석 모니터링
+//
+// #169: 상단 KPI 4종은 기존 seat-counts 실 API로 선연동.
+//       좌석 맵은 seat-layouts(useSeats)로 조회. SSE는 붙이지 않음(수동 새로고침).
+//       상세/강제해제는 admin mock API 유지 → BE #562 대기.
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
@@ -6,11 +12,11 @@ import StatCard from "@/components/admin/StatCard";
 import AdminSeatMap from "@/components/admin/AdminSeatMap";
 import AdminSeatDetailPanel from "@/components/admin/AdminSeatDetailPanel";
 import {
-  useAdminSeatMonitoring,
   useAdminSeatDetail,
   useAdminReleaseSeat,
   useAdminDashboard,
 } from "@/hooks/admin/useAdmin";
+import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import type { SeatWithStatus } from "@/types/domain/seat";
 
 export default function AdminSeatMonitoringPage() {
@@ -20,19 +26,40 @@ export default function AdminSeatMonitoringPage() {
   );
   const [selectedSeatId, setSelectedSeatId] = useState<number | null>(null);
 
-  // 대시보드 데이터에서 공연 목록 활용
+  // 대시보드 데이터에서 공연 목록 활용 (대시보드 실연동 전엔 mock)
   const { data: dashboard } = useAdminDashboard();
   const concertList = dashboard?.concertList ?? [];
 
-  const { data, isLoading, refetch, isFetching } = useAdminSeatMonitoring(
-    selectedConcertId ?? undefined,
-  );
+  const {
+    data: seatCounts,
+    isLoading: countsLoading,
+    isFetching: countsFetching,
+    refetch: refetchCounts,
+    isError: countsError,
+  } = useSeatCounts(selectedConcertId ?? undefined);
+
+  const {
+    data: seats,
+    isLoading: seatsLoading,
+    isFetching: seatsFetching,
+    refetch: refetchSeats,
+    isError: seatsError,
+  } = useSeats(selectedConcertId ?? undefined);
+
   const { data: seatDetail, isLoading: detailLoading } = useAdminSeatDetail(
     selectedConcertId ?? undefined,
     selectedSeatId,
   );
 
   const releaseMutation = useAdminReleaseSeat(selectedConcertId ?? 0);
+
+  const isLoading = countsLoading || seatsLoading;
+  const isFetching = countsFetching || seatsFetching;
+
+  function handleRefresh() {
+    void refetchCounts();
+    void refetchSeats();
+  }
 
   function handleSeatClick(seat: SeatWithStatus) {
     if (seat.status === "AVAILABLE") {
@@ -47,6 +74,7 @@ export default function AdminSeatMonitoringPage() {
       await releaseMutation.mutateAsync(seatId);
       toast.success("예약이 해제되었습니다.");
       setSelectedSeatId(null);
+      handleRefresh();
     } catch (error: unknown) {
       const err =
         error instanceof Error ? error : new Error("예약 해제에 실패했습니다.");
@@ -78,7 +106,7 @@ export default function AdminSeatMonitoringPage() {
               좌석 현황 실시간 모니터링
             </h1>
             <p className="text-sm text-admin-text-secondary mt-1">
-              공연별 좌석 상태를 실시간으로 확인하고 관리합니다
+              공연별 좌석 상태를 확인하고 관리합니다
             </p>
           </div>
           <button
@@ -127,8 +155,7 @@ export default function AdminSeatMonitoringPage() {
                         ? "text-[#1D7DFF]"
                         : "text-admin-text";
                   const isSoldOut =
-                    c.status === "CLOSED" ||
-                    c.totalSeats - c.soldSeats <= 0;
+                    c.totalSeats > 0 && c.soldSeats >= c.totalSeats;
                   return (
                     <tr
                       key={c.id}
@@ -138,13 +165,13 @@ export default function AdminSeatMonitoringPage() {
                       <td className="py-3 px-3 font-mono text-xs">
                         E{String(c.id).padStart(3, "0")}
                       </td>
-                      <td className="py-3 px-3 font-bold">{c.title}</td>
+                      <td className="py-3 px-3 font-semibold">{c.title}</td>
                       <td className="py-3 px-3">{c.genre}</td>
                       <td className="py-3 px-3">{c.date}</td>
                       <td className="py-3 px-3">
                         {c.soldSeats}/{c.totalSeats}
                       </td>
-                      <td className={`py-3 px-3 font-bold ${rateColor}`}>
+                      <td className={`py-3 px-3 font-semibold ${rateColor}`}>
                         {rate.toFixed(0)}%
                       </td>
                       <td className="py-3 px-3">
@@ -152,10 +179,11 @@ export default function AdminSeatMonitoringPage() {
                       </td>
                       <td className="py-3 px-3">
                         <span
-                          className="px-3 py-1 rounded-md text-xs font-bold text-white"
-                          style={{
-                            backgroundColor: isSoldOut ? "#FB2C36" : "#00C950",
-                          }}
+                          className={`text-xs px-2 py-0.5 rounded ${
+                            isSoldOut
+                              ? "bg-red-100 text-red-600"
+                              : "bg-admin-border"
+                          }`}
                         >
                           {isSoldOut ? "매진" : "판매중"}
                         </span>
@@ -171,11 +199,12 @@ export default function AdminSeatMonitoringPage() {
     );
   }
 
-  // ── 2단계: 좌석 맵 화면 ─────────────────────────
+  // ── 2단계: 좌석 맵 화면 ──────────────────────────
   const selectedConcert = concertList.find((c) => c.id === selectedConcertId);
 
   return (
     <div className="p-8 space-y-6">
+      {/* 헤더 */}
       <div className="flex items-start justify-between">
         <div>
           <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
@@ -183,7 +212,7 @@ export default function AdminSeatMonitoringPage() {
           </span>
           <h1 className="text-3xl font-bold mt-2">좌석 현황 실시간 모니터링</h1>
           <p className="text-sm text-admin-text-secondary mt-1">
-            공연별 좌석 상태를 실시간으로 확인하고 관리합니다
+            공연별 좌석 상태를 확인하고 관리합니다
           </p>
         </div>
         <button
@@ -211,7 +240,7 @@ export default function AdminSeatMonitoringPage() {
           />
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             disabled={isFetching}
             className="px-4 py-2 rounded-lg bg-primary text-white font-semibold flex items-center gap-2 disabled:opacity-50"
           >
@@ -224,13 +253,13 @@ export default function AdminSeatMonitoringPage() {
         </div>
       </div>
 
-      {/* 통계 카드 4개 */}
+      {/* 통계 카드 4개 — GET /seat/{id}/seat-counts (#169) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<Users size={24} />}
           badge="TOTAL"
           badgeColor="purple"
-          value={data?.stats.totalSeats ?? 0}
+          value={seatCounts?.totalCount ?? 0}
           label="전체 좌석"
         />
         <StatCard
@@ -239,7 +268,7 @@ export default function AdminSeatMonitoringPage() {
           }
           badge="AVAILABLE"
           badgeColor="green"
-          value={data?.stats.availableSeats ?? 0}
+          value={seatCounts?.availableCount ?? 0}
           label="예매 가능"
         />
         <StatCard
@@ -248,17 +277,23 @@ export default function AdminSeatMonitoringPage() {
           }
           badge="SOLD"
           badgeColor="blue"
-          value={data?.stats.soldSeats ?? 0}
+          value={seatCounts?.soldCount ?? 0}
           label="판매 완료"
         />
         <StatCard
           icon={<Clock size={24} />}
           badge="HOLDING"
           badgeColor="yellow"
-          value={data?.stats.holdingSeats ?? 0}
+          value={seatCounts?.holdCount ?? 0}
           label="임시 예매 (타이머)"
         />
       </div>
+
+      {countsError && (
+        <p className="text-sm text-red-400">
+          좌석 요약(seat-counts)을 불러올 수 없습니다.
+        </p>
+      )}
 
       {/* 좌석 맵 + 상세 패널 */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
@@ -271,10 +306,10 @@ export default function AdminSeatMonitoringPage() {
             <div className="text-center py-20 text-admin-text-secondary">
               좌석 정보 불러오는 중...
             </div>
-          ) : data ? (
+          ) : seats && !seatsError ? (
             <>
               <AdminSeatMap
-                seats={data.seats}
+                seats={seats}
                 selectedSeatId={selectedSeatId}
                 onSeatClick={handleSeatClick}
                 scale={0.7}

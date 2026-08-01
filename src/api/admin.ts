@@ -38,6 +38,10 @@ export async function adminRefundBookingApi(bookingNumber: string) {
 }
 
 // ── 좌석 모니터링 ──────────────────────────────────────
+// #169: 요약 KPI는 seats.ts의 fetchSeatCounts 사용.
+//       좌석 맵은 seats.ts의 fetchSeats(seat-layouts) 사용.
+//       아래는 레거시 전용 admin monitoring (미사용). 상세/강제해제는 #562.
+/** @deprecated #169 — use fetchSeatCounts / fetchSeats instead */
 export async function fetchAdminSeatMonitoring(performanceId: number) {
   if (USE_MOCK) return mocks.mockGetAdminSeatMonitoring(performanceId);
   // const res = await apiClient.get(`/api/v1/admin/seats/${performanceId}/monitoring`);
