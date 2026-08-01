@@ -32,18 +32,23 @@ interface ConcertCardProps {
 function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
 
-  // 실 API로 잔여 좌석 조회 (실패/로딩 시 mock 값 fallback)
-  const { data: seatCounts } = useSeatCounts(concert.id);
+  // 판매 종료/취소된 공연 → 무조건 예매 불가 & 잔여 좌석 0으로 고정
+  //   (실시간 좌석 수를 조회해도 의미 없으므로 API 호출 자체를 생략)
+  const isUnavailable =
+    concert.status === "CLOSED" || concert.status === "CANCELED";
 
-  // 잔여 좌석 우선순위: seatCounts (실 API) > concert.remainingSeats (mock)
-  const remaining = seatCounts?.availableCount ?? concert.remainingSeats ?? 0;
+  // 실 API로 잔여 좌석 조회 (실패/로딩 시 mock 값 fallback, 매진 공연은 조회 생략)
+  const { data: seatCounts } = useSeatCounts(concert.id, !isUnavailable);
+
+  // 잔여 좌석 우선순위: 매진/종료 공연은 0 고정 > seatCounts (실 API) > concert.remainingSeats (mock)
+  const remaining = isUnavailable
+    ? 0
+    : (seatCounts?.availableCount ?? concert.remainingSeats ?? 0);
   const total = seatCounts?.totalCount ?? concert.totalSeats ?? 0;
 
   // 매진 판단:
   //   1. status가 CLOSED/CANCELED → 무조건 예매 불가
   //   2. 잔여 좌석 0 → 매진 (기술적 매진)
-  const isUnavailable =
-    concert.status === "CLOSED" || concert.status === "CANCELED";
   const isSoldOut = isUnavailable || (total > 0 && remaining === 0);
 
   const remainingPercent = total > 0 ? (remaining / total) * 100 : 0;
