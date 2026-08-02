@@ -1,4 +1,19 @@
 // Mock 관리자 데이터
+//
+// NOTE: 관리자(백오피스) mock은 현재 백엔드 미구현 상태이므로 관리 편의성
+// 차원에서 `date` + `time` 폼 필드를 유지합니다. 퍼블릭 도메인(사용자)
+// 필드(`showDate`/`showTime`)와 네이밍이 다른 것은 의도적이며, 실제 API
+// 연동 시에는 폼 값을 변환하여 전송하도록 어댑터를 적용할 예정입니다.
+//
+// 이번 리팩터링에서는 다른 도메인(concert, seat, booking)의 필드명
+// 변경을 반영해 내부 참조와 타입을 정리했습니다. mock 데이터 구조의
+// 일부 필드명(date/time 등)은 admin 용도에서 의도적으로 보존됩니다.
+//
+// 변경 요약:
+//   - AdminBookingItem.seatNumbers → seatNumbers
+//   - AdminSeatDetail.seatNumber → seatNumber
+//   - ConcertFormData 반환값 필드명 정렬 (artist → performer 등)
+
 import { mockDelay, mockError } from "./_helpers";
 import { MOCK_CONCERTS } from "./concerts";
 import {
@@ -22,17 +37,22 @@ import type {
 } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
 
+/**
+ * MOCK_CONCERTS 항목에서 판매된 좌석 수 파생.
+ * remainingSeats가 optional이 됐으므로 safe 접근 필요.
+ */
+function getSold(c: (typeof MOCK_CONCERTS)[number]): number {
+  return c.totalSeats - (c.remainingSeats ?? 0);
+}
+
 // ── 대시보드 ───────────────────────────────────────────
 export async function mockGetAdminDashboard() {
   await mockDelay(500);
 
-  const totalSold = MOCK_CONCERTS.reduce(
-    (sum, c) => sum + (c.totalSeats - c.remainingSeats),
-    0,
-  );
+  const totalSold = MOCK_CONCERTS.reduce((sum, c) => sum + getSold(c), 0);
   const totalSeats = MOCK_CONCERTS.reduce((sum, c) => sum + c.totalSeats, 0);
   const totalRevenue = MOCK_CONCERTS.reduce(
-    (sum, c) => sum + (c.totalSeats - c.remainingSeats) * c.price,
+    (sum, c) => sum + getSold(c) * c.price,
     0,
   );
 
@@ -66,7 +86,7 @@ export async function mockGetAdminDashboard() {
     BALLET: "발레",
   };
   MOCK_CONCERTS.forEach((c) => {
-    const revenue = (c.totalSeats - c.remainingSeats) * c.price;
+    const revenue = getSold(c) * c.price;
     const prev = genreMap.get(c.genre);
     genreMap.set(c.genre, {
       revenue: (prev?.revenue ?? 0) + revenue,
@@ -88,12 +108,12 @@ export async function mockGetAdminDashboard() {
 
   // 공연별 판매 현황
   const concertSales: ConcertSalesStatus[] = MOCK_CONCERTS.map((c) => {
-    const sold = c.totalSeats - c.remainingSeats;
+    const sold = getSold(c);
     return {
       concertId: c.id,
       title: c.title,
       genre: c.genre,
-      date: c.date,
+      date: c.showDate,
       soldSeats: sold,
       totalSeats: c.totalSeats,
       occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
@@ -104,12 +124,12 @@ export async function mockGetAdminDashboard() {
 
   // 전체 공연 목록 (관리자 테이블용)
   const concertList: AdminConcertItem[] = MOCK_CONCERTS.map((c) => {
-    const sold = c.totalSeats - c.remainingSeats;
+    const sold = getSold(c);
     return {
       id: c.id,
       title: c.title,
       genre: c.genre,
-      date: c.date,
+      date: c.showDate,
       soldSeats: sold,
       totalSeats: c.totalSeats,
       occupancyRate: c.totalSeats > 0 ? sold / c.totalSeats : 0,
@@ -122,7 +142,6 @@ export async function mockGetAdminDashboard() {
 }
 
 // ── 예매 내역 관리 ────────────────────────────────────
-// 메모리 mock — 충분한 데이터 생성
 const ADMIN_USERS = [
   { name: "김철수", email: "user@example.com" },
   { name: "박민수", email: "minsoo@example.com" },
@@ -140,17 +159,17 @@ const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
     const seatId = (i % 120) + 1;
     const rowIdx = Math.floor((seatId - 1) / 12);
     const colIdx = ((seatId - 1) % 12) + 1;
-    const seatLabel = `${String.fromCharCode("A".charCodeAt(0) + rowIdx)}-${colIdx}`;
+    const seatNumber = `${String.fromCharCode("A".charCodeAt(0) + rowIdx)}-${colIdx}`;
 
     const isCancelled = i % 7 === 0;
     items.push({
       bookingNumber: `X${7000 + i}-KLPW${i % 10}`,
       concertTitle: concert.title,
-      concertDate: `${concert.date} ${concert.time}`,
+      concertDate: `${concert.showDate} ${concert.showTime}`,
       bookedAt: new Date(Date.now() - i * 3600 * 1000).toISOString(),
       userName: user.name,
       userEmail: user.email,
-      seatLabels: [seatLabel],
+      seatNumbers: [seatNumber],
       seatCount: 1,
       unitPrice: concert.price,
       totalAmount: concert.price,
@@ -236,41 +255,38 @@ export async function mockAdminRefundBooking(
 }
 
 // ── 좌석 모니터링 ─────────────────────────────────────
-// 사용자 mock seats.ts와 동일 패턴 — 별도 함수로 구현
-// price: 행이 앞일수록 비쌈 (사용자 좌석맵과 동일 로직: 50000 + rowIdx * 10000)
+// mock 좌석 데이터는 seats.ts와 별도로 관리. 앞열=낮은 행.
+// price 필드는 개별 좌석에 없음 (백엔드 스펙).
 export async function mockGetAdminSeatMonitoring(
   _performanceId: number,
 ): Promise<{
   stats: AdminSeatStats;
   seats: Array<{
     id: number;
-    layoutId: number;
-    label: string;
+    seatLayoutId: number;
+    seatNumber: string;
     row: string;
     col: number;
     status: import("@/types/domain/seat").SeatStatus;
-    price: number;
   }>;
 }> {
   await mockDelay(400);
 
-  // 좌석 상태 mock (간단하게 새로 생성 - 실제로는 seats.ts와 공유)
   const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
   const COLS = 12;
   const seats: Array<{
     id: number;
-    layoutId: number;
-    label: string;
+    seatLayoutId: number;
+    seatNumber: string;
     row: string;
     col: number;
     status: import("@/types/domain/seat").SeatStatus;
-    price: number;
   }> = [];
   let id = 1;
   let available = 0,
     sold = 0,
     holding = 0;
-  ROWS.forEach((row, rowIdx) => {
+  ROWS.forEach((row) => {
     for (let col = 1; col <= COLS; col++) {
       const r = Math.random();
       let status: import("@/types/domain/seat").SeatStatus = "AVAILABLE";
@@ -285,12 +301,11 @@ export async function mockGetAdminSeatMonitoring(
       }
       seats.push({
         id,
-        layoutId: id,
-        label: `${row}-${col}`,
+        seatLayoutId: id,
+        seatNumber: `${row}-${col}`,
         row,
         col,
         status,
-        price: 50000 + rowIdx * 10000, // 앞열일수록 비쌈 (A:50000 ~ J:140000)
       });
       id++;
     }
@@ -313,22 +328,21 @@ export async function mockGetAdminSeatDetail(
 ): Promise<AdminSeatDetail> {
   await mockDelay(200);
 
-  // 좌석 라벨 계산
+  // 좌석 번호 계산
   const rowIdx = Math.floor((seatId - 1) / 12);
   const colIdx = ((seatId - 1) % 12) + 1;
-  const label = `${String.fromCharCode("A".charCodeAt(0) + rowIdx)}-${colIdx}`;
+  const seatNumber = `${String.fromCharCode("A".charCodeAt(0) + rowIdx)}-${colIdx}`;
 
-  // booking store에서 해당 seatId의 예매 정보 조회 (백엔드 패턴 동일)
+  // booking store에서 해당 seatId의 예매 정보 조회
   const booking = _findMockBookingBySeat(performanceId, seatId);
 
   if (booking) {
     if (booking.status === "PENDING") {
-      // PENDING = HOLD 상태 — 타이머 진행중
       const elapsedMs = Date.now() - new Date(booking.createdAt).getTime();
-      const remainingSec = Math.max(0, 300 - Math.floor(elapsedMs / 1000)); // 5분
+      const remainingSec = Math.max(0, 300 - Math.floor(elapsedMs / 1000));
       return {
         seatId,
-        seatLabel: label,
+        seatNumber, // ← 변경
         status: "HOLD",
         reservedBy: "예매 진행자",
         reservedAt: booking.createdAt,
@@ -338,9 +352,9 @@ export async function mockGetAdminSeatDetail(
     if (booking.status === "CONFIRMED") {
       return {
         seatId,
-        seatLabel: label,
+        seatNumber, // ← 변경
         status: "SOLD",
-        reservedBy: "김철수", // mock: 실제 백엔드에선 booking.userName
+        reservedBy: "김철수",
         reservedAt: booking.paidAt ?? booking.createdAt,
       };
     }
@@ -348,7 +362,7 @@ export async function mockGetAdminSeatDetail(
 
   return {
     seatId,
-    seatLabel: label,
+    seatNumber, // ← 변경
     status: "AVAILABLE",
   };
 }
@@ -367,7 +381,6 @@ export async function mockCreateConcert(
 ): Promise<{ id: number }> {
   await mockDelay(500);
   const newId = Math.max(...MOCK_CONCERTS.map((c) => c.id)) + 1;
-  // 실제로는 MOCK_CONCERTS에 push해야 함 (mock에선 ID만 반환)
   return { id: newId };
 }
 
@@ -380,12 +393,10 @@ export async function mockUpdateConcert(
   if (!concert) {
     await mockError("CONCERT_NOT_FOUND", "공연을 찾을 수 없습니다.");
   }
-  // mock에선 noop
 }
 
 export async function mockDeleteConcert(_id: number): Promise<void> {
   await mockDelay(500);
-  // mock에선 noop
 }
 
 export async function mockGetConcertForEdit(
@@ -398,16 +409,16 @@ export async function mockGetConcertForEdit(
   }
   return {
     title: concert!.title,
-    artist: concert!.artist,
+    performer: concert!.performer,
     genre: concert!.genre,
     venue: concert!.venue,
-    address: "서울특별시 서초구 남부순환로 2406",
-    date: concert!.date,
-    time: concert!.time,
+    address: concert!.address,
+    date: concert!.showDate,
+    time: concert!.showTime,
     price: concert!.price,
-    duration: 120,
+    durationMinutes: 120,
     description: "공연 설명...",
-    posterUrl: concert!.posterUrl,
+    imageMainUrl: concert!.imageMainUrl,
     facilities: [],
     notices: [],
   };

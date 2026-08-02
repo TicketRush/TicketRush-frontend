@@ -1,3 +1,10 @@
+// 회원가입 페이지
+//
+// 백엔드 스펙 반영 변경:
+//   - signupApi 파라미터에 passwordConfirm 추가 (백엔드 스펙 요구)
+//   - 회원가입 흐름에 consumeEmailAuthApi 단계 추가:
+//     send → verify → consume(신규) → signup
+//     consume은 백엔드 임시 인증 상태를 소비하여 재사용 방지 목적
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -9,6 +16,7 @@ import { signupSchema, type SignupFormData } from "../../schemas/auth";
 import {
   sendEmailVerificationApi,
   verifyEmailCodeApi,
+  consumeEmailAuthApi,
   signupApi,
 } from "@/api/auth";
 import backbtnIcon from "@/assets/icons/arrow-back.svg";
@@ -89,13 +97,21 @@ export default function SignupPage() {
   });
 
   // 회원가입 mutation
+  // 백엔드 스펙: consume → signup 순서 필수
+  //   consume은 백엔드가 임시로 저장한 "이메일 인증 완료" 상태를 소비.
+  //   consume 성공 후 signup 실패 시, 사용자는 인증부터 다시 시작해야 함.
   const signupMutation = useMutation({
-    mutationFn: (data: SignupFormData) =>
-      signupApi({
+    mutationFn: async (data: SignupFormData) => {
+      // 1. 이메일 인증 상태 소비 (백엔드 스펙 요구)
+      await consumeEmailAuthApi(data.email);
+      // 2. 회원가입 (passwordConfirm 포함)
+      return signupApi({
         name: data.name,
         email: data.email,
         password: data.password,
-      }),
+        passwordConfirm: data.passwordConfirm,
+      });
+    },
     onSuccess: () => {
       toast.success("회원가입이 완료되었습니다.");
       navigate("/login");

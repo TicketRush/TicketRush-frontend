@@ -1,3 +1,9 @@
+// 좌석 선택 페이지
+//
+// 백엔드 스펙 반영 변경:
+//   - handleSeatClick의 seat 객체 필드명 변경 (label→seatNumber, layoutId→seatLayoutId)
+//   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
+//   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { useMemo } from "react";
@@ -38,16 +44,17 @@ export default function SeatSelectionPage() {
     };
   }, [seats]);
 
-  const totalAmount = selectedSeat?.price ?? currentConcert?.price ?? 0;
+  // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
+  const totalAmount = currentConcert?.price ?? 0;
 
   function handleSeatClick(seat: SeatWithStatus) {
+    // Seat 도메인 타입에 맞게 필드 정렬
     toggleSeat({
       id: seat.id,
-      layoutId: seat.layoutId,
-      label: seat.label,
+      seatLayoutId: seat.seatLayoutId,
+      seatNumber: seat.seatNumber,
       row: seat.row,
       col: seat.col,
-      price: seat.price,
     });
   }
 

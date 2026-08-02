@@ -11,10 +11,10 @@ import usePaymentStore from "@/stores/reservation/paymentStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 
 export default function PaymentCompletePage() {
-  const { reservationId } = useParams<{ reservationId: string }>();
+  const { bookingNumber } = useParams<{ bookingNumber: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading, isError } = useBookingDetail(reservationId);
+  const { data, isLoading, isError } = useBookingDetail(bookingNumber);
 
   const resetSeat = useSeatStore((s) => s.reset);
   const resetPayment = usePaymentStore((s) => s.reset);
@@ -27,7 +27,7 @@ export default function PaymentCompletePage() {
     resetPayment();
   }, [stopTimer, resetSeat, resetPayment]);
 
-  if (!reservationId) return <Navigate to="/concerts" replace />;
+  if (!bookingNumber) return <Navigate to="/concerts" replace />;
 
   if (isLoading) {
     return (
@@ -53,7 +53,7 @@ export default function PaymentCompletePage() {
   // TODO: 백엔드 응답에 qrToken 필드 추가되면 (data as any).qrToken ?? JSON.stringify(...) 패턴으로
   const qrPayload = JSON.stringify({
     reservationId: data.bookingNumber,
-    seatLabel: data.seatLabel,
+    seatLabel: data.seatNumber,
     issuedAt: new Date().toISOString(),
   });
 
@@ -77,9 +77,9 @@ export default function PaymentCompletePage() {
       <div className="bg-white border-2 border-border rounded-2xl overflow-hidden mb-6">
         {/* 공연 정보 헤더 */}
         <div className="bg-primary/5 p-6 flex items-center gap-4">
-          {data.performancePosterUrl ? (
+          {data.performanceImageMainUrl ? (
             <img
-              src={data.performancePosterUrl}
+              src={data.performanceImageMainUrl}
               alt={data.performanceTitle}
               className="w-14 h-14 rounded-xl object-cover shrink-0"
             />
@@ -110,7 +110,7 @@ export default function PaymentCompletePage() {
             label="시간"
             value={data.performanceTime}
           />
-          <InfoBox icon={null} label="좌석" value={data.seatLabel} />
+          <InfoBox icon={null} label="좌석" value={data.seatNumber} />
           <InfoBox
             icon={null}
             label="예매 번호"

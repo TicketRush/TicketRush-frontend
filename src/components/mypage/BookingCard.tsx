@@ -1,4 +1,7 @@
 // src/components/mypage/BookingCard.tsx
+//
+// 백엔드 스펙 반영 변경:
+//   - booking.seatNumber → booking.seatNumber
 import { useNavigate } from "react-router-dom";
 import { Calendar, MapPin, Ticket, AlertCircle } from "lucide-react";
 import type { BookingListItem, BookingTab } from "@/types/domain/booking";
@@ -109,9 +112,9 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       <div className="grid grid-cols-3 gap-4 bg-gray-50 rounded-lg p-4 mb-4">
         <div>
           <p className="text-xs text-gray-500 mb-2">좌석</p>
-          {/* 1인 1석 — 단일 좌석 라벨 */}
+          {/* 1인 1석 — 단일 좌석 번호 */}
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-white font-medium">
-            {booking.seatLabel}
+            {booking.seatNumber}
           </span>
         </div>
 
