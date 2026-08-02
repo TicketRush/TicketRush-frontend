@@ -17,74 +17,79 @@ import type {
 } from "@/types/domain/concert";
 import { MOCK_CONCERTS, getMockConcertDetail } from "./mocks/concerts";
 import { mockDelay, mockError } from "./mocks/_helpers";
-// import apiClient from "./instance"; // 실 API 시 주석 해제
+import apiClient from "./instance";
 
-const USE_MOCK = true;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+
+async function buildMockConcertListResponse(
+  params: ConcertListParams = {},
+): Promise<ConcertListResponse> {
+  await mockDelay();
+
+  let filtered = [...MOCK_CONCERTS];
+
+  if (params.genre) {
+    filtered = filtered.filter((c) => c.genre === params.genre);
+  }
+  if (params.status) {
+    filtered = filtered.filter((c) => c.status === params.status);
+  }
+  if (params.minPrice !== undefined) {
+    filtered = filtered.filter((c) => c.price >= params.minPrice!);
+  }
+  if (params.maxPrice !== undefined) {
+    filtered = filtered.filter((c) => c.price <= params.maxPrice!);
+  }
+  if (params.keyword) {
+    const kw = params.keyword.toLowerCase();
+    filtered = filtered.filter(
+      (c) =>
+        c.title.toLowerCase().includes(kw) ||
+        c.performer.toLowerCase().includes(kw),
+    );
+  }
+
+  // 정렬
+  if (params.sort === "PRICE_ASC") {
+    filtered.sort((a, b) => a.price - b.price);
+  } else if (params.sort === "PRICE_DESC") {
+    filtered.sort((a, b) => b.price - a.price);
+  } else if (params.sort === "POPULAR") {
+    filtered.sort((a, b) => {
+      const remA = a.remainingSeats ?? a.totalSeats;
+      const remB = b.remainingSeats ?? b.totalSeats;
+      return remA / a.totalSeats - remB / b.totalSeats;
+    });
+  }
+  // LATEST는 기본 순서 유지
+
+  // Cursor 페이지네이션
+  const size = params.size ?? 10;
+  const cursor = params.cursor ?? 0;
+  const items = filtered.slice(cursor, cursor + size);
+
+  return {
+    items,
+    pagination: {
+      hasNext: cursor + size < filtered.length,
+      nextCursor: cursor + size,
+      size,
+    },
+  };
+}
 
 export async function fetchConcerts(
   params: ConcertListParams = {},
 ): Promise<ConcertListResponse> {
   if (USE_MOCK) {
-    await mockDelay();
-
-    let filtered = [...MOCK_CONCERTS];
-
-    if (params.genre) {
-      filtered = filtered.filter((c) => c.genre === params.genre);
-    }
-    if (params.status) {
-      filtered = filtered.filter((c) => c.status === params.status);
-    }
-    if (params.minPrice !== undefined) {
-      filtered = filtered.filter((c) => c.price >= params.minPrice!);
-    }
-    if (params.maxPrice !== undefined) {
-      filtered = filtered.filter((c) => c.price <= params.maxPrice!);
-    }
-    if (params.keyword) {
-      const kw = params.keyword.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.title.toLowerCase().includes(kw) ||
-          c.performer.toLowerCase().includes(kw),
-      );
-    }
-
-    // 정렬
-    if (params.sort === "PRICE_ASC") {
-      filtered.sort((a, b) => a.price - b.price);
-    } else if (params.sort === "PRICE_DESC") {
-      filtered.sort((a, b) => b.price - a.price);
-    } else if (params.sort === "POPULAR") {
-      // 잔여석 비율이 낮을수록 인기
-      // remainingSeats가 optional이 됐으므로 nullish coalescing으로 안전 처리
-      filtered.sort((a, b) => {
-        const remA = a.remainingSeats ?? a.totalSeats;
-        const remB = b.remainingSeats ?? b.totalSeats;
-        return remA / a.totalSeats - remB / b.totalSeats;
-      });
-    }
-    // LATEST는 기본 순서 유지
-
-    // Cursor 페이지네이션
-    const size = params.size ?? 10;
-    const cursor = params.cursor ?? 0;
-    const items = filtered.slice(cursor, cursor + size);
-
-    return {
-      items,
-      pagination: {
-        hasNext: cursor + size < filtered.length,
-        nextCursor: cursor + size,
-        size,
-      },
-    };
+    return buildMockConcertListResponse(params);
   }
 
-  // 실 API — GET /api/v1/performance
-  // const res = await apiClient.get<ConcertListResponse>("/api/v1/performance", { params });
-  // return res.data;
-  throw new Error("Real API not implemented");
+  // useless try/catch 제거 — 예외는 자동 전파
+  const res = await apiClient.get<ConcertListResponse>("/api/v1/performance", {
+    params,
+  });
+  return res.data;
 }
 
 export async function fetchConcertDetail(id: number): Promise<ConcertDetail> {
@@ -96,7 +101,8 @@ export async function fetchConcertDetail(id: number): Promise<ConcertDetail> {
     }
     return detail!;
   }
-  // const res = await apiClient.get<ConcertDetail>(`/api/v1/performance/${id}`);
-  // return res.data;
-  throw new Error("Real API not implemented");
+
+  // useless try/catch 제거 — 예외는 자동 전파
+  const res = await apiClient.get<ConcertDetail>(`/api/v1/performance/${id}`);
+  return res.data;
 }

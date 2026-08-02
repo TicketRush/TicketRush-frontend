@@ -24,7 +24,7 @@ import {
 } from "./mocks/bookings";
 // import apiClient from "./instance";
 
-const USE_MOCK = true;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 /** 예매 생성 (백엔드 확정: POST /api/v1/booking) */
 export async function createBookingApi(

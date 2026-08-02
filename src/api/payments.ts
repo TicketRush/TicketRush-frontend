@@ -27,7 +27,7 @@ import {
 } from "./mocks/payments";
 // import apiClient from "./instance";
 
-const USE_MOCK = true;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 /**
  * 결제 확정 (백엔드 확정).
