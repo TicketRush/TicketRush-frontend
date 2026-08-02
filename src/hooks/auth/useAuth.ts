@@ -1,6 +1,7 @@
 // 인증 관련 mutation 훅들
 //
-// 변경사항 (백엔드 스펙 반영):
+// 변경사항:
+//   - setAuth 호출부에 refreshToken 매개변수 추가 (refresh 토큰 자동 재발급 지원)
 //   - useEmailLogin.onSuccess에서 백엔드 응답의 data.role 우선 사용
 //     (화이트리스트는 backend가 role 안 줄 때만 fallback)
 //   - 실 API 연동 후에는 화이트리스트 로직 제거 가능
@@ -35,7 +36,7 @@ export function useSocialLogin() {
       // 소셜 로그인 응답에 role 이미 포함됨
       const role = determineRole(data.email, data.role);
 
-      setAuth(data.accessToken, {
+      setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
         name: data.name,
         email: data.email,
@@ -57,7 +58,7 @@ export function useEmailLogin() {
       // 백엔드 응답의 data.role 우선, 없으면 화이트리스트 fallback
       const role = determineRole(variables.email, data.role);
 
-      setAuth(data.accessToken, {
+      setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
         name: data.name,
         email: variables.email,
