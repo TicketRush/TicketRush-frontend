@@ -285,9 +285,25 @@ interface BackendAdminRefundBooking {
 // 프론트에서 호출 가능한 "userId → 사용자 정보" 조회 API가 없어
 // (auth-info는 internal 전용) 사용자 식별 정보는 표시 불가.
 
+/**
+ * hasNext 결정:
+ *   1. interceptor가 분리한 paginationInfo.hasNext 우선
+ *   2. 없으면 items.length === requestedSize fallback
+ *      (마지막 페이지 항목 수가 size와 같으면 false positive 가능)
+ */
+function resolveAdminRefundHasNext(
+  paginationHasNext: boolean | undefined,
+  itemCount: number,
+  requestedSize: number,
+): boolean {
+  if (typeof paginationHasNext === "boolean") return paginationHasNext;
+  return itemCount === requestedSize;
+}
+
 async function toAdminRefundListResponse(
   raw: BackendAdminRefundBooking[],
   requestedSize: number,
+  paginationHasNext?: boolean,
 ): Promise<AdminRefundBookingListResponse> {
   const items: AdminRefundBookingItem[] = raw.map((b) => ({
     bookingId: b.bookingId,
@@ -339,7 +355,14 @@ async function toAdminRefundListResponse(
     seatNumber: seatNumberMap.get(i.seatId) ?? "?",
   }));
 
-  return { items: richItems, hasNext: items.length === requestedSize };
+  return {
+    items: richItems,
+    hasNext: resolveAdminRefundHasNext(
+      paginationHasNext,
+      items.length,
+      requestedSize,
+    ),
+  };
 }
 
 /** 백엔드: GET /api/v1/booking/admin/bookings/refund-failed (환불 처리 자체가 실패한 건) */
@@ -354,7 +377,11 @@ export async function getRefundFailedBookingsApi(
     "/api/v1/booking/admin/bookings/refund-failed",
     { params: { page, size } },
   );
-  return toAdminRefundListResponse(res.data ?? [], size);
+  return toAdminRefundListResponse(
+    res.data ?? [],
+    size,
+    res.pagination?.hasNext,
+  );
 }
 
 /** 백엔드: GET /api/v1/booking/admin/bookings/refunding-stuck (REFUNDING 상태로 멈춰있는 건) */
@@ -369,7 +396,11 @@ export async function getRefundingStuckBookingsApi(
     "/api/v1/booking/admin/bookings/refunding-stuck",
     { params: { page, size } },
   );
-  return toAdminRefundListResponse(res.data ?? [], size);
+  return toAdminRefundListResponse(
+    res.data ?? [],
+    size,
+    res.pagination?.hasNext,
+  );
 }
 
 /** 백엔드: POST /api/v1/booking/admin/{bookingNumber}/refund-retry */
