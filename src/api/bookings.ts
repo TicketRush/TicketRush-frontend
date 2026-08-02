@@ -82,26 +82,50 @@ export async function createBookingApi(
 //
 // 예매 상세 조회 (aggregation).
 //
-// ⚠️ 백엔드에 이 API 없음. 다음 순서로 aggregation:
-//   1. GET /api/v1/booking/me 에서 해당 bookingNumber 찾기
+// ⚠️ 백엔드에 단건 조회 API 없음 (후속: FE #168 / BE #560).
+// 현재 우회:
+//   1. GET /api/v1/booking/me 를 status·page 순회하며 bookingNumber 찾기
 //   2. GET /api/v1/performance/{performanceId} 공연 정보 조회
 //   3. GET /api/v1/seat/numbers?seatIds= 좌석 번호 조회
 //
 // 결제 정보(price, paidAt)는 booking 응답에서 파생 불가 → 결제 API 별도 조회 필요.
 // 지금은 concert.price로 fallback. 필요 시 GET /payment 로직 추가.
 
+const BOOKING_ME_PAGE_SIZE = 100;
+const BOOKING_ME_MAX_PAGES = 50;
+const BOOKING_DETAIL_STATUSES: BookingStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "CANCELED",
+  "REFUNDED",
+];
+
+/** /booking/me 를 status·page 순회해 bookingNumber에 해당하는 summary를 찾는다. */
+async function findMyBookingSummary(
+  bookingNumber: string,
+): Promise<BackendBookingSummary | undefined> {
+  for (const status of BOOKING_DETAIL_STATUSES) {
+    for (let page = 0; page < BOOKING_ME_MAX_PAGES; page++) {
+      const listRes = await apiClient.get<BackendBookingSummary[]>(
+        "/api/v1/booking/me",
+        { params: { status, page, size: BOOKING_ME_PAGE_SIZE } },
+      );
+      const summaries = listRes.data ?? [];
+      const found = summaries.find((b) => b.bookingNumber === bookingNumber);
+      if (found) return found;
+      if (summaries.length < BOOKING_ME_PAGE_SIZE) break;
+    }
+  }
+  return undefined;
+}
+
 export async function fetchBookingDetail(
   bookingNumber: string,
 ): Promise<BookingDetail> {
   if (USE_MOCK) return mockGetBookingDetail(bookingNumber);
 
-  // 1. 내 예매 목록에서 해당 bookingNumber 찾기 (백엔드가 단건 조회 API 미제공)
-  const listRes = await apiClient.get<BackendBookingSummary[]>(
-    "/api/v1/booking/me",
-    { params: { size: 100 } },
-  );
-  const summaries = listRes.data ?? [];
-  const target = summaries.find((b) => b.bookingNumber === bookingNumber);
+  // 1. 내 예매 목록에서 해당 bookingNumber 찾기 (단건 API 전까지 pagination 우회)
+  const target = await findMyBookingSummary(bookingNumber);
   if (!target) {
     throw new Error("예매 정보를 찾을 수 없습니다.");
   }
