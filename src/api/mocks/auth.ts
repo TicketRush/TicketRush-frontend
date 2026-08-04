@@ -4,10 +4,10 @@
 //
 // 주요 변경:
 //   - mockSocialLogin: email/role/joinedAt 제거 (실 응답에 없음)
-//   - mockEmailLogin: name/joinedAt/expiresIn 제거, role은 "MEMBER"|"ADMIN"
+//   - mockEmailLogin: BE와 같이 MEMBER→USER normalize, /me용 role은 세션에 보관
 //   - mockEmailAuthConsume 제거 (해당 엔드포인트 존재하지 않음)
 //   - mockCheckEmail: isDuplicated → exists
-//   - mockGetMe: name/email/createdAt만 반환
+//   - mockGetMe: name/email/createdAt/role 반환 (#137)
 //   - mockDevAuthToken: LoginResponse와 동일 구조로 정정
 
 import { mockDelay, mockError } from "./_helpers";
@@ -27,10 +27,16 @@ import type {
   DevAuthTokenResponse,
   MeResponse,
   UserRole,
+  LoginResponseRole,
 } from "@/types/domain/auth";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** mockGetMe가 로그인 세션 role을 반영하도록 보관 (DB/me = MEMBER|ADMIN) */
+let mockSessionRole: UserRole = "MEMBER";
+let mockSessionEmail = "user@example.com";
+let mockSessionName = "김철수";
 
 // ── 소셜 로그인 ───────────────────────────────────────
 export async function mockSocialLogin(
@@ -38,9 +44,13 @@ export async function mockSocialLogin(
 ): Promise<OauthLoginResponse> {
   await mockDelay(500);
 
+  mockSessionRole = "MEMBER";
+  mockSessionName = `${req.provider}_TestUser`;
+  mockSessionEmail = `${req.provider.toLowerCase()}_user@example.com`;
+
   return {
     userId: 1,
-    name: `${req.provider}_TestUser`,
+    name: mockSessionName,
     isNewUser: false,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
@@ -63,14 +73,17 @@ export async function mockEmailLogin(
     );
   }
 
-  // 관리자 테스트용
-  const role: UserRole =
-    req.email === "admin@ticketrush.com" ? "ADMIN" : "MEMBER";
+  // /me·DB 기준 role. 로그인 응답만 BE normalize(MEMBER→USER) 반영
+  const isAdmin = req.email === "admin@ticketrush.com";
+  mockSessionRole = isAdmin ? "ADMIN" : "MEMBER";
+  mockSessionEmail = req.email;
+  mockSessionName = isAdmin ? "관리자" : "김철수";
+  const loginRole: LoginResponseRole = isAdmin ? "ADMIN" : "USER";
 
   return {
     userId: 1,
     email: req.email,
-    role,
+    role: loginRole,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
   };
@@ -176,8 +189,9 @@ export async function mockDevAuthToken(
 export async function mockGetMe(): Promise<MeResponse> {
   await mockDelay(300);
   return {
-    email: "user@example.com",
-    name: "김철수",
+    email: mockSessionEmail,
+    name: mockSessionName,
     createdAt: "2025-01-15T00:00:00",
+    role: mockSessionRole,
   };
 }
