@@ -4,7 +4,7 @@
 //
 // 주요 변경:
 //   - mockSocialLogin: email/role/joinedAt 제거 (실 응답에 없음)
-//   - mockEmailLogin: BE와 같이 MEMBER→USER normalize, /me용 role은 세션에 보관
+//   - mockEmailLogin: role MEMBER|ADMIN (/me·로그인 응답 동일)
 //   - mockEmailAuthConsume 제거 (해당 엔드포인트 존재하지 않음)
 //   - mockCheckEmail: isDuplicated → exists
 //   - mockGetMe: name/email/createdAt/role 반환 (#137)
@@ -27,7 +27,6 @@ import type {
   DevAuthTokenResponse,
   MeResponse,
   UserRole,
-  LoginResponseRole,
 } from "@/types/domain/auth";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -73,17 +72,15 @@ export async function mockEmailLogin(
     );
   }
 
-  // /me·DB 기준 role. 로그인 응답만 BE normalize(MEMBER→USER) 반영
   const isAdmin = req.email === "admin@ticketrush.com";
   mockSessionRole = isAdmin ? "ADMIN" : "MEMBER";
   mockSessionEmail = req.email;
   mockSessionName = isAdmin ? "관리자" : "김철수";
-  const loginRole: LoginResponseRole = isAdmin ? "ADMIN" : "USER";
 
   return {
     userId: 1,
     email: req.email,
-    role: loginRole,
+    role: mockSessionRole,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
   };

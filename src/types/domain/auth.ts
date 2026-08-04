@@ -3,8 +3,7 @@
 // 백엔드 auth-service, user-service 스펙 반영 (2026-07-19 백엔드 코드 직접 확인)
 //
 // 주요 변경:
-//   - UserRole(프론트/DB/me): "MEMBER" | "ADMIN"
-//   - 이메일 로그인 응답 role: BE LoginUseCase가 MEMBER→"USER"로 normalize
+//   - UserRole: DB / 로그인 / JWT / /me 모두 "MEMBER" | "ADMIN" 통일
 //   - OauthLoginResponse: email/role 없음 (userId, name, isNewUser, 토큰류만)
 //   - MeResponse: name, email, createdAt, role (BE #558/#568)
 //   - EmailCheckResponse: isDuplicated → exists
@@ -12,14 +11,8 @@
 //   - DevAuthTokenResponse: LoginResponse와 동일 구조로 정정
 
 export type OauthProvider = "KAKAO" | "NAVER" | "GOOGLE";
-/** authStore / AdminRoute / GET /me 기준 권한 */
+/** authStore / AdminRoute / 로그인·/me·JWT 공통 권한 */
 export type UserRole = "MEMBER" | "ADMIN";
-/**
- * 이메일 로그인 응답·JWT claim에 올 수 있는 role.
- * BE `LoginUseCase.normalizeRole`: DB MEMBER → "USER", ADMIN → "ADMIN".
- * 프론트 저장 시 `toUserRole()`로 UserRole에 맞춘다.
- */
-export type LoginResponseRole = "USER" | "MEMBER" | "ADMIN";
 
 // ── 소셜 로그인 ───────────────────────────────────────
 export interface SocialOauthLoginRequest {
@@ -55,12 +48,12 @@ export interface EmailLoginRequest {
 /**
  * POST /api/v1/auth/login 응답
  * 백엔드 LoginResponse DTO: name/joinedAt/expiresIn 없음.
- * role은 MEMBER→USER normalize 값이 올 수 있음 → authStore에는 UserRole로 변환.
+ * role: MEMBER | ADMIN (/me·JWT와 동일)
  */
 export interface EmailLoginResponse {
   userId: number;
   email: string;
-  role: LoginResponseRole;
+  role: UserRole;
   accessToken: string;
   refreshToken: string;
 }

@@ -5,22 +5,16 @@
 //   - 소셜 로그인 응답에 email/role/joinedAt 없음 반영 (백엔드 OauthLoginResponse)
 //   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
 //   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt/role) 보강 (#137)
-//   - authStore.role SSOT = /me.role (이메일 로그인 USER→MEMBER 매핑 포함)
+//   - authStore.role SSOT = /me.role (BE role = MEMBER | ADMIN 통일)
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
 import useAuthStore from "@/stores/global/authStore";
 import type { UserRole } from "@/types/domain/auth";
 
-/**
- * BE role 문자열 → 프론트 UserRole.
- * - /me: "MEMBER" | "ADMIN"
- * - 이메일 로그인/JWT: "USER"(=MEMBER) | "ADMIN"
- */
+/** BE role → UserRole. 알 수 없는 값은 MEMBER로 안전하게 처리 */
 function toUserRole(backendRole?: string): UserRole {
-  if (backendRole === "ADMIN") return "ADMIN";
-  if (backendRole === "MEMBER" || backendRole === "USER") return "MEMBER";
-  return "MEMBER";
+  return backendRole === "ADMIN" ? "ADMIN" : "MEMBER";
 }
 
 export function useSocialLogin() {
@@ -30,7 +24,7 @@ export function useSocialLogin() {
   return useMutation({
     mutationFn: socialLoginApi,
     onSuccess: async (data) => {
-      // 소셜 응답에 role 없음 → /me 전 임시 MEMBER, 보강 후 me.role 사용
+      // 소셜 응답 body에 role 없음 → /me 전 임시 MEMBER, 보강 후 me.role 사용
       let role: UserRole = "MEMBER";
 
       setAuth(data.accessToken, data.refreshToken, {
@@ -67,7 +61,7 @@ export function useEmailLogin() {
   return useMutation({
     mutationFn: emailLoginApi,
     onSuccess: async (data, variables) => {
-      // /me 전: 로그인 응답 role 사용 (USER→MEMBER). /me 성공 시 me.role로 덮어씀.
+      // /me 전: 로그인 응답 role. /me 성공 시 me.role로 덮어씀 (SSOT).
       let role = toUserRole(data.role);
 
       setAuth(data.accessToken, data.refreshToken, {
