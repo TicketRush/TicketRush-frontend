@@ -16,6 +16,9 @@
 //   - seat-counts 로딩/실패 시 mock fallback으로 예매 CTA를 열지 않음
 //   - UPCOMING → "오픈 예정" / 비활성 (BE 생성 시 기본 상태)
 //   - ON_SALE + 조회 성공 + availableCount > 0 일 때만 "예매하기"
+// - 2026-08-06 (이슈 #177):
+//   - CLOSED/CANCELED/매진도 카드 클릭으로 상세 진입 허용 (예매 버튼만 비활성)
+//   - 잔여 좌석 미확정 시 "0" 대신 "-", 게이지 숨김
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
 // React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
@@ -51,19 +54,18 @@ function ConcertCard({ concert }: ConcertCardProps) {
   const seatsReady =
     !!seatCounts && !seatCountsLoading && !seatCountsError;
 
-  // 좌석 수: 확정 전에는 0 (fallback으로 예매를 열지 않음)
-  const remaining = isClosedOrCanceled
-    ? 0
-    : seatsReady
-      ? seatCounts.availableCount
-      : 0;
+  // 확정된 잔여만 숫자로 사용. 미확정(로딩/실패/미호출)은 null → UI에서 "-"
+  const remaining = seatsReady ? seatCounts.availableCount : null;
   const total = seatsReady
     ? seatCounts.totalCount
     : (concert.totalSeats ?? 0);
 
   // 예매 CTA 활성: ON_SALE + seat-counts 성공 + availableCount > 0
   const canBook =
-    seatsReady && concert.status === "ON_SALE" && remaining > 0;
+    seatsReady &&
+    concert.status === "ON_SALE" &&
+    remaining !== null &&
+    remaining > 0;
 
   const isSoldOutConfirmed =
     isClosedOrCanceled || (seatsReady && remaining === 0);
@@ -83,7 +85,10 @@ function ConcertCard({ concert }: ConcertCardProps) {
     buttonLabel = "예매불가";
   }
 
-  const remainingPercent = seatsReady && total > 0 ? (remaining / total) * 100 : 0;
+  const remainingPercent =
+    seatsReady && remaining !== null && total > 0
+      ? (remaining / total) * 100
+      : 0;
   const isEndingSoon =
     canBook && remainingPercent > 0 && remainingPercent <= 20;
 
@@ -95,32 +100,19 @@ function ConcertCard({ concert }: ConcertCardProps) {
   // venue fallback: venue > address
   const venueDisplay = concert.venue ?? concert.address ?? "";
 
-  // 상세 이동: 종료/취소·확정 매진만 막고, UPCOMING/로딩/실패는 상세에서 재확인 가능
-  function canNavigateToDetail() {
-    if (isClosedOrCanceled) return false;
-    if (seatsReady && concert.status === "ON_SALE" && remaining === 0) {
-      return false;
-    }
-    return true;
-  }
-
+  // 상세는 상태와 무관하게 진입 가능. 예매만 canBook으로 제어 (#177)
   function handleClick() {
-    if (!canNavigateToDetail()) return;
     navigate(`/concerts/${concert.id}`);
   }
 
-  const clickable = canNavigateToDetail();
-
   return (
     <article
-      className={`group rounded-xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 ${
-        clickable ? "cursor-pointer" : ""
-      }`}
+      className="group rounded-xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
       onClick={handleClick}
       role="link"
-      tabIndex={clickable ? 0 : -1}
+      tabIndex={0}
       onKeyDown={(e) => {
-        if (clickable && (e.key === "Enter" || e.key === " ")) {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           handleClick();
         }
@@ -177,10 +169,11 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        {/* 좌석 게이지 — seat-counts 확정 + 총석 있을 때만 */}
-        {seatsReady && total > 0 && (
-          <SeatGauge remaining={remaining} total={total} />
-        )}
+        {/* 잔여 좌석: 확정 시 숫자+게이지, 미확정 시 "-" (게이지 숨김) */}
+        <SeatGauge
+          remaining={seatsReady ? remaining : null}
+          total={total}
+        />
 
         <button
           type="button"

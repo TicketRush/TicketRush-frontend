@@ -9,16 +9,20 @@
 //   - seat-counts 로딩/실패 시 예매 비활성 + 안내 문구
 // - 2026-08-05 (#134 리뷰):
 //   - UPCOMING → "오픈 예정" (예매 종료로 묶지 않음)
+// - 2026-08-06 (이슈 #177):
+//   - 잔여 미확정 시 "-" 표시, 게이지/% 숨김
 import { Ticket, AlertTriangle } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 
 interface BookingSidebarProps {
-  remaining: number;
+  remaining: number | null;
   total: number;
   price: number;
   duration: number;
   isOnSale: boolean;
   status: ConcertStatus;
+  /** seat-counts 확정 여부 — false면 숫자 "-", 게이지 숨김 */
+  seatsReady?: boolean;
   /** seat-counts 로딩 중 — 예매 비활성 */
   seatsLoading?: boolean;
   /** seat-counts 실패 — 예매 비활성 + 안내 */
@@ -34,21 +38,24 @@ export default function BookingSidebar({
   duration,
   isOnSale,
   status,
+  seatsReady = false,
   seatsLoading = false,
   seatsError = false,
   notices,
   onBooking,
 }: BookingSidebarProps) {
-  const seatsPending = seatsLoading || seatsError;
+  const confirmedRemaining = seatsReady ? (remaining ?? 0) : null;
   const percent =
-    !seatsPending && total > 0 ? (remaining / total) * 100 : 0;
+    confirmedRemaining !== null && total > 0
+      ? (confirmedRemaining / total) * 100
+      : 0;
 
   // 매진 판단:
   //   status === "CLOSED" → 판매 종료 (매진 포함)
-  //   status === "CANCELED" → 공연 취소
   //   remaining === 0 → 기술적 매진 (seat-counts 확정 후에만)
-  const isUnavailable = status === "CLOSED" || status === "CANCELED";
-  const isSoldOut = !seatsPending && (isUnavailable || remaining === 0);
+  const isSoldOut =
+    status === "CLOSED" ||
+    (seatsReady && confirmedRemaining === 0);
 
   // buttonLabel:
   //   seat-counts 로딩 → "잔여 좌석 확인 중"
@@ -86,35 +93,44 @@ export default function BookingSidebar({
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-xs text-text-secondary">잔여 좌석</span>
             <div className="flex items-baseline gap-0.5">
-              {seatsPending ? (
-                <span className="text-lg font-semibold text-text-secondary">
-                  {seatsLoading ? "확인 중…" : "—"}
+              {confirmedRemaining === null ? (
+                <span className="text-3xl font-bold text-text-secondary">
+                  -
                 </span>
               ) : (
                 <>
                   <span className="text-3xl font-bold text-text">
-                    {remaining}
+                    {confirmedRemaining}
                   </span>
                   <span className="text-xs text-text-secondary">/{total}</span>
                 </>
               )}
             </div>
           </div>
-          <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                isSoldOut ? "bg-danger" : "bg-primary"
-              }`}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-text-secondary mt-1">
-            {seatsLoading
-              ? "잔여 좌석을 확인하고 있습니다"
-              : seatsError
-                ? "잔여 좌석을 확인할 수 없습니다"
-                : `${Math.round(percent)}% 잔여`}
-          </p>
+          {confirmedRemaining !== null && total > 0 && (
+            <>
+              <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    isSoldOut ? "bg-danger" : "bg-primary"
+                  }`}
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-text-secondary mt-1">
+                {`${Math.round(percent)}% 잔여`}
+              </p>
+            </>
+          )}
+          {confirmedRemaining === null && (
+            <p className="text-[10px] text-text-secondary mt-1">
+              {seatsLoading
+                ? "잔여 좌석을 확인하고 있습니다"
+                : seatsError
+                  ? "잔여 좌석을 확인할 수 없습니다"
+                  : "잔여 좌석 정보 없음"}
+            </p>
+          )}
         </div>
 
         {/* 1인 가격 — 강조 박스 */}

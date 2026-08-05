@@ -1,9 +1,21 @@
 interface SeatGaugeProps {
-  remaining: number;
+  /** null이면 미확정 → "-" 표시, 게이지 숨김 */
+  remaining: number | null;
   total: number;
 }
 
 export default function SeatGauge({ remaining, total }: SeatGaugeProps) {
+  if (remaining === null) {
+    return (
+      <div className="w-full">
+        <div className="flex justify-between items-baseline">
+          <span className="text-xs text-placeholder">잔여 좌석</span>
+          <span className="text-sm font-bold text-text-secondary">-</span>
+        </div>
+      </div>
+    );
+  }
+
   const percent = total > 0 ? Math.round((remaining / total) * 100) : 0;
   const isSoldOut = remaining === 0;
   // 마감임박 = 잔여 20% 이하 (단, 매진 제외)
