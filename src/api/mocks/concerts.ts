@@ -9,9 +9,20 @@
  * - 2026-07-15 (이슈 #121):
  *   - status enum 정정: SOLD_OUT → CLOSED (백엔드 스펙 일치)
  *     (매진은 status가 아닌 availableCount === 0으로 유도)
+ * - 2026-08-06 (이슈 #177):
+ *   - 상세 진입 / 잔여 "-" 표시 검증용 상태별 fixture 추가
+ *     (ON_SALE 매진, CLOSED, CANCELED, UPCOMING)
+ *   - remainingSeats는 seats mock의 availableCount 시드와 동기화
  *
  * ⚠️ venue 필드는 유지 (백엔드 venueName 요청 대기)
  * ⚠️ remainingSeats는 mock 편의상 유지. 실 API에선 별도 API(/seat/:id/seat-counts).
+ *
+ * #177 수동 확인 가이드 (VITE_USE_MOCK=true):
+ *   id 1  — ON_SALE + 잔여 > 0 → 예매하기 활성, 숫자/게이지 표시
+ *   id 2  — ON_SALE + 잔여 0(매진) → 카드 클릭으로 상세 진입, 버튼 비활성, 잔여 0
+ *   id 8  — CLOSED → 카드 클릭으로 상세 진입, 예매불가/매진, 잔여 "-"
+ *   id 9  — CANCELED → 카드 클릭으로 상세 진입, 취소된 공연, 잔여 "-"
+ *   id 10 — UPCOMING → 카드 클릭으로 상세 진입, 오픈 예정, 잔여 "-"
  */
 import type { ConcertSummary, ConcertDetail } from "@/types/domain/concert";
 import { mockDelay } from "./_helpers";
@@ -35,20 +46,20 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     status: "ON_SALE",
   },
   {
+    // #177: ON_SALE + availableCount === 0 (기술적 매진)
     id: 2,
-    title: "The Phantom of the Opera",
-    performer: "뮤지컬 앙상블",
-    genre: "MUSICAL",
-    venue: "블루스퀘어 신한카드홀",
-    address: "서울특별시 용산구 이태원로 294",
+    title: "[Mock] 매진 공연 (ON_SALE + 잔여 0)",
+    performer: "Sold Out Band",
+    genre: "CONCERT",
+    venue: "올림픽공원 핸드볼경기장",
+    address: "서울특별시 송파구 올림픽로 424",
     showDate: "2026-06-15",
     showTime: "19:30",
     price: 88000,
     imageMainUrl: POSTER,
     totalSeats: 120,
     remainingSeats: 0,
-    // 매진 상태를 백엔드 표현으로: CLOSED
-    status: "CLOSED",
+    status: "ON_SALE",
   },
   {
     id: 3,
@@ -124,6 +135,54 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     totalSeats: 120,
     remainingSeats: 56,
     status: "ON_SALE",
+  },
+  {
+    // #177: CLOSED — 상세 진입 가능, seat-counts 미조회 → 잔여 "-"
+    id: 8,
+    title: "[Mock] 종료된 공연 (CLOSED)",
+    performer: "Closed Orchestra",
+    genre: "CLASSIC",
+    venue: "세종문화회관",
+    address: "서울특별시 종로구 세종대로 175",
+    showDate: "2026-05-01",
+    showTime: "19:00",
+    price: 44000,
+    imageMainUrl: POSTER,
+    totalSeats: 120,
+    remainingSeats: 0,
+    status: "CLOSED",
+  },
+  {
+    // #177: CANCELED — 상세 진입 가능, 버튼「취소된 공연」, 잔여 "-"
+    id: 9,
+    title: "[Mock] 취소된 공연 (CANCELED)",
+    performer: "Canceled Crew",
+    genre: "MUSICAL",
+    venue: "충무아트센터",
+    address: "서울특별시 중구 퇴계로 387",
+    showDate: "2026-07-12",
+    showTime: "19:30",
+    price: 77000,
+    imageMainUrl: POSTER,
+    totalSeats: 120,
+    remainingSeats: 40,
+    status: "CANCELED",
+  },
+  {
+    // #177: UPCOMING — 상세 진입 가능, 버튼「오픈 예정」, 잔여 "-"
+    id: 10,
+    title: "[Mock] 오픈 예정 공연 (UPCOMING)",
+    performer: "Upcoming Stars",
+    genre: "CONCERT",
+    venue: "고척스카이돔",
+    address: "서울특별시 구로구 경인로 430",
+    showDate: "2026-10-01",
+    showTime: "18:00",
+    price: 110000,
+    imageMainUrl: POSTER,
+    totalSeats: 120,
+    remainingSeats: 120,
+    status: "UPCOMING",
   },
 ];
 
