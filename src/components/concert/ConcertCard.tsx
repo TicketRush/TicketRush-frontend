@@ -62,10 +62,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
 
   // 예매 CTA 활성: ON_SALE + seat-counts 성공 + availableCount > 0
   const canBook =
-    seatsReady &&
-    concert.status === "ON_SALE" &&
-    remaining !== null &&
-    remaining > 0;
+    seatsReady && concert.status === "ON_SALE" && (remaining ?? 0) > 0;
 
   const isSoldOutConfirmed =
     isClosedOrCanceled || (seatsReady && remaining === 0);
@@ -170,10 +167,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
         </div>
 
         {/* 잔여 좌석: 확정 시 숫자+게이지, 미확정 시 "-" (게이지 숨김) */}
-        <SeatGauge
-          remaining={seatsReady ? remaining : null}
-          total={total}
-        />
+        <SeatGauge remaining={remaining} total={total} />
 
         <button
           type="button"
@@ -184,8 +178,10 @@ function ConcertCard({ concert }: ConcertCardProps) {
           }`}
           disabled={!canBook}
           onClick={(e) => {
+            // 카드 클릭(상세)과 분리 — 예매 가능 시에만 동일 진입 허용
             e.stopPropagation();
-            if (canBook) handleClick();
+            if (!canBook) return;
+            handleClick();
           }}
         >
           {buttonLabel}

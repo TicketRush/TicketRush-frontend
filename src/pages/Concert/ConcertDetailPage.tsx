@@ -234,7 +234,6 @@ export default function ConcertDetailPage() {
             duration={data.durationMinutes}
             isOnSale={isOnSale}
             status={data.status}
-            seatsReady={seatsReady}
             seatsLoading={shouldFetchSeats && seatCountsLoading}
             seatsError={shouldFetchSeats && seatCountsError}
             notices={

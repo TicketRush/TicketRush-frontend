@@ -10,19 +10,18 @@
 // - 2026-08-05 (#134 리뷰):
 //   - UPCOMING → "오픈 예정" (예매 종료로 묶지 않음)
 // - 2026-08-06 (이슈 #177):
-//   - 잔여 미확정 시 "-" 표시, 게이지/% 숨김
+//   - 잔여 미확정(null) 시 "-" 표시, 게이지/% 숨김
 import { Ticket, AlertTriangle } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 
 interface BookingSidebarProps {
+  /** null이면 미확정 → "-" */
   remaining: number | null;
   total: number;
   price: number;
   duration: number;
   isOnSale: boolean;
   status: ConcertStatus;
-  /** seat-counts 확정 여부 — false면 숫자 "-", 게이지 숨김 */
-  seatsReady?: boolean;
   /** seat-counts 로딩 중 — 예매 비활성 */
   seatsLoading?: boolean;
   /** seat-counts 실패 — 예매 비활성 + 안내 */
@@ -38,33 +37,18 @@ export default function BookingSidebar({
   duration,
   isOnSale,
   status,
-  seatsReady = false,
   seatsLoading = false,
   seatsError = false,
   notices,
   onBooking,
 }: BookingSidebarProps) {
-  const confirmedRemaining = seatsReady ? (remaining ?? 0) : null;
+  const seatsConfirmed = remaining !== null;
   const percent =
-    confirmedRemaining !== null && total > 0
-      ? (confirmedRemaining / total) * 100
-      : 0;
+    seatsConfirmed && total > 0 ? (remaining / total) * 100 : 0;
 
-  // 매진 판단:
-  //   status === "CLOSED" → 판매 종료 (매진 포함)
-  //   remaining === 0 → 기술적 매진 (seat-counts 확정 후에만)
-  const isSoldOut =
-    status === "CLOSED" ||
-    (seatsReady && confirmedRemaining === 0);
+  // CLOSED → 판매 종료 / remaining === 0 → 기술적 매진(확정 후)
+  const isSoldOut = status === "CLOSED" || remaining === 0;
 
-  // buttonLabel:
-  //   seat-counts 로딩 → "잔여 좌석 확인 중"
-  //   seat-counts 실패 → "좌석 정보 확인 불가"
-  //   UPCOMING → "오픈 예정"
-  //   CANCELED → "취소된 공연"
-  //   CLOSED or remaining === 0 → "매진"
-  //   ON_SALE → "예매하기"
-  //   그 외 → "예매 종료"
   let buttonLabel: string;
   if (seatsLoading) {
     buttonLabel = "잔여 좌석 확인 중";
@@ -84,30 +68,29 @@ export default function BookingSidebar({
 
   return (
     <div className="lg:sticky lg:top-4 space-y-3">
-      {/* 메인 박스 */}
       <div className="bg-white border border-border rounded-xl p-5 space-y-4">
         <h3 className="font-bold">예매 정보</h3>
 
-        {/* 잔여 좌석 + 게이지바 */}
         <div>
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-xs text-text-secondary">잔여 좌석</span>
             <div className="flex items-baseline gap-0.5">
-              {confirmedRemaining === null ? (
+              {!seatsConfirmed ? (
                 <span className="text-3xl font-bold text-text-secondary">
                   -
                 </span>
               ) : (
                 <>
                   <span className="text-3xl font-bold text-text">
-                    {confirmedRemaining}
+                    {remaining}
                   </span>
                   <span className="text-xs text-text-secondary">/{total}</span>
                 </>
               )}
             </div>
           </div>
-          {confirmedRemaining !== null && total > 0 && (
+
+          {seatsConfirmed && total > 0 && (
             <>
               <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
                 <div
@@ -122,18 +105,16 @@ export default function BookingSidebar({
               </p>
             </>
           )}
-          {confirmedRemaining === null && (
+
+          {!seatsConfirmed && (seatsLoading || seatsError) && (
             <p className="text-[10px] text-text-secondary mt-1">
               {seatsLoading
                 ? "잔여 좌석을 확인하고 있습니다"
-                : seatsError
-                  ? "잔여 좌석을 확인할 수 없습니다"
-                  : "잔여 좌석 정보 없음"}
+                : "잔여 좌석을 확인할 수 없습니다"}
             </p>
           )}
         </div>
 
-        {/* 1인 가격 — 강조 박스 */}
         <div className="border-2 border-primary rounded-lg p-3 bg-primary/5">
           <p className="text-xs text-text-secondary">1인 가격</p>
           <p className="text-2xl font-bold text-primary mt-0.5">
@@ -141,13 +122,11 @@ export default function BookingSidebar({
           </p>
         </div>
 
-        {/* 관람 시간 박스 */}
         <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
           <span className="text-xs text-text-secondary">관람 시간</span>
           <span className="text-sm font-semibold">{duration}분</span>
         </div>
 
-        {/* 예매 버튼 — seat-counts 확정 전에는 비활성 */}
         <button
           type="button"
           onClick={onBooking}
@@ -162,7 +141,6 @@ export default function BookingSidebar({
           {buttonLabel}
         </button>
 
-        {/* 노란 경고 박스 */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
           <AlertTriangle
             size={14}
@@ -175,7 +153,6 @@ export default function BookingSidebar({
         </div>
       </div>
 
-      {/* 유의사항 박스 */}
       <div className="bg-white border border-border rounded-xl p-4">
         <ul className="text-xs text-text-secondary space-y-1.5">
           {notices.map((n, i) => (
