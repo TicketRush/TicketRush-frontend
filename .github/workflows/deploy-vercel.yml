@@ -7,6 +7,10 @@
 #
 # Vercel 프로젝트 Environment Variables에 빌드용 값 설정:
 #   VITE_API_BASE_URL, VITE_USE_MOCK, VITE_TOSS_CLIENT_KEY 등
+#
+# concurrency:
+#   develop/main 이 동일 Production으로 배포되므로 한 그룹으로 묶어
+#   이전 배포가 최신 배포를 덮어쓰지 않도록 한다 (#172 리뷰).
 
 name: Deploy Vercel
 
@@ -14,6 +18,10 @@ on:
   push:
     branches: ["develop", "main"]
   workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
