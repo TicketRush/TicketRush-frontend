@@ -12,6 +12,10 @@
 // - 2026-07-15 (이슈 #122 정리):
 //   - useSeatCounts import 경로 정정: @/hooks/queries/useSeats
 //     (별도 useSeatCounts.ts 파일은 중복이므로 삭제 예정)
+// - 2026-08-05 (#134 리뷰):
+//   - seat-counts 로딩/실패 시 mock fallback으로 예매 CTA를 열지 않음
+//   - UPCOMING → "오픈 예정" / 비활성 (BE 생성 시 기본 상태)
+//   - ON_SALE + 조회 성공 + availableCount > 0 일 때만 "예매하기"
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
 // React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
@@ -32,28 +36,56 @@ interface ConcertCardProps {
 function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
 
-  // 판매 종료/취소된 공연 → 무조건 예매 불가 & 잔여 좌석 0으로 고정
-  //   (실시간 좌석 수를 조회해도 의미 없으므로 API 호출 자체를 생략)
-  const isUnavailable =
+  const isClosedOrCanceled =
     concert.status === "CLOSED" || concert.status === "CANCELED";
+  const isUpcoming = concert.status === "UPCOMING";
 
-  // 실 API로 잔여 좌석 조회 (실패/로딩 시 mock 값 fallback, 매진 공연은 조회 생략)
-  const { data: seatCounts } = useSeatCounts(concert.id, !isUnavailable);
+  // CLOSED/CANCELED/UPCOMING → 예매 불가이므로 seat-counts 생략
+  //   (UPCOMING은 오픈 전이라 잔여 좌석이 CTA에 쓰이지 않음)
+  const {
+    data: seatCounts,
+    isLoading: seatCountsLoading,
+    isError: seatCountsError,
+  } = useSeatCounts(concert.id, !isClosedOrCanceled && !isUpcoming);
 
-  // 잔여 좌석 우선순위: 매진/종료 공연은 0 고정 > seatCounts (실 API) > concert.remainingSeats (mock)
-  const remaining = isUnavailable
+  const seatsReady =
+    !!seatCounts && !seatCountsLoading && !seatCountsError;
+
+  // 좌석 수: 확정 전에는 0 (fallback으로 예매를 열지 않음)
+  const remaining = isClosedOrCanceled
     ? 0
-    : (seatCounts?.availableCount ?? concert.remainingSeats ?? 0);
-  const total = seatCounts?.totalCount ?? concert.totalSeats ?? 0;
+    : seatsReady
+      ? seatCounts.availableCount
+      : 0;
+  const total = seatsReady
+    ? seatCounts.totalCount
+    : (concert.totalSeats ?? 0);
 
-  // 매진 판단:
-  //   1. status가 CLOSED/CANCELED → 무조건 예매 불가
-  //   2. 잔여 좌석 0 → 매진 (기술적 매진)
-  const isSoldOut = isUnavailable || (total > 0 && remaining === 0);
+  // 예매 CTA 활성: ON_SALE + seat-counts 성공 + availableCount > 0
+  const canBook =
+    seatsReady && concert.status === "ON_SALE" && remaining > 0;
 
-  const remainingPercent = total > 0 ? (remaining / total) * 100 : 0;
+  const isSoldOutConfirmed =
+    isClosedOrCanceled || (seatsReady && remaining === 0);
+
+  let buttonLabel: string;
+  if (isUpcoming) {
+    buttonLabel = "오픈 예정";
+  } else if (seatCountsLoading) {
+    buttonLabel = "잔여 좌석 확인 중";
+  } else if (seatCountsError) {
+    buttonLabel = "좌석 정보 확인 불가";
+  } else if (isSoldOutConfirmed) {
+    buttonLabel = "예매불가";
+  } else if (canBook) {
+    buttonLabel = "예매하기";
+  } else {
+    buttonLabel = "예매불가";
+  }
+
+  const remainingPercent = seatsReady && total > 0 ? (remaining / total) * 100 : 0;
   const isEndingSoon =
-    !isSoldOut && remainingPercent > 0 && remainingPercent <= 20;
+    canBook && remainingPercent > 0 && remainingPercent <= 20;
 
   const formattedPrice = concert.price.toLocaleString("ko-KR");
 
@@ -63,20 +95,32 @@ function ConcertCard({ concert }: ConcertCardProps) {
   // venue fallback: venue > address
   const venueDisplay = concert.venue ?? concert.address ?? "";
 
-  function handleClick() {
-    if (!isSoldOut) navigate(`/concerts/${concert.id}`);
+  // 상세 이동: 종료/취소·확정 매진만 막고, UPCOMING/로딩/실패는 상세에서 재확인 가능
+  function canNavigateToDetail() {
+    if (isClosedOrCanceled) return false;
+    if (seatsReady && concert.status === "ON_SALE" && remaining === 0) {
+      return false;
+    }
+    return true;
   }
+
+  function handleClick() {
+    if (!canNavigateToDetail()) return;
+    navigate(`/concerts/${concert.id}`);
+  }
+
+  const clickable = canNavigateToDetail();
 
   return (
     <article
       className={`group rounded-xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 ${
-        isSoldOut ? "" : "cursor-pointer"
+        clickable ? "cursor-pointer" : ""
       }`}
       onClick={handleClick}
       role="link"
-      tabIndex={isSoldOut ? -1 : 0}
+      tabIndex={clickable ? 0 : -1}
       onKeyDown={(e) => {
-        if (!isSoldOut && (e.key === "Enter" || e.key === " ")) {
+        if (clickable && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           handleClick();
         }
@@ -133,23 +177,25 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        {/* 좌석 게이지 - 총 좌석 수 없으면 표시 안 함 */}
-        {total > 0 && <SeatGauge remaining={remaining} total={total} />}
+        {/* 좌석 게이지 — seat-counts 확정 + 총석 있을 때만 */}
+        {seatsReady && total > 0 && (
+          <SeatGauge remaining={remaining} total={total} />
+        )}
 
         <button
           type="button"
           className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${
-            isSoldOut
-              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-              : "bg-primary text-white hover:opacity-90"
+            canBook
+              ? "bg-primary text-white hover:opacity-90"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
-          disabled={isSoldOut}
+          disabled={!canBook}
           onClick={(e) => {
             e.stopPropagation();
-            if (!isSoldOut) handleClick();
+            if (canBook) handleClick();
           }}
         >
-          {isSoldOut ? "예매불가" : "예매하기"}
+          {buttonLabel}
         </button>
       </div>
     </article>

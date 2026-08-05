@@ -7,6 +7,8 @@
 //   - buttonLabel 로직 정정
 // - 2026-08-02 (#134 리뷰):
 //   - seat-counts 로딩/실패 시 예매 비활성 + 안내 문구
+// - 2026-08-05 (#134 리뷰):
+//   - UPCOMING → "오픈 예정" (예매 종료로 묶지 않음)
 import { Ticket, AlertTriangle } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 
@@ -51,15 +53,18 @@ export default function BookingSidebar({
   // buttonLabel:
   //   seat-counts 로딩 → "잔여 좌석 확인 중"
   //   seat-counts 실패 → "좌석 정보 확인 불가"
+  //   UPCOMING → "오픈 예정"
   //   CANCELED → "취소된 공연"
   //   CLOSED or remaining === 0 → "매진"
-  //   ON_SALE 아닌 다른 상태 (UPCOMING 등) → "예매 종료"
   //   ON_SALE → "예매하기"
+  //   그 외 → "예매 종료"
   let buttonLabel: string;
   if (seatsLoading) {
     buttonLabel = "잔여 좌석 확인 중";
   } else if (seatsError) {
     buttonLabel = "좌석 정보 확인 불가";
+  } else if (status === "UPCOMING") {
+    buttonLabel = "오픈 예정";
   } else if (status === "CANCELED") {
     buttonLabel = "취소된 공연";
   } else if (isSoldOut) {
