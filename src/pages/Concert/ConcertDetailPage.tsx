@@ -49,18 +49,18 @@ export default function ConcertDetailPage() {
 
   function handleBooking() {
     setConcert({
-      id: String(data!.id),
+      id: data!.id,
       title: data!.title,
       price: data!.price,
-      date: data!.date,
-      time: data!.time,
+      showDate: data!.showDate,
+      showTime: data!.showTime,
       venue: data!.venue,
       // optional 메타데이터 — 결제 페이지에서 활용
-      artist: data!.artist,
+      performer: data!.performer,
       genre: data!.genre,
-      posterUrl: data!.posterUrl,
+      imageMainUrl: data!.imageMainUrl,
       address: data!.address,
-      duration: data!.duration,
+      durationMinutes: data!.durationMinutes,
       totalSeats: data!.totalSeats,
       remainingSeats: data!.remainingSeats,
       status: data!.status,
@@ -87,7 +87,7 @@ export default function ConcertDetailPage() {
           {/* 포스터 (4:3) */}
           <div className="bg-white border border-border rounded-xl overflow-hidden">
             <img
-              src={data.posterUrl || samplePoster}
+              src={data.imageMainUrl || samplePoster}
               alt={`${data.title} 포스터`}
               className="w-full aspect-[4/3] object-cover bg-gray-100"
               onError={(e) => {
@@ -96,7 +96,7 @@ export default function ConcertDetailPage() {
             />
             <div className="p-6">
               <h1 className="text-3xl font-bold text-text">{data.title}</h1>
-              <p className="text-text-secondary mt-1">{data.artist}</p>
+              <p className="text-text-secondary mt-1">{data.performer}</p>
               <div className="mt-3">
                 <GenreBadge genre={data.genre} />
               </div>
@@ -108,12 +108,12 @@ export default function ConcertDetailPage() {
             <InfoBox
               icon={<Calendar size={16} className="text-primary" />}
               label="공연일"
-              value={data.date}
+              value={data.showDate}
             />
             <InfoBox
               icon={<Clock size={16} className="text-primary" />}
               label="시간"
-              value={`${data.time} (${data.duration}분)`}
+              value={`${data.showTime} (${data.durationMinutes}분)`}
             />
             <InfoBox
               icon={<MapPin size={16} className="text-primary" />}
@@ -165,8 +165,8 @@ export default function ConcertDetailPage() {
           {/* 공연장 갤러리 */}
           <Section title="공연장 갤러리">
             <div className="grid grid-cols-3 gap-3">
-              {(data.gallery && data.gallery.length > 0
-                ? data.gallery
+              {(data.imageGalleryUrls && data.imageGalleryUrls.length > 0
+                ? data.imageGalleryUrls
                 : [samplePoster, samplePoster, samplePoster]
               ).map((src, i) => (
                 <img
@@ -186,10 +186,10 @@ export default function ConcertDetailPage() {
         {/* ── 우측: sticky 예매 사이드바 ──────────────────── */}
         <div>
           <BookingSidebar
-            remaining={data.remainingSeats}
+            remaining={data.remainingSeats ?? 0}
             total={data.totalSeats}
             price={data.price}
-            duration={data.duration}
+            duration={data.durationMinutes}
             isOnSale={isOnSale}
             status={data.status}
             notices={

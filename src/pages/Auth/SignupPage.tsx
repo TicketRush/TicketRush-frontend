@@ -1,3 +1,11 @@
+// 회원가입 페이지
+//
+// 백엔드 스펙 반영 변경 (2026-07-19):
+//   - signupApi 파라미터에 passwordConfirm 추가 (백엔드 스펙 요구)
+//   - ⚠️ consumeEmailAuthApi 단계 제거: send → verify → signup 2단계로 확정.
+//     "consume" 엔드포인트는 실제로 존재하지 않음 (404 NoResourceFoundException 확인).
+//   - 이미 가입된 이메일: 인증번호 발송 단계에서 AUTH_EMAIL_ALREADY_EXISTS,
+//     회원가입 단계에서 USER_EMAIL_ALREADY_EXISTS로 각각 안내 문구 처리.
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -6,11 +14,9 @@ import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { signupSchema, type SignupFormData } from "../../schemas/auth";
-import {
-  sendEmailVerificationApi,
-  verifyEmailCodeApi,
-  signupApi,
-} from "@/api/auth";
+import { sendEmailVerificationApi, verifyEmailCodeApi, signupApi } from "@/api/auth";
+import { ApiError } from "@/api/errors/errorMapper";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
 import backbtnIcon from "@/assets/icons/arrow-back.svg";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
@@ -66,8 +72,13 @@ export default function SignupPage() {
       setResendCountdown(180); // 3분 쿨다운
       toast.success("인증번호가 발송되었습니다. (mock: 123456)");
     },
-    onError: () => {
-      toast.error("인증번호 발송에 실패했습니다.");
+    onError: (error: unknown) => {
+      const apiError = ApiError.fromUnknown(error);
+      if (apiError.code === ERROR_CODES.AUTH_EMAIL_ALREADY_EXISTS) {
+        setError("email", { message: "이미 가입된 이메일입니다" });
+        return;
+      }
+      toast.error(apiError.message || "인증번호 발송에 실패했습니다.");
     },
   });
 
@@ -89,28 +100,27 @@ export default function SignupPage() {
   });
 
   // 회원가입 mutation
+  // 이메일 인증(send → verify) 완료 후 바로 signupApi 호출.
+  // ⚠️ "consume" 단계는 존재하지 않음 (제거됨, 2026-07-18 백엔드 확인).
   const signupMutation = useMutation({
     mutationFn: (data: SignupFormData) =>
       signupApi({
         name: data.name,
         email: data.email,
         password: data.password,
+        passwordConfirm: data.passwordConfirm,
       }),
     onSuccess: () => {
       toast.success("회원가입이 완료되었습니다.");
       navigate("/login");
     },
     onError: (error: unknown) => {
-      const maybeResp = (error as { response?: { status?: number } } | null)
-        ?.response;
-      if (maybeResp?.status === 409) {
-        setError("email", { message: "이미 사용 중인 이메일입니다" });
+      const apiError = ApiError.fromUnknown(error);
+      // 실 백엔드는 409가 아니라 400 + USER_EMAIL_ALREADY_EXISTS로 응답
+      if (apiError.code === ERROR_CODES.USER_EMAIL_ALREADY_EXISTS) {
+        setError("email", { message: "이미 가입된 이메일입니다" });
       } else {
-        const err =
-          error instanceof Error
-            ? error
-            : new Error("회원가입에 실패했습니다.");
-        toast.error(err.message);
+        toast.error(apiError.message || "회원가입에 실패했습니다.");
       }
     },
   });
@@ -269,7 +279,7 @@ export default function SignupPage() {
           <PasswordInput
             label="비밀번호"
             icon={lockIcon}
-            placeholder="비밀번호를 입력해주세요 (8자 이상)"
+            placeholder="영소문자, 숫자, 특수문자 포함 12자 이상"
             show={showPassword}
             onToggle={() => setShowPassword((p) => !p)}
             error={errors.password?.message}

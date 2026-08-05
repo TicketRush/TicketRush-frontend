@@ -1,3 +1,7 @@
+// 좌석 아이템 컴포넌트
+//
+// 백엔드 스펙 반영 변경:
+//   - seat.seatNumber → seat.seatNumber (aria-label, 툴팁)
 import { memo } from "react";
 import { Ban } from "lucide-react";
 import type { SeatWithStatus, SeatStatus } from "@/types/domain/seat";
@@ -29,7 +33,7 @@ function SeatItemImpl({ seat, isSelected, onClick }: SeatItemProps) {
         type="button"
         disabled={!isClickable}
         onClick={() => onClick(seat)}
-        aria-label={`좌석 ${seat.label} ${seat.status}`}
+        aria-label={`좌석 ${seat.seatNumber} ${seat.status}`}
         className={`relative w-8 h-8 rounded-md text-[10px] font-bold transition-all duration-150 ${STYLES[visualStatus]}`}
       >
         {/* 매진 좌석엔 🚫 아이콘, 그 외엔 좌석 번호 (col) */}
@@ -51,7 +55,7 @@ function SeatItemImpl({ seat, isSelected, onClick }: SeatItemProps) {
           bg-gray-800 text-white text-[10px] font-semibold rounded px-1.5 py-0.5 whitespace-nowrap"
         role="tooltip"
       >
-        {seat.label}
+        {seat.seatNumber}
       </div>
     </div>
   );

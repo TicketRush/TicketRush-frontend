@@ -3,36 +3,50 @@ import { useConcertStore } from "@/stores/reservation/concertStore";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
+import type { Genre, ConcertStatus } from "@/types/domain/concert";
 import type { Seat } from "@/types/domain/seat";
 
-// concertStore.Concert 인터페이스에 맞춤 (id가 string)
-const MOCK_CONCERT = {
-  id: "1",
+// concertStore.Concert 인터페이스에 맞춤
+const MOCK_CONCERT: {
+  id: number;
+  title: string;
+  price: number;
+  showDate: string;
+  showTime: string;
+  venue: string;
+  performer: string;
+  genre: Genre;
+  imageMainUrl: string;
+  address: string;
+  durationMinutes: number;
+  totalSeats: number;
+  remainingSeats: number;
+  status: ConcertStatus;
+} = {
+  id: 1,
   title: "Summer Jazz Night",
   price: 80000,
-  date: "2026-06-15",
-  time: "19:00",
+  showDate: "2026-06-15",
+  showTime: "19:00",
   venue: "Grand Concert Hall",
-  artist: "Various Artists",
+  performer: "Various Artists",
   genre: "JAZZ",
-  posterUrl: "",
+  imageMainUrl: "",
   address: "서울특별시 강남구 테헤란로 123",
-  duration: 120,
+  durationMinutes: 120,
   totalSeats: 500,
   remainingSeats: 245,
   status: "ON_SALE",
 };
 
 // Seat 타입은 도메인에 정의된 것 사용 — 실제 shape이 다르면 캐스팅으로 통과
-const MOCK_SEAT = {
+const MOCK_SEAT: Seat = {
   id: 5,
-  layoutId: 5,
-  label: "A-5",
+  seatLayoutId: 5,
+  seatNumber: "A-5",
   row: "A",
   col: 5,
-  price: 80000,
-  status: "AVAILABLE",
-} as unknown as Seat;
+};
 
 export default function DevNavPage() {
   // 훅은 항상 호출되어야 하므로 가드보다 위에 둠
@@ -131,7 +145,7 @@ export default function DevNavPage() {
         <div className="space-y-2">
           {scenarios.map((s) => (
             <button
-              key={s.label}
+              key={s.path}
               type="button"
               onClick={() => {
                 s.run();
