@@ -10,7 +10,7 @@ export default function Footer() {
             <p>
               TicketRush ·{" "}
               <a
-                href="https://github.com/TicketRush"
+                href="https://github.com/your-org/ticketrush"
                 target="_blank"
                 rel="noreferrer"
                 className="hover:text-primary"
