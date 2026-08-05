@@ -5,7 +5,7 @@
 //   → POST /api/v1/auth/social/login { provider, code } 로 토큰 교환
 //
 // ⚠️ React StrictMode는 useEffect를 두 번 실행한다. OAuth code는 1회용이라
-//   두 번째 호출이 실패한다. sessionStorage로 동일 code 재사용을 막는다.
+//   두 번째 호출이 실패한다. 모듈 스코프 Set(exchangedCodes)으로 동일 code 재사용을 막는다.
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
