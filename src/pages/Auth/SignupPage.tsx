@@ -6,6 +6,11 @@
 //     "consume" 엔드포인트는 실제로 존재하지 않음 (404 NoResourceFoundException 확인).
 //   - 이미 가입된 이메일: 인증번호 발송 단계에서 AUTH_EMAIL_ALREADY_EXISTS,
 //     회원가입 단계에서 USER_EMAIL_ALREADY_EXISTS로 각각 안내 문구 처리.
+//
+// 변경 이력 (이슈 #119):
+//   - 소셜 버튼에 LoginPage와 동일한 OAuth 시작 로직 연결
+//     * getOauthUrlApi(provider) → window.location.href 리다이렉트
+//     * 실패 시 toast, pendingProvider로 로딩·중복 클릭 방지
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -14,7 +19,12 @@ import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { signupSchema, type SignupFormData } from "../../schemas/auth";
-import { sendEmailVerificationApi, verifyEmailCodeApi, signupApi } from "@/api/auth";
+import {
+  sendEmailVerificationApi,
+  verifyEmailCodeApi,
+  signupApi,
+  getOauthUrlApi,
+} from "@/api/auth";
 import { ApiError } from "@/api/errors/errorMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import backbtnIcon from "@/assets/icons/arrow-back.svg";
@@ -24,6 +34,8 @@ import userIcon from "@/assets/icons/user.svg";
 import emailIcon from "@/assets/icons/email.svg";
 import checkIcon from "@/assets/icons/check.svg";
 import lockIcon from "@/assets/icons/lock.svg";
+
+type SocialProvider = "kakao" | "naver" | "google";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -35,6 +47,11 @@ export default function SignupPage() {
   // 비밀번호 토글
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+
+  // 소셜 로그인/가입 진행 중인 provider (중복 클릭 방지) — LoginPage와 동일
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
+    null,
+  );
 
   const {
     register,
@@ -141,6 +158,25 @@ export default function SignupPage() {
   const onSubmit = (data: SignupFormData) => {
     signupMutation.mutate(data);
   };
+
+  /** LoginPage와 동일 — 소셜은 가입/로그인 구분 없이 OAuth URL로 시작 */
+  async function handleSocialLogin(provider: SocialProvider) {
+    if (pendingProvider) return;
+
+    setPendingProvider(provider);
+    try {
+      const { url } = await getOauthUrlApi(provider);
+      // 이후: BE 콜백 → /oauth/callback/:provider?code=... → social/login
+      window.location.href = url;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "소셜 로그인 요청에 실패했습니다.";
+      toast.error(message);
+      setPendingProvider(null);
+    }
+  }
 
   // 이메일 입력 변경 시 인증 상태 초기화
   useEffect(() => {
@@ -318,15 +354,39 @@ export default function SignupPage() {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* OAuth */}
+        {/* OAuth — LoginPage와 동일 핸들러 (이슈 #119) */}
         <div className="flex gap-3">
-          <Button variant="kakao" size="oauth" className="flex-1">
+          <Button
+            variant="kakao"
+            size="oauth"
+            className="flex-1"
+            type="button"
+            loading={pendingProvider === "kakao"}
+            disabled={pendingProvider !== null}
+            onClick={() => handleSocialLogin("kakao")}
+          >
             카카오
           </Button>
-          <Button variant="naver" size="oauth" className="flex-1">
+          <Button
+            variant="naver"
+            size="oauth"
+            className="flex-1"
+            type="button"
+            loading={pendingProvider === "naver"}
+            disabled={pendingProvider !== null}
+            onClick={() => handleSocialLogin("naver")}
+          >
             네이버
           </Button>
-          <Button variant="google" size="oauth" className="flex-1">
+          <Button
+            variant="google"
+            size="oauth"
+            className="flex-1"
+            type="button"
+            loading={pendingProvider === "google"}
+            disabled={pendingProvider !== null}
+            onClick={() => handleSocialLogin("google")}
+          >
             구글
           </Button>
         </div>
