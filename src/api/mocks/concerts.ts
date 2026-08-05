@@ -195,6 +195,9 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
   return {
     ...summary,
     totalSeats,
+    // #177 UPCOMING mock — 티켓 오픈 안내 문구 검증용
+    bookingOpenAt:
+      summary.status === "UPCOMING" ? "2026-09-15T12:00:00" : null,
     description:
       `${summary.title}의 특별한 공연이 ${summary.venue ?? summary.address}에서 펼쳐집니다. ` +
       `${summary.performer}의 감동적인 무대를 놓치지 마세요. ` +
