@@ -24,8 +24,8 @@
 //     enabled=false여도 캐시가 있으면 옛 좌석 수/게이지가 보이던 문제 방지
 // - 2026-08-07 (#178):
 //   - 상태별 CTA 문구 (매진/예매 마감/공연 취소/오픈 예정)
-//   - 썸네일 우상단 소프트 칩 (매진 / 마감임박) — D-N·목록 bookingOpenAt 제거
-//     (목록 API에 bookingOpenAt 없음. 오픈 안내는 상세만)
+//   - ON_SALE 미확정 시 CTA「잔여 좌석 확인 중」(Sidebar와 동일)
+//   - 썸네일 우상단 소프트 칩 (매진 / 마감임박) — 목록 bookingOpenAt 미사용
 //   - CANCELED만 썸네일 dim (뱃지 없음)
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
@@ -83,6 +83,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
   // ON_SALE + 잔여 0 (기술적 매진). CLOSED/CANCELED와 구분
   const isSoldOut = seatsReady && remaining === 0;
 
+  // Sidebar와 동일: ON_SALE 라벨은 status(+좌석 확정) 기준. canBook은 disabled만.
   let buttonLabel: string;
   if (isUpcoming) {
     // 목록 API에 bookingOpenAt 없음 →「오픈 예정」고정 (오픈 시각 안내는 상세)
@@ -91,14 +92,19 @@ function ConcertCard({ concert }: ConcertCardProps) {
     buttonLabel = "공연 취소";
   } else if (isClosed) {
     buttonLabel = "예매 마감";
-  } else if (seatCountsLoading) {
-    buttonLabel = "잔여 좌석 확인 중";
-  } else if (seatCountsError) {
-    buttonLabel = "좌석 정보 확인 불가";
-  } else if (isSoldOut) {
-    buttonLabel = "매진";
-  } else if (canBook) {
-    buttonLabel = "예매하기";
+  } else if (shouldFetchSeats) {
+    // ON_SALE: 미확정 순간이「예매불가」로 떨어지지 않게 함
+    if (seatCountsError) {
+      buttonLabel = "좌석 정보 확인 불가";
+    } else if (seatCountsLoading || !seatsReady) {
+      buttonLabel = "잔여 좌석 확인 중";
+    } else if (isSoldOut) {
+      buttonLabel = "매진";
+    } else if (canBook) {
+      buttonLabel = "예매하기";
+    } else {
+      buttonLabel = "예매불가";
+    }
   } else {
     buttonLabel = "예매불가";
   }
