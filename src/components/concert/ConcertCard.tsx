@@ -23,10 +23,10 @@
 //   - seatsReady에 shouldFetchSeats(ON_SALE) 포함
 //     enabled=false여도 캐시가 있으면 옛 좌석 수/게이지가 보이던 문제 방지
 // - 2026-08-07 (#178):
-//   - 상태별 CTA 문구 (매진/예매 마감/공연 취소/MM/DD 오픈)
-//   - 썸네일 우상단 소프트 칩 통일 (D-N / 매진 / 마감임박)
+//   - 상태별 CTA 문구 (매진/예매 마감/공연 취소/오픈 예정)
+//   - 썸네일 우상단 소프트 칩 (매진 / 마감임박) — D-N·목록 bookingOpenAt 제거
+//     (목록 API에 bookingOpenAt 없음. 오픈 안내는 상세만)
 //   - CANCELED만 썸네일 dim (뱃지 없음)
-//   - UPCOMING 잔여 좌석 슬롯 유지
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
 // React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
@@ -43,33 +43,6 @@ import samplePoster from "@/assets/images/sample-poster.svg";
 /** 썸네일 우상단 소프트 칩 — Figma 마감임박과 동일 포맷 */
 const THUMB_BADGE_BASE =
   "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold";
-
-/** UPCOMING CTA: `MM/DD 오픈` */
-function formatUpcomingButtonLabel(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "오픈 예정";
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${mm}/${dd} 오픈`;
-}
-
-/** 예매 오픈일(`bookingOpenAt`) 기준 D-N. 당일 이하는 D-DAY */
-function getBookingDDayLabel(iso: string): string | null {
-  const target = new Date(iso);
-  if (Number.isNaN(target.getTime())) return null;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const openDay = new Date(
-    target.getFullYear(),
-    target.getMonth(),
-    target.getDate(),
-  );
-  const diffDays = Math.round(
-    (openDay.getTime() - today.getTime()) / 86_400_000,
-  );
-  if (diffDays <= 0) return "D-DAY";
-  return `D-${diffDays}`;
-}
 
 interface ConcertCardProps {
   concert: ConcertSummary;
@@ -112,9 +85,8 @@ function ConcertCard({ concert }: ConcertCardProps) {
 
   let buttonLabel: string;
   if (isUpcoming) {
-    buttonLabel = concert.bookingOpenAt
-      ? formatUpcomingButtonLabel(concert.bookingOpenAt)
-      : "오픈 예정";
+    // 목록 API에 bookingOpenAt 없음 →「오픈 예정」고정 (오픈 시각 안내는 상세)
+    buttonLabel = "오픈 예정";
   } else if (isCanceled) {
     buttonLabel = "공연 취소";
   } else if (isClosed) {
@@ -138,14 +110,9 @@ function ConcertCard({ concert }: ConcertCardProps) {
   const isEndingSoon =
     canBook && remainingPercent > 0 && remainingPercent <= 20;
 
-  // 썸네일 우상단 뱃지 (상태 > 마감임박). 색만 분기, 포맷은 THUMB_BADGE_BASE
+  // 썸네일 우상단: 매진 / 마감임박 (D-N은 목록 API 필드 없어 미사용)
   let thumbBadge: { label: string; tone: string } | null = null;
-  if (isUpcoming && concert.bookingOpenAt) {
-    const dday = getBookingDDayLabel(concert.bookingOpenAt);
-    if (dday) {
-      thumbBadge = { label: dday, tone: "bg-primary/10 text-primary" };
-    }
-  } else if (isSoldOut) {
+  if (isSoldOut) {
     thumbBadge = { label: "매진", tone: "bg-gray-500/10 text-gray-600" };
   } else if (isEndingSoon) {
     thumbBadge = { label: "마감임박", tone: "bg-danger/10 text-danger" };
@@ -193,7 +160,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <div className="absolute inset-0 bg-black/30 pointer-events-none" />
         )}
 
-        {/* 우상단 소프트 칩: D-N / 매진 / 마감임박 */}
+        {/* 우상단 소프트 칩: 매진 / 마감임박 */}
         {thumbBadge && (
           <div className="absolute top-3 right-3 z-[1]">
             <span className={`${THUMB_BADGE_BASE} ${thumbBadge.tone}`}>

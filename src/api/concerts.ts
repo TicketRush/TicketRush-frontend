@@ -51,8 +51,6 @@ interface PerformanceListResponse {
   imageMainUrl: string;
   performanceStatus: ConcertStatus;
   price: number;
-  /** 예매 오픈 시각 — 목록에 오면 카드 UPCOMING 안내에 사용 (없으면 미정) */
-  bookingOpenAt?: string | null;
 }
 
 /** 백엔드 PerformanceDetailResponse (원본 스펙) */
@@ -120,8 +118,7 @@ function mapListItem(item: PerformanceListResponse): ConcertSummary {
     price: item.price,
     imageMainUrl: item.imageMainUrl,
     status: item.performanceStatus,
-    bookingOpenAt: item.bookingOpenAt ?? null,
-    // totalSeats, remainingSeats는 목록 응답에 없음
+    // totalSeats, remainingSeats, bookingOpenAt은 목록 응답에 없음
   };
 }
 

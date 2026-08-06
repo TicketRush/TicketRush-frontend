@@ -27,7 +27,7 @@
  *   id 2  — ON_SALE 매진: 버튼「매진」+ 우상단「매진」뱃지
  *   id 8  — CLOSED「예매 마감」(뱃지 없음)
  *   id 9  — CANCELED「공연 취소」+ dim (뱃지 없음)
- *   id 10 — UPCOMING「MM/DD 오픈」+ 우상단 D-N (bookingOpenAt 기준)
+ *   id 10 — UPCOMING「오픈 예정」(목록에 bookingOpenAt 없음 → 상세에서만 오픈 안내)
  * #178 카드 제목 줄수:
  *   id 11 — 제목 1줄 / id 12 — 제목 2줄
  */
@@ -209,7 +209,8 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     status: "CANCELED",
   },
   {
-    // #177/#178: UPCOMING — 버튼「MM/DD 오픈」, 잔여 좌석 슬롯 "-"
+    // #177/#178: UPCOMING — 목록 CTA「오픈 예정」, 잔여 "-"
+    // bookingOpenAt은 목록 API에 없음 → 상세 mock에서만 주입
     id: 10,
     title: "[Mock] 오픈 예정 공연 (UPCOMING)",
     performer: "Upcoming Stars",
@@ -223,8 +224,6 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     totalSeats: 120,
     remainingSeats: 120,
     status: "UPCOMING",
-    // D-1 확인용 (오늘이 2026-08-07이면 D-1). 날짜 지나면 mock만 조정
-    bookingOpenAt: "2026-08-08T12:00:00",
   },
 ];
 
@@ -237,10 +236,9 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
   return {
     ...summary,
     totalSeats,
-    // #177/#178 UPCOMING — summary.bookingOpenAt 우선, 없으면 상세용 fallback
+    // 상세 API에만 있는 bookingOpenAt (목록 mock에는 없음)
     bookingOpenAt:
-      summary.bookingOpenAt ??
-      (summary.status === "UPCOMING" ? "2026-09-15T12:00:00" : null),
+      summary.status === "UPCOMING" ? "2026-09-15T12:00:00" : null,
     description:
       `${summary.title}의 특별한 공연이 ${summary.venue ?? summary.address}에서 펼쳐집니다. ` +
       `${summary.performer}의 감동적인 무대를 놓치지 마세요. ` +
