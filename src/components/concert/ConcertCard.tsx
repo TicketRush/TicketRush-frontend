@@ -22,6 +22,11 @@
 // - 2026-08-07 (#178 리뷰):
 //   - seatsReady에 shouldFetchSeats(ON_SALE) 포함
 //     enabled=false여도 캐시가 있으면 옛 좌석 수/게이지가 보이던 문제 방지
+// - 2026-08-07 (#178):
+//   - 상태별 CTA 문구 (매진/예매 마감/공연 취소/MM/DD 오픈)
+//   - 썸네일 우상단 소프트 칩 통일 (D-N / 매진 / 마감임박)
+//   - CANCELED만 썸네일 dim (뱃지 없음)
+//   - UPCOMING 잔여 좌석 슬롯 유지
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
 // React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
@@ -35,6 +40,37 @@ import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";
 
+/** 썸네일 우상단 소프트 칩 — Figma 마감임박과 동일 포맷 */
+const THUMB_BADGE_BASE =
+  "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold";
+
+/** UPCOMING CTA: `MM/DD 오픈` */
+function formatUpcomingButtonLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "오픈 예정";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd} 오픈`;
+}
+
+/** 예매 오픈일(`bookingOpenAt`) 기준 D-N. 당일 이하는 D-DAY */
+function getBookingDDayLabel(iso: string): string | null {
+  const target = new Date(iso);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const openDay = new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+  );
+  const diffDays = Math.round(
+    (openDay.getTime() - today.getTime()) / 86_400_000,
+  );
+  if (diffDays <= 0) return "D-DAY";
+  return `D-${diffDays}`;
+}
+
 interface ConcertCardProps {
   concert: ConcertSummary;
 }
@@ -42,8 +78,8 @@ interface ConcertCardProps {
 function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
 
-  const isClosedOrCanceled =
-    concert.status === "CLOSED" || concert.status === "CANCELED";
+  const isClosed = concert.status === "CLOSED";
+  const isCanceled = concert.status === "CANCELED";
   const isUpcoming = concert.status === "UPCOMING";
 
   // Detail과 동일: ON_SALE일 때만 seat-counts 조회 (#178 리뷰)
@@ -71,18 +107,24 @@ function ConcertCard({ concert }: ConcertCardProps) {
   const canBook =
     seatsReady && concert.status === "ON_SALE" && (remaining ?? 0) > 0;
 
-  const isSoldOutConfirmed =
-    isClosedOrCanceled || (seatsReady && remaining === 0);
+  // ON_SALE + 잔여 0 (기술적 매진). CLOSED/CANCELED와 구분
+  const isSoldOut = seatsReady && remaining === 0;
 
   let buttonLabel: string;
   if (isUpcoming) {
-    buttonLabel = "오픈 예정";
+    buttonLabel = concert.bookingOpenAt
+      ? formatUpcomingButtonLabel(concert.bookingOpenAt)
+      : "오픈 예정";
+  } else if (isCanceled) {
+    buttonLabel = "공연 취소";
+  } else if (isClosed) {
+    buttonLabel = "예매 마감";
   } else if (seatCountsLoading) {
     buttonLabel = "잔여 좌석 확인 중";
   } else if (seatCountsError) {
     buttonLabel = "좌석 정보 확인 불가";
-  } else if (isSoldOutConfirmed) {
-    buttonLabel = "예매불가";
+  } else if (isSoldOut) {
+    buttonLabel = "매진";
   } else if (canBook) {
     buttonLabel = "예매하기";
   } else {
@@ -95,6 +137,19 @@ function ConcertCard({ concert }: ConcertCardProps) {
       : 0;
   const isEndingSoon =
     canBook && remainingPercent > 0 && remainingPercent <= 20;
+
+  // 썸네일 우상단 뱃지 (상태 > 마감임박). 색만 분기, 포맷은 THUMB_BADGE_BASE
+  let thumbBadge: { label: string; tone: string } | null = null;
+  if (isUpcoming && concert.bookingOpenAt) {
+    const dday = getBookingDDayLabel(concert.bookingOpenAt);
+    if (dday) {
+      thumbBadge = { label: dday, tone: "bg-primary/10 text-primary" };
+    }
+  } else if (isSoldOut) {
+    thumbBadge = { label: "매진", tone: "bg-gray-500/10 text-gray-600" };
+  } else if (isEndingSoon) {
+    thumbBadge = { label: "마감임박", tone: "bg-danger/10 text-danger" };
+  }
 
   const formattedPrice = concert.price.toLocaleString("ko-KR");
 
@@ -133,17 +188,22 @@ function ConcertCard({ concert }: ConcertCardProps) {
           }}
         />
 
-        {/* 마감임박 뱃지 (우상단) */}
-        {isEndingSoon && (
-          <div className="absolute top-2 right-2">
-            <span className="inline-block px-2 py-1 rounded-md text-[10px] font-bold bg-red-100 text-red-600">
-              마감임박
+        {/* CANCELED만 썸네일 dim (살짝만 — 포스터 가독성 유지) */}
+        {isCanceled && (
+          <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+        )}
+
+        {/* 우상단 소프트 칩: D-N / 매진 / 마감임박 */}
+        {thumbBadge && (
+          <div className="absolute top-3 right-3 z-[1]">
+            <span className={`${THUMB_BADGE_BASE} ${thumbBadge.tone}`}>
+              {thumbBadge.label}
             </span>
           </div>
         )}
 
         {/* 장르 뱃지 (좌하단) */}
-        <div className="absolute bottom-2 left-2">
+        <div className="absolute bottom-2 left-2 z-[1]">
           <GenreBadge genre={concert.genre} />
         </div>
       </div>
@@ -173,7 +233,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        {/* 잔여 좌석: 확정 시 숫자+게이지, 미확정 시 "-" (게이지 숨김) */}
+        {/* 잔여 좌석: 확정 시 숫자+게이지, 미확정 시 "-" */}
         <SeatGauge remaining={remaining} total={total} />
 
         <button

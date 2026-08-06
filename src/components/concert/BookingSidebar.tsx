@@ -12,6 +12,9 @@
 // - 2026-08-06 (이슈 #177):
 //   - 잔여 미확정(null) 시 "-" 표시, 게이지/% 숨김
 //   - CLOSED/CANCELED/UPCOMING 상태별 버튼·주의 문구·배경색
+// - 2026-08-07 (#178):
+//   - 버튼 라벨을 status 기준으로 분기 (isOnSale/canBook은 disabled만)
+//     ON_SALE + 좌석 미확정 순간이 "예매 종료"로 떨어지지 않게 함
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 
@@ -127,21 +130,25 @@ export default function BookingSidebar({
 
   const isTechnicallySoldOut = seatsConfirmed && remaining === 0;
 
+  // 라벨은 status(+좌석 확정) 기준. isOnSale(canBook)은 disabled에만 사용.
+  // ON_SALE인데 remaining 미확정이면 로딩/에러로 흡수해 "예매 종료"를 피함.
   let buttonLabel: string;
-  if (seatsLoading) {
-    buttonLabel = "잔여 좌석 확인 중";
-  } else if (seatsError) {
-    buttonLabel = "좌석 정보 확인 불가";
-  } else if (status === "UPCOMING") {
+  if (status === "UPCOMING") {
     buttonLabel = "오픈 예정";
   } else if (status === "CANCELED") {
     buttonLabel = "공연 취소";
   } else if (status === "CLOSED") {
     buttonLabel = "예매 마감";
-  } else if (isTechnicallySoldOut) {
-    buttonLabel = "매진";
-  } else if (isOnSale) {
-    buttonLabel = "예매하기";
+  } else if (status === "ON_SALE") {
+    if (seatsError) {
+      buttonLabel = "좌석 정보 확인 불가";
+    } else if (seatsLoading || !seatsConfirmed) {
+      buttonLabel = "잔여 좌석 확인 중";
+    } else if (isTechnicallySoldOut) {
+      buttonLabel = "매진";
+    } else {
+      buttonLabel = "예매하기";
+    }
   } else {
     buttonLabel = "예매 종료";
   }

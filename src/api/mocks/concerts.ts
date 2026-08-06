@@ -23,6 +23,13 @@
  *   id 8  — CLOSED → 카드 클릭으로 상세 진입, 예매불가/매진, 잔여 "-"
  *   id 9  — CANCELED → 카드 클릭으로 상세 진입, 취소된 공연, 잔여 "-"
  *   id 10 — UPCOMING → 카드 클릭으로 상세 진입, 오픈 예정, 잔여 "-"
+ * #178 카드 CTA / 썸네일 뱃지:
+ *   id 2  — ON_SALE 매진: 버튼「매진」+ 우상단「매진」뱃지
+ *   id 8  — CLOSED「예매 마감」(뱃지 없음)
+ *   id 9  — CANCELED「공연 취소」+ dim (뱃지 없음)
+ *   id 10 — UPCOMING「MM/DD 오픈」+ 우상단 D-N (bookingOpenAt 기준)
+ * #178 카드 제목 줄수:
+ *   id 11 — 제목 1줄 / id 12 — 제목 2줄
  */
 import type { ConcertSummary, ConcertDetail } from "@/types/domain/concert";
 import { mockDelay } from "./_helpers";
@@ -30,6 +37,39 @@ import { mockDelay } from "./_helpers";
 const POSTER = "/placeholder-poster.png";
 
 export const MOCK_CONCERTS: ConcertSummary[] = [
+  {
+    // #178: 제목 1줄 — id 12와 나란히 CTA 정렬 비교
+    id: 11,
+    title: "짧은 제목",
+    performer: "One Line Act",
+    genre: "JAZZ",
+    venue: "블루노트 서울",
+    address: "서울특별시 용산구 이태원로 227",
+    showDate: "2026-08-18",
+    showTime: "20:00",
+    price: 55000,
+    imageMainUrl: POSTER,
+    totalSeats: 120,
+    remainingSeats: 48,
+    status: "ON_SALE",
+  },
+  {
+    // #178: 제목 2줄 — line-clamp-2로 두 줄까지 차는 긴 공연명
+    id: 12,
+    title:
+      "[Mock] 카드 제목 두 줄 검증용 — 목록 그리드에서 예매 버튼 위치가 어긋나는지 확인하는 매우 긴 공연명입니다",
+    performer: "Two Line Ensemble",
+    genre: "CONCERT",
+    venue: "올림픽공원 핸드볼경기장",
+    address: "서울특별시 송파구 올림픽로 424",
+    showDate: "2026-08-19",
+    showTime: "19:00",
+    price: 55000,
+    imageMainUrl: POSTER,
+    totalSeats: 120,
+    remainingSeats: 48,
+    status: "ON_SALE",
+  },
   {
     id: 1,
     title: "BTS World Tour: Beyond the Stars",
@@ -169,7 +209,7 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     status: "CANCELED",
   },
   {
-    // #177: UPCOMING — 상세 진입 가능, 버튼「오픈 예정」, 잔여 "-"
+    // #177/#178: UPCOMING — 버튼「MM/DD 오픈」, 잔여 좌석 슬롯 "-"
     id: 10,
     title: "[Mock] 오픈 예정 공연 (UPCOMING)",
     performer: "Upcoming Stars",
@@ -183,6 +223,8 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     totalSeats: 120,
     remainingSeats: 120,
     status: "UPCOMING",
+    // D-1 확인용 (오늘이 2026-08-07이면 D-1). 날짜 지나면 mock만 조정
+    bookingOpenAt: "2026-08-08T12:00:00",
   },
 ];
 
@@ -195,9 +237,10 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
   return {
     ...summary,
     totalSeats,
-    // #177 UPCOMING mock — 티켓 오픈 안내 문구 검증용
+    // #177/#178 UPCOMING — summary.bookingOpenAt 우선, 없으면 상세용 fallback
     bookingOpenAt:
-      summary.status === "UPCOMING" ? "2026-09-15T12:00:00" : null,
+      summary.bookingOpenAt ??
+      (summary.status === "UPCOMING" ? "2026-09-15T12:00:00" : null),
     description:
       `${summary.title}의 특별한 공연이 ${summary.venue ?? summary.address}에서 펼쳐집니다. ` +
       `${summary.performer}의 감동적인 무대를 놓치지 마세요. ` +

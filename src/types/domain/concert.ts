@@ -71,6 +71,11 @@ export interface ConcertSummary {
    */
   remainingSeats?: number;
   status: ConcertStatus;
+  /**
+   * 예매 오픈 시각 — 백엔드 `bookingOpenAt` (UPCOMING 안내)
+   * ISO datetime. 목록에 없으면 undefined → 카드는 "오픈일 미정".
+   */
+  bookingOpenAt?: string | null;
 }
 
 /**
@@ -94,11 +99,6 @@ export interface ConcertDetail extends ConcertSummary {
   imageGalleryUrls: string[];
   /** ⚠️ 3D 모델 이미지 URL (예랑 담당, 현재 미사용) */
   image3dUrl?: string;
-  /**
-   * 예매 오픈 시각 — 백엔드 `bookingOpenAt` (UPCOMING 안내 문구용)
-   * ISO datetime 문자열. null/미응답이면 오픈일 미정 안내.
-   */
-  bookingOpenAt?: string | null;
   /** ⚠️ 백엔드 응답에 없음. 프론트 임시 상수 fallback */
   notices?: string[];
   /** 상세는 totalSeats 필수 */
