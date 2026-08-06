@@ -19,6 +19,9 @@
 // - 2026-08-06 (이슈 #177):
 //   - CLOSED/CANCELED/매진도 카드 클릭으로 상세 진입 허용 (예매 버튼만 비활성)
 //   - 잔여 좌석 미확정 시 "0" 대신 "-", 게이지 숨김
+// - 2026-08-07 (#178 리뷰):
+//   - seatsReady에 shouldFetchSeats(ON_SALE) 포함
+//     enabled=false여도 캐시가 있으면 옛 좌석 수/게이지가 보이던 문제 방지
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
 // React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
@@ -43,16 +46,20 @@ function ConcertCard({ concert }: ConcertCardProps) {
     concert.status === "CLOSED" || concert.status === "CANCELED";
   const isUpcoming = concert.status === "UPCOMING";
 
-  // CLOSED/CANCELED/UPCOMING → 예매 불가이므로 seat-counts 생략
-  //   (UPCOMING은 오픈 전이라 잔여 좌석이 CTA에 쓰이지 않음)
+  // Detail과 동일: ON_SALE일 때만 seat-counts 조회 (#178 리뷰)
+  // seatsReady에도 포함해야 enabled=false + 캐시 hit 시 옛 숫자가 안 보임
+  const shouldFetchSeats = concert.status === "ON_SALE";
   const {
     data: seatCounts,
     isLoading: seatCountsLoading,
     isError: seatCountsError,
-  } = useSeatCounts(concert.id, !isClosedOrCanceled && !isUpcoming);
+  } = useSeatCounts(concert.id, shouldFetchSeats);
 
   const seatsReady =
-    !!seatCounts && !seatCountsLoading && !seatCountsError;
+    shouldFetchSeats &&
+    !!seatCounts &&
+    !seatCountsLoading &&
+    !seatCountsError;
 
   // 확정된 잔여만 숫자로 사용. 미확정(로딩/실패/미호출)은 null → UI에서 "-"
   const remaining = seatsReady ? seatCounts.availableCount : null;
