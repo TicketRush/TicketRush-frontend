@@ -27,6 +27,8 @@
 //   - ON_SALE 미확정 시 CTA「잔여 좌석 확인 중」(Sidebar와 동일)
 //   - 썸네일 우상단 소프트 칩 (매진 / 마감임박) — 목록 bookingOpenAt 미사용
 //   - CANCELED만 썸네일 dim (뱃지 없음)
+// - 2026-08-07 (#178 보완):
+//   - CTA 문구는 getBookingCtaLabel 공통 헬퍼 사용
 //
 // ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
 // React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
@@ -36,6 +38,7 @@ import { useNavigate } from "react-router-dom";
 import { MapPin, Calendar } from "lucide-react";
 import type { ConcertSummary } from "@/types/domain/concert";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
+import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -51,9 +54,7 @@ interface ConcertCardProps {
 function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
 
-  const isClosed = concert.status === "CLOSED";
   const isCanceled = concert.status === "CANCELED";
-  const isUpcoming = concert.status === "UPCOMING";
 
   // Detail과 동일: ON_SALE일 때만 seat-counts 조회 (#178 리뷰)
   // seatsReady에도 포함해야 enabled=false + 캐시 hit 시 옛 숫자가 안 보임
@@ -83,31 +84,12 @@ function ConcertCard({ concert }: ConcertCardProps) {
   // ON_SALE + 잔여 0 (기술적 매진). CLOSED/CANCELED와 구분
   const isSoldOut = seatsReady && remaining === 0;
 
-  // Sidebar와 동일: ON_SALE 라벨은 status(+좌석 확정) 기준. canBook은 disabled만.
-  let buttonLabel: string;
-  if (isUpcoming) {
-    // 목록 API에 bookingOpenAt 없음 →「오픈 예정」고정 (오픈 시각 안내는 상세)
-    buttonLabel = "오픈 예정";
-  } else if (isCanceled) {
-    buttonLabel = "공연 취소";
-  } else if (isClosed) {
-    buttonLabel = "예매 마감";
-  } else if (shouldFetchSeats) {
-    // ON_SALE: 미확정 순간이「예매불가」로 떨어지지 않게 함
-    if (seatCountsError) {
-      buttonLabel = "좌석 정보 확인 불가";
-    } else if (seatCountsLoading || !seatsReady) {
-      buttonLabel = "잔여 좌석 확인 중";
-    } else if (isSoldOut) {
-      buttonLabel = "매진";
-    } else if (canBook) {
-      buttonLabel = "예매하기";
-    } else {
-      buttonLabel = "예매불가";
-    }
-  } else {
-    buttonLabel = "예매불가";
-  }
+  const buttonLabel = getBookingCtaLabel({
+    status: concert.status,
+    seatsLoading: seatCountsLoading,
+    seatsError: seatCountsError,
+    remaining,
+  });
 
   const remainingPercent =
     seatsReady && remaining !== null && total > 0

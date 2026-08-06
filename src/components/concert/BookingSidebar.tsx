@@ -15,8 +15,13 @@
 // - 2026-08-07 (#178):
 //   - 버튼 라벨을 status 기준으로 분기 (isOnSale/canBook은 disabled만)
 //     ON_SALE + 좌석 미확정 순간이 "예매 종료"로 떨어지지 않게 함
+// - 2026-08-07 (#178 보완):
+//   - 매진 게이지 색을 SeatGauge와 동일(primary)로 통일
+//   - 잔여 미확정 시에도 게이지·% 줄 높이 슬롯 유지 (레이아웃 점프 방지)
+//   - CTA 문구는 getBookingCtaLabel 공통 헬퍼 사용
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
+import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 
 interface BookingSidebarProps {
   /** null이면 미확정 → "-" */
@@ -127,31 +132,17 @@ export default function BookingSidebar({
   const seatsConfirmed = remaining !== null;
   const percent =
     seatsConfirmed && total > 0 ? (remaining / total) * 100 : 0;
+  // SeatGauge와 동일: 매진(0)은 일반색, ≤20%만 마감임박(danger)
+  const isEndingSoon =
+    seatsConfirmed && remaining > 0 && percent > 0 && percent <= 20;
+  const showGauge = seatsConfirmed && total > 0;
 
-  const isTechnicallySoldOut = seatsConfirmed && remaining === 0;
-
-  // 라벨은 status(+좌석 확정) 기준. isOnSale(canBook)은 disabled에만 사용.
-  // ON_SALE인데 remaining 미확정이면 로딩/에러로 흡수해 "예매 종료"를 피함.
-  let buttonLabel: string;
-  if (status === "UPCOMING") {
-    buttonLabel = "오픈 예정";
-  } else if (status === "CANCELED") {
-    buttonLabel = "공연 취소";
-  } else if (status === "CLOSED") {
-    buttonLabel = "예매 마감";
-  } else if (status === "ON_SALE") {
-    if (seatsError) {
-      buttonLabel = "좌석 정보 확인 불가";
-    } else if (seatsLoading || !seatsConfirmed) {
-      buttonLabel = "잔여 좌석 확인 중";
-    } else if (isTechnicallySoldOut) {
-      buttonLabel = "매진";
-    } else {
-      buttonLabel = "예매하기";
-    }
-  } else {
-    buttonLabel = "예매 종료";
-  }
+  const buttonLabel = getBookingCtaLabel({
+    status,
+    seatsLoading,
+    seatsError,
+    remaining,
+  });
 
   const statusNotice = getStatusNotice(status, bookingOpenAt);
   const noticeStyle = statusNotice
@@ -186,29 +177,28 @@ export default function BookingSidebar({
             </div>
           </div>
 
-          {seatsConfirmed && total > 0 && (
-            <>
-              <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    isTechnicallySoldOut ? "bg-danger" : "bg-primary"
-                  }`}
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-text-secondary mt-1">
-                {`${Math.round(percent)}% 잔여`}
-              </p>
-            </>
+          {/* 게이지: 확정 시 바 표시, 미확정 시 높이 슬롯만 유지 */}
+          {showGauge ? (
+            <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  isEndingSoon ? "bg-danger" : "bg-primary"
+                }`}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          ) : (
+            <div className="w-full h-1" aria-hidden />
           )}
-
-          {!seatsConfirmed && (seatsLoading || seatsError) && (
-            <p className="text-[10px] text-text-secondary mt-1">
-              {seatsLoading
+          <p className="text-[10px] text-text-secondary mt-1">
+            {showGauge
+              ? `${Math.round(percent)}% 잔여`
+              : seatsLoading
                 ? "잔여 좌석을 확인하고 있습니다"
-                : "잔여 좌석을 확인할 수 없습니다"}
-            </p>
-          )}
+                : seatsError
+                  ? "잔여 좌석을 확인할 수 없습니다"
+                  : "\u00A0"}
+          </p>
         </div>
 
         <div className="border-2 border-primary rounded-lg p-3 bg-primary/5">
