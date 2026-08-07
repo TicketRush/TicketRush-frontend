@@ -29,7 +29,7 @@ export default function SeatSelectionPage() {
   const startTimer = useTimerStore((s) => s.startTimer);
   const currentConcert = useConcertStore((s) => s.currentConcert);
 
-  /** 내 좌석 확인(HOLD) 진행 중 — 선택 해제/토스트 오탐 방지 */
+  /** 내 「좌석 확인」 진행 중 seatId — Confirm 진입 전까지 선택 해제 스킵 */
   const confirmingSeatIdRef = useRef<number | null>(null);
   const shouldPreserveSelection = useCallback(
     (seatId: number) => confirmingSeatIdRef.current === seatId,
@@ -87,13 +87,20 @@ export default function SeatSelectionPage() {
 
   async function handleConfirm() {
     if (!selectedSeat || !performanceId || !selectedSeatAvailable) return;
-    confirmingSeatIdRef.current = selectedSeat.id;
+
+    // 「좌석 확인」~Confirm 진입까지: 내 HOLD/SSE로 선택이 풀리지 않게 유지
+    // (실제 선점 성공 여부는 holdSeat API가 판단. 실패 시 아래에서 해제)
+    const seatId = selectedSeat.id;
+    confirmingSeatIdRef.current = seatId;
+
     try {
-      await holdSeatMutation.mutateAsync(selectedSeat.id);
+      await holdSeatMutation.mutateAsync(seatId);
       startTimer();
       navigate(`/concerts/${performanceId}/payment/confirm`);
     } catch (error: unknown) {
       confirmingSeatIdRef.current = null;
+      // 남이 먼저 선점 등으로 API 실패 → 선택 해제 (preserve 해제 후)
+      useSeatStore.getState().reset();
       const err =
         error instanceof Error ? error : new Error("좌석 선점에 실패했습니다.");
       toast.error(err.message);
