@@ -1,8 +1,8 @@
 // 좌석 상태 SSE 구독 hook (이슈 #123)
 // - SSE(named event: seat-status-changed)가 주 경로
-// - 연결 실패/단절 시 5초 polling fallback (좌석맵 + 카운트 재조회)
-// - SSE 재연결(open) 시 polling 중지
-// - unmount 시 EventSource.close + clearInterval
+// - 연결 실패/단절 시 짧은 debounce 후 5초 polling fallback (좌석맵 + 카운트 재조회)
+// - SSE 재연결(open) 시 debounce/polling 중지
+// - unmount 시 EventSource.close + clearTimeout/clearInterval
 // - 선택 좌석이 HOLD/SOLD 등으로 바뀌면 seatStore 선택 해제
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,8 @@ import useSeatStore from "@/stores/reservation/seatStore";
 import type { SeatWithStatus, SeatUpdateEvent } from "@/types/domain/seat";
 
 const POLL_INTERVAL_MS = 5_000;
+/** onerror 직후 바로 polling 하지 않고, 짧은 재연결 기회를 준 뒤 fallback */
+const POLL_FALLBACK_DEBOUNCE_MS = 1_500;
 
 function clearSelectedSeatIfUnavailable(
   seatId: number,
@@ -32,6 +34,7 @@ export function useSeatEventStream(performanceId: number | undefined) {
 
     let disposed = false;
     let pollingId: ReturnType<typeof setInterval> | null = null;
+    let fallbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const applySeatUpdate = (event: SeatUpdateEvent) => {
       queryClient.setQueryData<SeatWithStatus[]>(
@@ -61,6 +64,12 @@ export function useSeatEventStream(performanceId: number | undefined) {
       pollingId = null;
     };
 
+    const cancelFallbackSchedule = () => {
+      if (fallbackTimeoutId == null) return;
+      clearTimeout(fallbackTimeoutId);
+      fallbackTimeoutId = null;
+    };
+
     const pollOnce = () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.seats.byPerformance(performanceId),
@@ -76,17 +85,28 @@ export function useSeatEventStream(performanceId: number | undefined) {
       pollingId = setInterval(pollOnce, POLL_INTERVAL_MS);
     };
 
+    /** 짧은 재연결에 성공하면 open에서 취소됨 → 불필요한 polling 방지 */
+    const schedulePollingFallback = () => {
+      if (disposed || pollingId != null || fallbackTimeoutId != null) return;
+      fallbackTimeoutId = setTimeout(() => {
+        fallbackTimeoutId = null;
+        startPolling();
+      }, POLL_FALLBACK_DEBOUNCE_MS);
+    };
+
     const unsubscribe = subscribeSeatStream(performanceId, applySeatUpdate, {
       onError: () => {
-        startPolling();
+        schedulePollingFallback();
       },
       onOpen: () => {
+        cancelFallbackSchedule();
         stopPolling();
       },
     });
 
     return () => {
       disposed = true;
+      cancelFallbackSchedule();
       stopPolling();
       unsubscribe();
     };
