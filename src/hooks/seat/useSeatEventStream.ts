@@ -128,7 +128,7 @@ export function useSeatEventStream(
   useEffect(() => {
     if (!performanceId || !isForceHoldSelectedEnabled()) return;
 
-    console.info(
+    console.warn(
       "[QA] forceHoldSelected=1 — 좌석을 선택하면 약 2초 뒤 HOLD + 선택 해제 토스트가 납니다.",
     );
 
