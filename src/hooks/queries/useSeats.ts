@@ -4,13 +4,16 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchSeats, fetchSeatCounts } from "@/api/seats";
 import { queryKeys } from "@/constants/queryKeys";
 
-export function useSeats(performanceId: number | undefined) {
+export function useSeats(
+  performanceId: number | undefined,
+  enabled: boolean = true,
+) {
   return useQuery({
     queryKey: performanceId
       ? queryKeys.seats.byPerformance(performanceId)
       : ["seats", "invalid"],
     queryFn: () => fetchSeats(performanceId!),
-    enabled: !!performanceId,
+    enabled: !!performanceId && enabled,
     staleTime: 0, // 실시간
   });
 }

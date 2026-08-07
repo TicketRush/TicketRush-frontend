@@ -6,11 +6,14 @@ import { subscribeSeatStream } from "@/api/seats";
 import { queryKeys } from "@/constants/queryKeys";
 import type { SeatWithStatus, SeatUpdateEvent } from "@/types/domain/seat";
 
-export function useSeatEventStream(performanceId: number | undefined) {
+export function useSeatEventStream(
+  performanceId: number | undefined,
+  enabled: boolean = true,
+) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!performanceId) return;
+    if (!performanceId || !enabled) return;
 
     const unsubscribe = subscribeSeatStream(
       performanceId,
@@ -36,5 +39,5 @@ export function useSeatEventStream(performanceId: number | undefined) {
     );
 
     return unsubscribe;
-  }, [performanceId, queryClient]);
+  }, [performanceId, enabled, queryClient]);
 }
