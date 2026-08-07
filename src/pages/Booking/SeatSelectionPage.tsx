@@ -4,7 +4,7 @@
 //   - handleSeatClick의 seat 객체 필드명 변경 (label→seatNumber, layoutId→seatLayoutId)
 //   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import SeatMap from "@/components/seat/SeatMap";
@@ -15,6 +15,7 @@ import { useHoldSeat } from "@/hooks/mutations/useHoldSeat";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
+import { clearSelectedSeatIfTaken } from "@/utils/seat/clearSelectedSeatIfTaken";
 import { toast } from "react-toastify";
 import type { SeatWithStatus } from "@/types/domain/seat";
 
@@ -25,24 +26,36 @@ export default function SeatSelectionPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const toggleSeat = useSeatStore((s) => s.toggleSeat);
-  const resetSeat = useSeatStore((s) => s.reset);
   const startTimer = useTimerStore((s) => s.startTimer);
   const currentConcert = useConcertStore((s) => s.currentConcert);
+
+  /** 내 좌석 확인(HOLD) 진행 중 — 선택 해제/토스트 오탐 방지 */
+  const confirmingSeatIdRef = useRef<number | null>(null);
+  const shouldPreserveSelection = useCallback(
+    (seatId: number) => confirmingSeatIdRef.current === seatId,
+    [],
+  );
 
   const { data: seats, isLoading, isError } = useSeats(performanceId);
   const holdSeatMutation = useHoldSeat(performanceId ?? 0);
 
   // SSE 구독
-  useSeatEventStream(performanceId);
+  useSeatEventStream(performanceId, { shouldPreserveSelection });
 
   // polling fallback 등으로 캐시가 갱신돼도 선택 좌석이 AVAILABLE이 아니면 해제
   useEffect(() => {
     if (!selectedSeat || !seats) return;
     const current = seats.find((s) => s.id === selectedSeat.id);
-    if (!current || current.status !== "AVAILABLE") {
-      resetSeat();
+    if (!current) {
+      clearSelectedSeatIfTaken(selectedSeat.id, "SOLD", {
+        preserve: shouldPreserveSelection(selectedSeat.id),
+      });
+      return;
     }
-  }, [seats, selectedSeat, resetSeat]);
+    clearSelectedSeatIfTaken(selectedSeat.id, current.status, {
+      preserve: shouldPreserveSelection(selectedSeat.id),
+    });
+  }, [seats, selectedSeat, shouldPreserveSelection]);
 
   const stats = useMemo(() => {
     if (!seats) return { total: 0, available: 0, holding: 0, sold: 0 };
@@ -74,11 +87,13 @@ export default function SeatSelectionPage() {
 
   async function handleConfirm() {
     if (!selectedSeat || !performanceId || !selectedSeatAvailable) return;
+    confirmingSeatIdRef.current = selectedSeat.id;
     try {
       await holdSeatMutation.mutateAsync(selectedSeat.id);
       startTimer();
       navigate(`/concerts/${performanceId}/payment/confirm`);
     } catch (error: unknown) {
+      confirmingSeatIdRef.current = null;
       const err =
         error instanceof Error ? error : new Error("좌석 선점에 실패했습니다.");
       toast.error(err.message);

@@ -3,31 +3,29 @@
 // - 연결 실패/단절 시 짧은 debounce 후 5초 polling fallback (좌석맵 + 카운트 재조회)
 // - SSE 재연결(open) 시 debounce/polling 중지
 // - unmount 시 EventSource.close + clearTimeout/clearInterval
-// - 선택 좌석이 HOLD/SOLD 등으로 바뀌면 seatStore 선택 해제
+// - 선택 좌석이 HOLD/SOLD 등으로 바뀌면 seatStore 선택 해제 (+ 토스트)
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { subscribeSeatStream } from "@/api/seats";
 import { queryKeys } from "@/constants/queryKeys";
-import useSeatStore from "@/stores/reservation/seatStore";
+import { clearSelectedSeatIfTaken } from "@/utils/seat/clearSelectedSeatIfTaken";
 import type { SeatWithStatus, SeatUpdateEvent } from "@/types/domain/seat";
 
 const POLL_INTERVAL_MS = 5_000;
 /** onerror 직후 바로 polling 하지 않고, 짧은 재연결 기회를 준 뒤 fallback */
 const POLL_FALLBACK_DEBOUNCE_MS = 1_500;
 
-function clearSelectedSeatIfUnavailable(
-  seatId: number,
-  status: SeatUpdateEvent["status"],
-) {
-  if (status === "AVAILABLE") return;
-  const selected = useSeatStore.getState().selectedSeat;
-  if (selected?.id === seatId) {
-    useSeatStore.getState().reset();
-  }
+interface UseSeatEventStreamOptions {
+  /** 내 좌석 확인 진행 중 등 — 해당 seatId는 선택 유지 */
+  shouldPreserveSelection?: (seatId: number) => boolean;
 }
 
-export function useSeatEventStream(performanceId: number | undefined) {
+export function useSeatEventStream(
+  performanceId: number | undefined,
+  options?: UseSeatEventStreamOptions,
+) {
   const queryClient = useQueryClient();
+  const shouldPreserveSelection = options?.shouldPreserveSelection;
 
   useEffect(() => {
     if (!performanceId) return;
@@ -50,7 +48,9 @@ export function useSeatEventStream(performanceId: number | undefined) {
       );
 
       // 내가 고른 좌석이 타인에게 잡히면 선택 해제 (SELECTED 잔상·확인 버튼 방지)
-      clearSelectedSeatIfUnavailable(event.seatId, event.status);
+      clearSelectedSeatIfTaken(event.seatId, event.status, {
+        preserve: shouldPreserveSelection?.(event.seatId) ?? false,
+      });
 
       // 좌석 잔여 수도 같이 무효화 (간단히 다시 fetch)
       queryClient.invalidateQueries({
@@ -110,5 +110,5 @@ export function useSeatEventStream(performanceId: number | undefined) {
       stopPolling();
       unsubscribe();
     };
-  }, [performanceId, queryClient]);
+  }, [performanceId, queryClient, shouldPreserveSelection]);
 }
