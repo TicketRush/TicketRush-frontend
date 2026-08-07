@@ -1,27 +1,35 @@
 interface SeatGaugeProps {
-  remaining: number;
+  /** null이면 미확정 → "-" 표시, 게이지 바는 숨기되 높이만 유지 */
+  remaining: number | null;
   total: number;
 }
 
 export default function SeatGauge({ remaining, total }: SeatGaugeProps) {
+  if (remaining === null) {
+    return (
+      <div className="w-full">
+        <div className="flex justify-between items-baseline mb-1.5">
+          <span className="text-xs text-placeholder">잔여 좌석</span>
+          <span className="text-sm font-bold text-text-secondary">-</span>
+        </div>
+        {/* 확정 시 게이지(h-1)와 동일 높이 — 카드 CTA 정렬용 */}
+        <div className="w-full h-1" aria-hidden />
+      </div>
+    );
+  }
+
   const percent = total > 0 ? Math.round((remaining / total) * 100) : 0;
   const isSoldOut = remaining === 0;
-  // 마감임박 = 잔여 20% 이하 (단, 매진 제외)
+  // 마감임박 = 잔여 20% 이하 (단, 매진 제외). 매진(0)은 일반 색 유지
   const isEndingSoon = !isSoldOut && percent <= 20;
 
-  const barColor = isSoldOut || isEndingSoon ? "bg-danger" : "bg-primary";
+  const barColor = isEndingSoon ? "bg-danger" : "bg-primary";
 
   return (
     <div className="w-full">
       <div className="flex justify-between items-baseline mb-1.5">
         <span className="text-xs text-placeholder">잔여 좌석</span>
-        <span
-          className={`text-sm font-bold ${
-            isSoldOut ? "text-danger" : "text-text"
-          }`}
-        >
-          {remaining}석
-        </span>
+        <span className="text-sm font-bold text-text">{remaining}석</span>
       </div>
       <div
         className="w-full h-1 bg-gray-100 rounded-full overflow-hidden"

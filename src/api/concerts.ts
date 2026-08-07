@@ -67,6 +67,8 @@ interface PerformanceDetailResponse {
   totalSeats: number;
   address: string;
   performanceStatus: ConcertStatus;
+  /** 예매 오픈 시각 (UPCOMING 안내) */
+  bookingOpenAt?: string | null;
   imageMainUrl: string;
   image3dUrl?: string;
   imageGalleryUrls: string[];
@@ -116,7 +118,7 @@ function mapListItem(item: PerformanceListResponse): ConcertSummary {
     price: item.price,
     imageMainUrl: item.imageMainUrl,
     status: item.performanceStatus,
-    // totalSeats, remainingSeats는 목록 응답에 없음
+    // totalSeats, remainingSeats, bookingOpenAt은 목록 응답에 없음
   };
 }
 
@@ -142,6 +144,7 @@ function mapDetail(item: PerformanceDetailResponse): ConcertDetail {
       label: f,
     })),
     status: item.performanceStatus,
+    bookingOpenAt: item.bookingOpenAt ?? null,
     // notices는 백엔드에 없음 → 프론트 페이지에서 fallback 상수 사용
   };
 }
