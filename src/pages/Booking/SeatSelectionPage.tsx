@@ -4,9 +4,9 @@
 //   - handleSeatClick의 seat 객체 필드명 변경 (label→seatNumber, layoutId→seatLayoutId)
 //   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
+import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { useMemo } from "react";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
 import { useSeats } from "@/hooks/queries/useSeats";
@@ -25,6 +25,7 @@ export default function SeatSelectionPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const toggleSeat = useSeatStore((s) => s.toggleSeat);
+  const resetSeat = useSeatStore((s) => s.reset);
   const startTimer = useTimerStore((s) => s.startTimer);
   const currentConcert = useConcertStore((s) => s.currentConcert);
 
@@ -33,6 +34,15 @@ export default function SeatSelectionPage() {
 
   // SSE 구독
   useSeatEventStream(performanceId);
+
+  // polling fallback 등으로 캐시가 갱신돼도 선택 좌석이 AVAILABLE이 아니면 해제
+  useEffect(() => {
+    if (!selectedSeat || !seats) return;
+    const current = seats.find((s) => s.id === selectedSeat.id);
+    if (!current || current.status !== "AVAILABLE") {
+      resetSeat();
+    }
+  }, [seats, selectedSeat, resetSeat]);
 
   const stats = useMemo(() => {
     if (!seats) return { total: 0, available: 0, holding: 0, sold: 0 };
@@ -47,6 +57,10 @@ export default function SeatSelectionPage() {
   // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
   const totalAmount = currentConcert?.price ?? 0;
 
+  const selectedSeatAvailable =
+    !!selectedSeat &&
+    seats?.some((s) => s.id === selectedSeat.id && s.status === "AVAILABLE");
+
   function handleSeatClick(seat: SeatWithStatus) {
     // Seat 도메인 타입에 맞게 필드 정렬
     toggleSeat({
@@ -59,7 +73,7 @@ export default function SeatSelectionPage() {
   }
 
   async function handleConfirm() {
-    if (!selectedSeat || !performanceId) return;
+    if (!selectedSeat || !performanceId || !selectedSeatAvailable) return;
     try {
       await holdSeatMutation.mutateAsync(selectedSeat.id);
       startTimer();
@@ -86,16 +100,16 @@ export default function SeatSelectionPage() {
         <div className="text-center">
           <h1 className="text-base font-bold text-text">좌석 선택</h1>
           <p className="text-xs text-text-secondary mt-0.5">
-            선택: {selectedSeat ? "1석" : "0석"} | 총 금액: ₩
+            선택: {selectedSeatAvailable ? "1석" : "0석"} | 총 금액: ₩
             {totalAmount.toLocaleString()}
           </p>
         </div>
         <button
           type="button"
-          disabled={!selectedSeat || holdSeatMutation.isPending}
+          disabled={!selectedSeatAvailable || holdSeatMutation.isPending}
           onClick={handleConfirm}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-            selectedSeat && !holdSeatMutation.isPending
+            selectedSeatAvailable && !holdSeatMutation.isPending
               ? "bg-primary text-white hover:opacity-90"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
@@ -147,7 +161,7 @@ export default function SeatSelectionPage() {
           <div className="flex justify-center">
             <SeatMap
               seats={seats ?? []}
-              selectedSeatId={selectedSeat?.id ?? null}
+              selectedSeatId={selectedSeatAvailable ? (selectedSeat?.id ?? null) : null}
               onSeatClick={handleSeatClick}
             />
           </div>
