@@ -23,6 +23,7 @@
 
 import { mockDelay, mockError, shouldThrow } from "./_helpers";
 import { MOCK_CONCERTS } from "./concerts";
+import useSeatStore from "@/stores/reservation/seatStore";
 import type {
   SeatWithStatus,
   SeatCounts,
@@ -208,41 +209,76 @@ function notifyListeners(performanceId: number, event: SeatUpdateEvent) {
 }
 
 /**
+ * mock QA 임시 스위치.
+ * URL에 `?forceHoldSelected=1` 이면 랜덤이 아니라 **현재 선택 좌석**을 HOLD한다.
+ * 예: /concerts/1/seats?forceHoldSelected=1
+ */
+function isForceHoldSelectedEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    new URLSearchParams(window.location.search).get("forceHoldSelected") ===
+    "1"
+  );
+}
+
+function holdSeatForSimulator(
+  performanceId: number,
+  seatId: number,
+  statusMap: Map<number, SeatStatus>,
+) {
+  statusMap.set(seatId, "HOLD");
+  notifyListeners(performanceId, {
+    seatId,
+    status: "HOLD",
+    timestamp: new Date().toISOString(),
+  });
+
+  // 5초 후 다시 해제 (반복 테스트 가능)
+  setTimeout(() => {
+    if (statusMap.get(seatId) === "HOLD") {
+      statusMap.set(seatId, "AVAILABLE");
+      notifyListeners(performanceId, {
+        seatId,
+        status: "AVAILABLE",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, 5000);
+}
+
+/**
  * 다른 사용자의 좌석 활동을 시뮬레이션.
- * 3초마다 10% 확률로 랜덤한 좌석을 HOLD → 5초 후 AVAILABLE.
- * UI에서 SSE 동작을 눈으로 확인하기 위함.
+ * - 기본: 3초마다 10% 확률로 랜덤 좌석 HOLD → 5초 후 AVAILABLE
+ * - `?forceHoldSelected=1`: 선택 좌석이 있으면 약 2초마다 그 좌석을 HOLD (토스트/선택 해제 QA용)
  */
 function startSimulator(performanceId: number) {
   if (intervalByPerformance.has(performanceId)) return;
 
   const interval = setInterval(() => {
-    if (Math.random() >= 0.1) return;
-
     ensureSeatState(performanceId);
     const statusMap = seatStateByPerformance.get(performanceId)!;
+
+    // ── QA 스위치: 선택 좌석 강제 HOLD ──
+    if (isForceHoldSelectedEnabled()) {
+      const selectedId = useSeatStore.getState().selectedSeat?.id;
+      if (
+        selectedId != null &&
+        statusMap.get(selectedId) === "AVAILABLE"
+      ) {
+        holdSeatForSimulator(performanceId, selectedId, statusMap);
+      }
+      return;
+    }
+
+    // ── 기본 랜덤 시뮬레이터 ──
+    if (Math.random() >= 0.1) return;
+
     const seatIds = Array.from(statusMap.keys());
     const randomId = seatIds[Math.floor(Math.random() * seatIds.length)];
     const current = statusMap.get(randomId)!;
 
     if (current === "AVAILABLE" && Math.random() < 0.5) {
-      statusMap.set(randomId, "HOLD");
-      notifyListeners(performanceId, {
-        seatId: randomId,
-        status: "HOLD",
-        timestamp: new Date().toISOString(),
-      });
-
-      // 5초 후 다시 해제
-      setTimeout(() => {
-        if (statusMap.get(randomId) === "HOLD") {
-          statusMap.set(randomId, "AVAILABLE");
-          notifyListeners(performanceId, {
-            seatId: randomId,
-            status: "AVAILABLE",
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }, 5000);
+      holdSeatForSimulator(performanceId, randomId, statusMap);
     }
   }, 3000);
 
