@@ -21,6 +21,7 @@ import SeatLegend from "@/components/seat/SeatLegend";
 import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
+import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
@@ -35,13 +36,18 @@ export default function SeatSelectionPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const toggleSeat = useSeatStore((s) => s.toggleSeat);
+  const resetSeat = useSeatStore((s) => s.reset);
   const startTimer = useTimerStore((s) => s.startTimer);
+  const resetTimer = useTimerStore((s) => s.reset);
   const currentConcert = useConcertStore((s) => s.currentConcert);
+  const bookingNumber = usePaymentStore((s) => s.bookingNumber);
+  const resetPayment = usePaymentStore((s) => s.reset);
 
   // #122: layouts → 좌석맵, counts → 하단 잔여/상태 통계
   const { data: seats, isLoading, isError } = useSeats(performanceId);
   const { data: seatCounts } = useSeatCounts(performanceId);
   const createBookingMutation = useCreateBooking();
+  const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);
 
   // SSE 구독 (#123에서 polling fallback 보강)
   useSeatEventStream(performanceId);
@@ -67,9 +73,27 @@ export default function SeatSelectionPage() {
     });
   }
 
+  async function cancelExistingPending() {
+    const existing = usePaymentStore.getState().bookingNumber;
+    if (!existing) return;
+    try {
+      await releaseSeatMutation.mutateAsync({
+        bookingNumber: existing,
+        seatId: selectedSeat?.id,
+      });
+    } catch {
+      // 이미 만료/취소된 PENDING일 수 있음
+    } finally {
+      resetPayment();
+    }
+  }
+
   async function handleConfirm() {
     if (!selectedSeat || !performanceId) return;
     try {
+      // Confirm → 뒤로 → 재확인 시 중복 PENDING 방지: 기존 예매 먼저 취소
+      await cancelExistingPending();
+
       // 예매(PENDING) 생성 = 좌석 HOLD. 응답의 bookingNumber를 결제 플로우 전체에서 사용.
       const booking = await createBookingMutation.mutateAsync({
         performanceId,
@@ -85,14 +109,26 @@ export default function SeatSelectionPage() {
     }
   }
 
+  async function handleBack() {
+    if (bookingNumber) {
+      await cancelExistingPending();
+      resetSeat();
+      resetTimer();
+    }
+    navigate(`/concerts/${id}`);
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between bg-white border border-border rounded-xl px-6 py-4">
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-gray-100"
+          onClick={handleBack}
+          disabled={
+            createBookingMutation.isPending || releaseSeatMutation.isPending
+          }
+          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-gray-100 disabled:opacity-60"
         >
           <X size={14} />
           뒤로가기
@@ -106,15 +142,23 @@ export default function SeatSelectionPage() {
         </div>
         <button
           type="button"
-          disabled={!selectedSeat || createBookingMutation.isPending}
+          disabled={
+            !selectedSeat ||
+            createBookingMutation.isPending ||
+            releaseSeatMutation.isPending
+          }
           onClick={handleConfirm}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-            selectedSeat && !createBookingMutation.isPending
+            selectedSeat &&
+            !createBookingMutation.isPending &&
+            !releaseSeatMutation.isPending
               ? "bg-primary text-white hover:opacity-90"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
-          {createBookingMutation.isPending ? "선점 중..." : "좌석 확인"}
+          {createBookingMutation.isPending || releaseSeatMutation.isPending
+            ? "선점 중..."
+            : "좌석 확인"}
         </button>
       </div>
 
