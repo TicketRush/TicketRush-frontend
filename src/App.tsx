@@ -126,13 +126,14 @@ function App() {
         </Routes>
 
         <ToastContainer
-          position="bottom-right"
+          position="top-center"
           autoClose={3000}
           hideProgressBar={false}
           newestOnTop
           closeOnClick
           pauseOnHover
           draggable
+          style={{ zIndex: 9999 }}
         />
       </BrowserRouter>
     </ErrorBoundary>

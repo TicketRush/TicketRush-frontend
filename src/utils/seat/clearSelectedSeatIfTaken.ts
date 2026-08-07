@@ -1,4 +1,4 @@
-import { toast } from "react-toastify";
+import { toast } from "@/utils/toast";
 import useSeatStore from "@/stores/reservation/seatStore";
 import type { SeatStatus } from "@/types/domain/seat";
 
@@ -27,7 +27,7 @@ export function clearSelectedSeatIfTaken(
 
   useSeatStore.getState().reset();
   if (options?.notify !== false) {
-    toast.info(SEAT_TAKEN_TOAST);
+    toast.info(SEAT_TAKEN_TOAST, { position: "top-center" });
   }
   return true;
 }
