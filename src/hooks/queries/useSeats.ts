@@ -17,17 +17,13 @@ export function useSeats(performanceId: number | undefined) {
   });
 }
 
-<<<<<<< HEAD
+/** 이슈 #122 네이밍 별칭 — useSeats와 동일 */
+export const useSeatLayouts = useSeats;
+
 export function useSeatCounts(
   performanceId: number | undefined,
   enabled: boolean = true,
 ) {
-=======
-/** 이슈 #122 네이밍 별칭 — useSeats와 동일 */
-export const useSeatLayouts = useSeats;
-
-export function useSeatCounts(performanceId: number | undefined) {
->>>>>>> 78c6cff ([Feat] #122 좌석 배치/카운트/번호 실 API 연동 마무리)
   return useQuery({
     queryKey: performanceId
       ? queryKeys.seats.counts(performanceId)

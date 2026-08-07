@@ -1,18 +1,11 @@
 // 좌석 API — 백엔드 seat-service swagger (2026-07-07) 스펙 반영
 //
 // 백엔드 endpoint 매핑:
-<<<<<<< HEAD
-//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts
-//   fetchSeats            → GET /api/v1/seat/{performanceId}/seat-layouts
-//   fetchSeatNumbers      → GET /api/v1/seat/numbers
-//   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (SSE)
-=======
 //   fetchSeatCounts / fetchSeatLayouts → 이슈 #122 실 API
 //   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts  (이슈 #121/#122)
 //   fetchSeats / fetchSeatLayouts → GET /api/v1/seat/{performanceId}/seat-layouts (이슈 #122)
 //   fetchSeatNumbers      → GET /api/v1/seat/numbers?seatIds=1&seatIds=2   (이슈 #122)
 //   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (이슈 #123 SSE)
->>>>>>> 78c6cff ([Feat] #122 좌석 배치/카운트/번호 실 API 연동 마무리)
 //
 // ⚠️ 백엔드 응답이 snake_case (total_count 등) 이지만
 // instance.ts의 axios-case-converter가 camelCase로 자동 변환.
