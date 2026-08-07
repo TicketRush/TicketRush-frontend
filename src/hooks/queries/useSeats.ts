@@ -15,13 +15,16 @@ export function useSeats(performanceId: number | undefined) {
   });
 }
 
-export function useSeatCounts(performanceId: number | undefined) {
+export function useSeatCounts(
+  performanceId: number | undefined,
+  enabled: boolean = true,
+) {
   return useQuery({
     queryKey: performanceId
       ? queryKeys.seats.counts(performanceId)
       : ["seats", "counts", "invalid"],
     queryFn: () => fetchSeatCounts(performanceId!),
-    enabled: !!performanceId,
+    enabled: !!performanceId && enabled,
     staleTime: 5_000,
   });
 }

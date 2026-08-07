@@ -3,16 +3,14 @@
  *
  * 백엔드 performance-service swagger (2026-06-30) 스펙 반영.
  *
- * 주요 변경 (프론트 mock → 백엔드 스펙):
- *   - artist → performer
- *   - date → showDate
- *   - time → showTime
- *   - posterUrl → imageMainUrl
- *   - galleryUrls → imageGalleryUrls
- *   - duration → durationMinutes
- *   - address 필드 신규 (각 공연마다 임의값)
+ * 변경 이력:
+ * - 2026-06-30: artist→performer, date→showDate, time→showTime,
+ *   posterUrl→imageMainUrl, galleryUrls→imageGalleryUrls, address 필드 추가
+ * - 2026-07-15 (이슈 #121):
+ *   - status enum 정정: SOLD_OUT → CLOSED (백엔드 스펙 일치)
+ *     (매진은 status가 아닌 availableCount === 0으로 유도)
  *
- * ⚠️ venue 필드는 유지 (백엔드에 venueName 필드 추가 요청 예정)
+ * ⚠️ venue 필드는 유지 (백엔드 venueName 요청 대기)
  * ⚠️ remainingSeats는 mock 편의상 유지. 실 API에선 별도 API(/seat/:id/seat-counts).
  */
 import type { ConcertSummary, ConcertDetail } from "@/types/domain/concert";
@@ -49,7 +47,8 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     imageMainUrl: POSTER,
     totalSeats: 120,
     remainingSeats: 0,
-    status: "SOLD_OUT",
+    // 매진 상태를 백엔드 표현으로: CLOSED
+    status: "CLOSED",
   },
   {
     id: 3,
@@ -132,10 +131,13 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
   const summary = MOCK_CONCERTS.find((c) => c.id === id);
   if (!summary) return null;
 
+  const totalSeats = summary.totalSeats ?? 120;
+
   return {
     ...summary,
+    totalSeats,
     description:
-      `${summary.title}의 특별한 공연이 ${summary.venue}에서 펼쳐집니다. ` +
+      `${summary.title}의 특별한 공연이 ${summary.venue ?? summary.address}에서 펼쳐집니다. ` +
       `${summary.performer}의 감동적인 무대를 놓치지 마세요. ` +
       "이번 공연은 최고의 음향 시스템과 조명으로 관객 여러분께 " +
       "잊지 못할 경험을 선사합니다.",

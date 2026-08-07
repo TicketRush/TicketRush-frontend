@@ -1,4 +1,16 @@
 // 공연 상세 페이지 — 7:3 grid 레이아웃 + sticky 사이드바
+//
+// 변경 이력:
+// - 2026-07-15 (이슈 #121):
+//   - useSeatCounts 훅으로 잔여 좌석 실 API 조회 (remaining, total)
+//   - status enum 정정: isOnSale = status === "ON_SALE"
+//     (매진 판단은 seatCounts.availableCount === 0)
+//   - venue fallback: venue > address (백엔드 venueName 필드 대기)
+//   - concertStore.setConcert에 seatCounts 값 전달
+// - 2026-07-15 (이슈 #122 정리):
+//   - useSeatCounts import 경로 정정: @/hooks/queries/useSeats
+// - 2026-08-02 (#134 리뷰):
+//   - seat-counts 로딩/실패 시 totalSeats fallback으로 예매 열지 않음
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -9,6 +21,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
+import { useSeatCounts } from "@/hooks/queries/useSeats";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import { useConcertStore } from "@/stores/reservation/concertStore";
@@ -21,6 +34,13 @@ export default function ConcertDetailPage() {
 
   const concertId = id ? Number(id) : undefined;
   const { data, isLoading, isError } = useConcertDetail(concertId);
+  // 잔여 좌석 별도 조회 — seat-service
+  // 로딩/실패 시 totalSeats fallback으로 예매를 열지 않음 (#134 리뷰)
+  const {
+    data: seatCounts,
+    isLoading: seatCountsLoading,
+    isError: seatCountsError,
+  } = useSeatCounts(concertId);
 
   if (!concertId || isNaN(concertId))
     return <Navigate to="/concerts" replace />;
@@ -45,7 +65,19 @@ export default function ConcertDetailPage() {
     );
   }
 
-  const isOnSale = data.status === "ON_SALE";
+  const seatsReady = !!seatCounts && !seatCountsLoading && !seatCountsError;
+  // 표시/예매 판단은 seat-counts 확정 후에만 사용 (미확인 시 0으로 두고 버튼 비활성)
+  const total = seatsReady
+    ? seatCounts.totalCount
+    : (data.totalSeats ?? 0);
+  const remaining = seatsReady ? seatCounts.availableCount : 0;
+
+  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0
+  const isOnSale =
+    seatsReady && data.status === "ON_SALE" && remaining > 0;
+
+  // venue fallback
+  const venueDisplay = data.venue ?? data.address ?? "";
 
   function handleBooking() {
     setConcert({
@@ -54,15 +86,15 @@ export default function ConcertDetailPage() {
       price: data!.price,
       showDate: data!.showDate,
       showTime: data!.showTime,
-      venue: data!.venue,
+      venue: venueDisplay,
       // optional 메타데이터 — 결제 페이지에서 활용
       performer: data!.performer,
       genre: data!.genre,
       imageMainUrl: data!.imageMainUrl,
       address: data!.address,
       durationMinutes: data!.durationMinutes,
-      totalSeats: data!.totalSeats,
-      remainingSeats: data!.remainingSeats,
+      totalSeats: total,
+      remainingSeats: remaining,
       status: data!.status,
     });
     navigate(`/concerts/${data!.id}/seats`);
@@ -118,7 +150,7 @@ export default function ConcertDetailPage() {
             <InfoBox
               icon={<MapPin size={16} className="text-primary" />}
               label="장소"
-              value={data.venue}
+              value={venueDisplay}
             />
             <InfoBox
               icon={<DollarSign size={16} className="text-primary" />}
@@ -186,12 +218,14 @@ export default function ConcertDetailPage() {
         {/* ── 우측: sticky 예매 사이드바 ──────────────────── */}
         <div>
           <BookingSidebar
-            remaining={data.remainingSeats ?? 0}
-            total={data.totalSeats}
+            remaining={remaining}
+            total={total}
             price={data.price}
             duration={data.durationMinutes}
             isOnSale={isOnSale}
             status={data.status}
+            seatsLoading={seatCountsLoading}
+            seatsError={seatCountsError}
             notices={
               data.notices && data.notices.length > 0
                 ? data.notices
@@ -205,7 +239,7 @@ export default function ConcertDetailPage() {
   );
 }
 
-// 운영 정책 기본 유의사항
+// 운영 정책 기본 유의사항 (백엔드 응답에 notices 없어 프론트 fallback)
 const DEFAULT_NOTICES = [
   "예매 후 취소/환불은 공연 7일 전까지 가능합니다.",
   "공연 당일 티켓과 신분증을 지참해주세요.",
