@@ -19,8 +19,12 @@
 //   - 매진 게이지 색을 SeatGauge와 동일(primary)로 통일
 //   - 잔여 미확정 시에도 게이지·% 줄 높이 슬롯 유지 (레이아웃 점프 방지)
 //   - CTA 문구는 getBookingCtaLabel 공통 헬퍼 사용
+// - 2026-08-07 (#178 보완2):
+//   - ON_SALE 매진/로딩/실패 시 5분 타이머 안내 대신 상태 맞춤 문구
+//   - bookingOpenAt 포맷을 Asia/Seoul 기준으로 통일
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
+import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 
 interface BookingSidebarProps {
@@ -41,26 +45,14 @@ interface BookingSidebarProps {
   onBooking: () => void;
 }
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
-
-/** `2026년 09월 15일(월) 12:00` 형식 */
-function formatBookingOpenAt(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const weekday = WEEKDAYS[d.getDay()];
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}년 ${mm}월 ${dd}일(${weekday}) ${hh}:${min}`;
-}
-
 type NoticeTone = "default" | "muted" | "danger" | "success";
 
 function getStatusNotice(
   status: ConcertStatus,
   bookingOpenAt?: string | null,
+  seatsLoading = false,
+  seatsError = false,
+  remaining: number | null = null,
 ): { message: string; tone: NoticeTone } | null {
   if (status === "CLOSED") {
     return {
@@ -83,11 +75,33 @@ function getStatusNotice(
       tone: "success",
     };
   }
-  // ON_SALE 등 — 기존 타이머 주의
-  return {
-    message: "좌석 선택 후 5분의 제한 시간이 적용됩니다.",
-    tone: "default",
-  };
+
+  if (status === "ON_SALE") {
+    if (seatsError) {
+      return {
+        message: "잔여 좌석 정보를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+        tone: "muted",
+      };
+    }
+    if (seatsLoading || remaining === null) {
+      return {
+        message: "잔여 좌석을 확인하고 있습니다.",
+        tone: "muted",
+      };
+    }
+    if (remaining === 0) {
+      return {
+        message: "본 공연은 매진되었습니다.",
+        tone: "muted",
+      };
+    }
+    return {
+      message: "좌석 선택 후 5분의 제한 시간이 적용됩니다.",
+      tone: "default",
+    };
+  }
+
+  return null;
 }
 
 const NOTICE_STYLES: Record<
@@ -144,7 +158,13 @@ export default function BookingSidebar({
     remaining,
   });
 
-  const statusNotice = getStatusNotice(status, bookingOpenAt);
+  const statusNotice = getStatusNotice(
+    status,
+    bookingOpenAt,
+    seatsLoading,
+    seatsError,
+    remaining,
+  );
   const noticeStyle = statusNotice
     ? NOTICE_STYLES[statusNotice.tone]
     : NOTICE_STYLES.default;

@@ -19,10 +19,10 @@
  *
  * #177 수동 확인 가이드 (VITE_USE_MOCK=true):
  *   id 1  — ON_SALE + 잔여 > 0 → 예매하기 활성, 숫자/게이지 표시
- *   id 2  — ON_SALE + 잔여 0(매진) → 카드 클릭으로 상세 진입, 버튼 비활성, 잔여 0
- *   id 8  — CLOSED → 카드 클릭으로 상세 진입, 예매불가/매진, 잔여 "-"
- *   id 9  — CANCELED → 카드 클릭으로 상세 진입, 취소된 공연, 잔여 "-"
- *   id 10 — UPCOMING → 카드 클릭으로 상세 진입, 오픈 예정, 잔여 "-"
+ *   id 2  — ON_SALE + 잔여 0(매진) → 카드 클릭으로 상세 진입, CTA「매진」, 잔여 0
+ *   id 8  — CLOSED → 카드 클릭으로 상세 진입, CTA「예매 마감」, 잔여 "-"
+ *   id 9  — CANCELED → 카드 클릭으로 상세 진입, CTA「공연 취소」, 잔여 "-"
+ *   id 10 — UPCOMING → 카드 클릭으로 상세 진입, CTA「오픈 예정」, 잔여 "-"
  * #178 카드 CTA / 썸네일 뱃지:
  *   id 2  — ON_SALE 매진: 버튼「매진」+ 우상단「매진」뱃지
  *   id 8  — CLOSED「예매 마감」(뱃지 없음)
@@ -237,8 +237,9 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
     ...summary,
     totalSeats,
     // 상세 API에만 있는 bookingOpenAt (목록 mock에는 없음)
+    // Seoul(+09:00) offset 명시 — formatBookingOpenAt이 Asia/Seoul 벽시계로 표시
     bookingOpenAt:
-      summary.status === "UPCOMING" ? "2026-09-15T12:00:00" : null,
+      summary.status === "UPCOMING" ? "2026-09-15T12:00:00+09:00" : null,
     description:
       `${summary.title}의 특별한 공연이 ${summary.venue ?? summary.address}에서 펼쳐집니다. ` +
       `${summary.performer}의 감동적인 무대를 놓치지 마세요. ` +
