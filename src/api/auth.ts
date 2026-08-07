@@ -207,8 +207,8 @@ export async function devAuthTokenApi(
  * 로그인한 사용자 정보 조회.
  * 백엔드: GET /api/v1/user/me
  *
- * ⚠️ 백엔드 응답에 role 필드 없음
- * 관리자 페이지 접근 판단은 로그인 응답의 role을 authStore에 저장하고 그걸 사용.
+ * 응답: name, email, createdAt, role (MEMBER | ADMIN).
+ * 관리자 페이지 접근 판단은 authStore.role ← /me.role (#137).
  */
 export async function getMeApi(): Promise<MeResponse> {
   if (USE_MOCK) {
