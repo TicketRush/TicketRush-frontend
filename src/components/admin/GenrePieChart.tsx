@@ -44,9 +44,14 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
               cx="50%"
               cy="50%"
               outerRadius={100}
-              label={({ name, percent }) =>
-                `${name ?? ""} ${Math.round((percent ?? 0) * 100)}%`
-              }
+              label={(entry) => {
+                // recharts가 PieLabelRenderProps를 주입:
+                // { name, value, percent, payload, ... }
+                // name = nameKey가 가리키는 값(genre), percent = 0~1 비율
+                const name = entry.name ?? "";
+                const percent = entry.percent ?? 0;
+                return `${name} ${(percent * 100).toFixed(0)}%`;
+              }}
               labelLine={false}
             >
               {data.map((entry, idx) => (
@@ -60,10 +65,12 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
                 backgroundColor: "white",
                 border: "1px solid #E5E7EB",
               }}
-              formatter={(value) => [
-                `₩${Number(value).toLocaleString()}`,
-                "매출",
-              ]}
+              formatter={(value) => {
+                // recharts Formatter는 ValueType(string | number | array)를 줌
+                // Number(value)로 안전하게 숫자 변환
+                const num = Number(value);
+                return [`₩${num.toLocaleString()}`, "매출"];
+              }}
             />
           </PieChart>
         </ResponsiveContainer>
