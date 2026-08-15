@@ -8,6 +8,9 @@
 //   - URL 직접 진입 시 상세 canBook과 동일 조건으로 가드
 //   - 불가 시 /concerts/:id 로 replace redirect
 //   - 허용 시 detail로 concertStore hydrate (직접 진입 대비)
+// - 2026-08-15 (#181 리뷰):
+//   - performanceId 변경 시 selectedSeat 초기화 (교차 공연 HOLD 방지)
+//   - 가드용 detail/counts는 fresh 조회로 최신 기준 판정
 import { useEffect, useMemo } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
@@ -34,28 +37,38 @@ export default function SeatSelectionPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const toggleSeat = useSeatStore((s) => s.toggleSeat);
+  const resetSeat = useSeatStore((s) => s.reset);
   const startTimer = useTimerStore((s) => s.startTimer);
   const setConcert = useConcertStore((s) => s.setConcert);
   const currentConcert = useConcertStore((s) => s.currentConcert);
 
+  // URL의 공연이 바뀌면 이전 공연 selectedSeat 잔존 방지
+  useEffect(() => {
+    if (!performanceId || isNaN(performanceId)) return;
+    resetSeat();
+  }, [performanceId, resetSeat]);
+
   const {
     data: concert,
     isLoading: concertLoading,
+    isFetching: concertFetching,
     isError: concertError,
-  } = useConcertDetail(performanceId);
+  } = useConcertDetail(performanceId, { fresh: true });
 
   const shouldFetchSeats =
     !!concert && shouldFetchSeatCounts(concert.status);
   const {
     data: seatCounts,
     isLoading: seatCountsLoading,
+    isFetching: seatCountsFetching,
     isError: seatCountsError,
-  } = useSeatCounts(performanceId, shouldFetchSeats);
+  } = useSeatCounts(performanceId, shouldFetchSeats, { fresh: true });
 
   const seatsReady =
     shouldFetchSeats &&
     !!seatCounts &&
     !seatCountsLoading &&
+    !seatCountsFetching &&
     !seatCountsError;
   const remaining = seatsReady ? seatCounts.availableCount : null;
 
@@ -67,15 +80,16 @@ export default function SeatSelectionPage() {
       remaining,
     });
 
-  // 가드 판정 전(상세·seat-counts 로딩)에는 좌석맵/SSE를 열지 않음
+  // 가드 판정 전(상세·seat-counts fresh 조회)에는 좌석맵/SSE를 열지 않음
   const guardPending =
     !!performanceId &&
     !isNaN(performanceId) &&
     (concertLoading ||
+      concertFetching ||
       (!concertError &&
         !!concert &&
         shouldFetchSeats &&
-        seatCountsLoading));
+        (seatCountsLoading || seatCountsFetching)));
 
   const { data: seats, isLoading, isError } = useSeats(
     performanceId,
