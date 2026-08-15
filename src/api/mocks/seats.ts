@@ -277,7 +277,7 @@ function startSimulator(performanceId: number) {
     const randomId = seatIds[Math.floor(Math.random() * seatIds.length)];
     const current = statusMap.get(randomId)!;
 
-    if (current === "AVAILABLE" && Math.random() < 0.5) {
+    if (current === "AVAILABLE") {
       holdSeatForSimulator(performanceId, randomId, statusMap);
     }
   }, 3000);
