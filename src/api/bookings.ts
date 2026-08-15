@@ -280,10 +280,16 @@ export async function fetchMyBookings(
     return aggregateMyBookingSummaries(summaries, size);
   }
 
-  // status 미지정: BE 기본 CONFIRMED만 오는 것을 막고 전 상태 병렬 조회 후 merge
+  // status 미지정: BE 기본 CONFIRMED만 오는 것을 막고 전 상태 병렬 조회 후 merge.
+  // BE는 status당 pagination만 지원하므로, 요청 페이지를 채울 만큼 각 상태에서
+  // 앞쪽 항목을 가져온 뒤 **전체 목록 기준**으로 정렬·slice·hasNext를 계산한다.
+  const perStatusFetchSize = Math.min(
+    BOOKING_ME_PAGE_SIZE * BOOKING_ME_MAX_PAGES,
+    (page + 1) * size,
+  );
   const pages = await Promise.all(
     MY_BOOKING_LIST_STATUSES.map((status) =>
-      fetchMyBookingSummariesPage(status, page, size),
+      fetchMyBookingSummariesPage(status, 0, perStatusFetchSize),
     ),
   );
   const merged = new Map<number, BackendBookingSummary>();
@@ -298,9 +304,15 @@ export async function fetchMyBookings(
     return tb.localeCompare(ta);
   });
 
-  // 상태별 size씩 가져오므로 hasNext는 한 상태라도 size만큼 오면 true
-  const hasNext = pages.some((batch) => batch.length >= size);
-  const aggregated = await aggregateMyBookingSummaries(summaries, size);
+  const start = page * size;
+  const pageSummaries = summaries.slice(start, start + size);
+  const mayHaveMoreBeyondFetch = pages.some(
+    (batch) => batch.length >= perStatusFetchSize,
+  );
+  const hasNext =
+    start + size < summaries.length || mayHaveMoreBeyondFetch;
+
+  const aggregated = await aggregateMyBookingSummaries(pageSummaries, size);
   return { ...aggregated, hasNext };
 }
 

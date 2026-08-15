@@ -19,4 +19,5 @@ export {
   isUnauthorizedError,
   isForbiddenError,
   isValidationError,
+  isIgnorablePendingCancelError,
 } from "./errors/errorMapper";

@@ -27,6 +27,10 @@ import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { toast } from "react-toastify";
+import {
+  ApiError,
+  isIgnorablePendingCancelError,
+} from "@/api/errors/errorMapper";
 import type { SeatWithStatus } from "@/types/domain/seat";
 
 export default function SeatSelectionPage() {
@@ -73,18 +77,27 @@ export default function SeatSelectionPage() {
     });
   }
 
+  /**
+   * 기존 PENDING이 있으면 취소 후 payment store 초기화.
+   * - 이미 만료/취소/미존재 → 무시하고 store만 비움
+   * - 그 외 실패(네트워크·5xx 등) → store 유지한 채 throw (새 PENDING 생성 중단)
+   */
   async function cancelExistingPending() {
     const existing = usePaymentStore.getState().bookingNumber;
     if (!existing) return;
+
     try {
       await releaseSeatMutation.mutateAsync({
         bookingNumber: existing,
         seatId: selectedSeat?.id,
       });
-    } catch {
-      // 이미 만료/취소된 PENDING일 수 있음
-    } finally {
       resetPayment();
+    } catch (error: unknown) {
+      if (isIgnorablePendingCancelError(error)) {
+        resetPayment();
+        return;
+      }
+      throw ApiError.fromUnknown(error);
     }
   }
 
@@ -110,12 +123,20 @@ export default function SeatSelectionPage() {
   }
 
   async function handleBack() {
-    if (bookingNumber) {
-      await cancelExistingPending();
-      resetSeat();
-      resetTimer();
+    try {
+      if (bookingNumber) {
+        await cancelExistingPending();
+        resetSeat();
+        resetTimer();
+      }
+      navigate(`/concerts/${id}`);
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error
+          ? error
+          : new Error("기존 예매 취소에 실패했습니다. 다시 시도해 주세요.");
+      toast.error(err.message);
     }
-    navigate(`/concerts/${id}`);
   }
 
   return (
