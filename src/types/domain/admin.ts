@@ -1,5 +1,18 @@
 // 관리자 도메인 타입
-// 가상 스펙 — 백엔드 admin API swagger 확정 시 정렬 필요
+//
+// NOTE: 관리자(UI/백오피스)는 프론트엔드 입력 편의성 때문에 `date` + `time`
+// 조합 형태를 폼으로 유지하고 있습니다. 사용자 영역(퍼블릭)의 도메인
+// 필드(`showDate`/`showTime`)와 내부 표현이 다르므로, 백엔드가 확정되면
+// 폼 값은 전송시 변환(adapter)을 통해 `showDate`/`showTime`로 매핑됩니다.
+//
+// 관리자 API(및 mock 데이터)는 2026-06-30 기준 백엔드 미구현이므로
+// `USE_MOCK = true` 상태입니다. 이 파일의 타입·주석은 현재 상태를
+// 명확히 설명하기 위해 정리되어 있으며, 필드 네이밍 차이는 의도적입니다.
+//
+// 변경 요약(리팩터링 관련):
+//   - AdminBookingItem: seatNumbers 배열로 표준화
+//   - AdminSeatDetail: seatNumber 필드 정렬
+//   - ConcertFormData: artist → performer, duration → durationMinutes
 
 import type { Genre, ConcertStatus, ConcertFacility } from "./concert";
 import type { BookingStatus } from "./booking";
@@ -72,8 +85,8 @@ export interface AdminBookingItem {
   bookedAt: string;
   userName: string;
   userEmail: string;
-  /** 좌석 라벨 배열 (사용자는 1인 1석이지만 관리자 표시는 배열로 일반화) */
-  seatLabels: string[];
+  /** 좌석 번호 배열 (사용자는 1인 1석이지만 관리자 표시는 배열로 일반화) */
+  seatNumbers: string[];
   seatCount: number;
   unitPrice: number;
   totalAmount: number;
@@ -111,7 +124,7 @@ export interface AdminSeatStats {
 
 export interface AdminSeatDetail {
   seatId: number;
-  seatLabel: string;
+  seatNumber: string;
   status: SeatStatus;
   /** SOLD or HOLD 상태일 때만 존재 */
   reservedBy?: string;
@@ -122,18 +135,27 @@ export interface AdminSeatDetail {
 }
 
 // ── 공연 등록/수정 ────────────────────────────────────
+/**
+ * 관리자 공연 등록/수정 폼 데이터.
+ *
+ * 사용자 영역의 ConcertDetail과 필드명 정렬:
+ *   - artist → performer
+ *   - duration → durationMinutes
+ *   - posterUrl → imageMainUrl
+ */
 export interface ConcertFormData {
   title: string;
-  artist: string;
+  performer: string;
   genre: Genre;
   venue: string;
   address: string;
   date: string;
   time: string;
   price: number;
-  duration: number;
+  /** 공연 시간 (분) */
+  durationMinutes: number;
   description: string;
-  posterUrl: string;
+  imageMainUrl: string;
   facilities: ConcertFacility[];
   notices: string[];
 }

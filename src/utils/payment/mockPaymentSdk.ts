@@ -21,7 +21,7 @@ interface RequestPaymentParams {
  *   취소 → 결제 실패 → onFail()
  *
  * 실제 SDK 예시 (Toss):
- *   await tossPayments.requestPayment(method, { paymentKey, orderId, amount, ... })
+ *   await TOSSments.requestPayment(method, { paymentKey, orderId, amount, ... })
  */
 export function mockRequestPayment(params: RequestPaymentParams): void {
   setTimeout(() => {

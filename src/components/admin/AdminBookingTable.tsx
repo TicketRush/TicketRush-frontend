@@ -1,4 +1,7 @@
-
+// AdminBookingTable
+//
+// 백엔드 스펙 반영 변경:
+//   - booking.seatNumbers → booking.seatNumbers
 import { useState } from "react";
 import {
   flexRender,
@@ -135,7 +138,10 @@ export default function AdminBookingTable({
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="py-3 px-3 text-admin-text">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -170,7 +176,11 @@ function BookingDetail({
           예매자 정보
         </p>
         <div className="space-y-3 text-sm">
-          <Field icon={<User size={14} />} label="이름" value={booking.userName} />
+          <Field
+            icon={<User size={14} />}
+            label="이름"
+            value={booking.userName}
+          />
           <Field
             icon={<Mail size={14} />}
             label="이메일"
@@ -190,7 +200,7 @@ function BookingDetail({
           좌석 정보
         </p>
         <div className="flex gap-2 mb-3 flex-wrap">
-          {booking.seatLabels.map((s) => (
+          {booking.seatNumbers.map((s) => (
             <span
               key={s}
               className="px-3 py-1.5 rounded text-white text-sm font-bold"
@@ -201,14 +211,8 @@ function BookingDetail({
           ))}
         </div>
         <div className="bg-admin-bg/70 rounded p-4 space-y-2 text-sm">
-          <Row
-            label="좌석 수"
-            value={`${booking.seatLabels.length}석`}
-          />
-          <Row
-            label="단가"
-            value={`₩${booking.unitPrice.toLocaleString()}`}
-          />
+          <Row label="좌석 수" value={`${booking.seatNumbers.length}석`} />
+          <Row label="단가" value={`₩${booking.unitPrice.toLocaleString()}`} />
           <Row
             label="총 금액"
             value={`₩${booking.totalAmount.toLocaleString()}`}

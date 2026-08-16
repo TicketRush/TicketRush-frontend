@@ -1,3 +1,16 @@
+// 결제 페이지
+//
+// 백엔드 스펙 반영 변경:
+//   - PAYMENT_METHODS → PAYMENT_PROVIDERS 리네임 (개념 정리)
+//     * PaymentMethod = "CARD" | "SIMPLE_PAY" (결제 방식)
+//     * PaymentProvider = "KAKAO" | "NAVER" | "TOSS" (결제 제공자)
+//     * 기존 코드는 두 개념 혼동. 카카오/네이버/토스는 provider.
+//   - KAKAO → KAKAO, NAVER → NAVER, TOSS → TOSS
+//   - selectedSeat.seatNumber → seatNumber
+//   - selectedSeat 제거 → currentConcert 사용
+//   - paymentStore.setMethod에는 "SIMPLE_PAY" 저장 (3개 다 간편결제 카테고리)
+//     * 실 SDK 연동 시 paymentStore에 provider 필드 추가 예정
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, AlertCircle } from "lucide-react";
@@ -11,32 +24,32 @@ import useSeatStore from "@/stores/reservation/seatStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import TimeoutModal from "@/components/payment/TimeoutModal";
 import PaymentFailedModal from "@/components/payment/FailedModal";
-import type { PaymentMethod } from "@/types/domain/payment";
+import type { PaymentProvider } from "@/types/domain/payment";
 
-// ⚠️ PaymentMethod 타입 값이 다르면 여기서 수정 필요 (KAKAOPAY/NAVERPAY/TOSSPAY 가정)
-const PAYMENT_METHODS: Array<{
-  value: PaymentMethod;
+// 결제 제공자 3종 (카카오페이/네이버페이/토스페이는 모두 간편결제)
+const PAYMENT_PROVIDERS: Array<{
+  value: PaymentProvider;
   label: string;
   initial: string;
   bgColor: string;
   textColor: string;
 }> = [
   {
-    value: "KAKAOPAY" as PaymentMethod,
+    value: "KAKAO",
     label: "카카오페이",
     initial: "K",
     bgColor: "bg-[#FEE500]",
     textColor: "text-yellow-900",
   },
   {
-    value: "NAVERPAY" as PaymentMethod,
+    value: "NAVER",
     label: "네이버페이",
     initial: "N",
     bgColor: "bg-[#03C75A]",
     textColor: "text-white",
   },
   {
-    value: "TOSSPAY" as PaymentMethod,
+    value: "TOSS",
     label: "토스페이",
     initial: "T",
     bgColor: "bg-[#0064FF]",
@@ -62,9 +75,8 @@ export default function PaymentPage() {
   const startConfirming = usePaymentStore((s) => s.startConfirming);
   const reset = usePaymentStore((s) => s.reset);
 
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(
-    null,
-  );
+  const [selectedProvider, setSelectedProvider] =
+    useState<PaymentProvider | null>(null);
   const [agreed, setAgreed] = useState(false);
 
   // 타이머 만료 → paymentStore.expire (모달 띄움)
@@ -80,17 +92,19 @@ export default function PaymentPage() {
 
   if (!selectedSeat) return null;
 
-  function handleSelectMethod(method: PaymentMethod) {
-    setSelectedMethod(method);
-    setMethod(method);
+  function handleSelectProvider(provider: PaymentProvider) {
+    setSelectedProvider(provider);
+    // 3종 다 간편결제 카테고리 → SIMPLE_PAY
+    // 실 SDK 연동 시 paymentStore에 provider 필드 추가하여 별도 저장 예정
+    setMethod("SIMPLE_PAY");
   }
 
   async function handlePayment() {
-    if (!selectedMethod || !agreed) return;
+    if (!selectedProvider || !agreed) return;
 
     try {
       startRequest("mock-payment-key");
-      // TODO: Sprint 8 — 실제 PG SDK 호출로 교체
+      // TODO: 이슈 #B-10 — 실제 Toss SDK 호출로 교체
       await new Promise((r) => setTimeout(r, 800));
 
       // mock: 10% 확률로 실패
@@ -124,11 +138,12 @@ export default function PaymentPage() {
     navigate(`/concerts/${id}/seats`);
   }
 
-  const totalAmount = selectedSeat.price ?? currentConcert?.price ?? 0;
+  // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
+  const totalAmount = currentConcert?.price ?? 0;
 
   const isWarning = mm < 1; // 1분 미만
   const canPay =
-    !!selectedMethod &&
+    !!selectedProvider &&
     agreed &&
     timerStatus === "running" &&
     paymentStatus !== "REQUESTING" &&
@@ -190,24 +205,24 @@ export default function PaymentPage() {
           <div className="bg-white border border-border rounded-xl p-6">
             <p className="text-sm font-semibold mb-4">간편결제 서비스 선택</p>
             <div className="space-y-2">
-              {PAYMENT_METHODS.map((m) => (
+              {PAYMENT_PROVIDERS.map((p) => (
                 <button
-                  key={m.value}
+                  key={p.value}
                   type="button"
-                  onClick={() => handleSelectMethod(m.value)}
+                  onClick={() => handleSelectProvider(p.value)}
                   className={`w-full p-4 rounded-lg border-2 transition-all flex items-center gap-3 ${
-                    selectedMethod === m.value
+                    selectedProvider === p.value
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-gray-300"
                   }`}
                 >
                   <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${m.bgColor} ${m.textColor}`}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${p.bgColor} ${p.textColor}`}
                   >
-                    {m.initial}
+                    {p.initial}
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold">{m.label}</p>
+                    <p className="font-semibold">{p.label}</p>
                     <p className="text-xs text-text-secondary">
                       간편하고 빠른 결제
                     </p>
@@ -225,11 +240,8 @@ export default function PaymentPage() {
 
             <div className="space-y-2 text-sm">
               <Row label="좌석 수" value="1석" />
-              <Row label="좌석" value={selectedSeat.label} />
-              <Row
-                label="단가"
-                value={`₩${selectedSeat.price.toLocaleString()}`}
-              />
+              <Row label="좌석" value={selectedSeat.seatNumber} />
+              <Row label="단가" value={`₩${totalAmount.toLocaleString()}`} />
             </div>
 
             <div className="pt-3 border-t border-border">

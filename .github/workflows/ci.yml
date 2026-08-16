@@ -32,6 +32,10 @@ jobs:
       - name: Lint check
         run: npm run lint
 
+      # 단위 테스트
+      - name: Unit test
+        run: npm test
+
       # 빌드 테스트 (실제 배포용 파일 생성 확인)
       - name: Build project
         run: npm run build

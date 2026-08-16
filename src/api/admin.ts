@@ -6,7 +6,7 @@ import type {
 } from "@/types/domain/admin";
 // import apiClient from "./instance";
 
-const USE_MOCK = true;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 // ── 대시보드 ───────────────────────────────────────────
 export async function fetchAdminDashboard() {
