@@ -283,9 +283,10 @@ export async function fetchMyBookings(
   // status 미지정: BE 기본 CONFIRMED만 오는 것을 막고 전 상태 병렬 조회 후 merge.
   // BE는 status당 pagination만 지원하므로, 요청 페이지를 채울 만큼 각 상태에서
   // 앞쪽 항목을 가져온 뒤 **전체 목록 기준**으로 정렬·slice·hasNext를 계산한다.
+  const neededCount = (page + 1) * size;
   const perStatusFetchSize = Math.min(
     BOOKING_ME_PAGE_SIZE * BOOKING_ME_MAX_PAGES,
-    (page + 1) * size,
+    neededCount + 1,
   );
   const pages = await Promise.all(
     MY_BOOKING_LIST_STATUSES.map((status) =>
