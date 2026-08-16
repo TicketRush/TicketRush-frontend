@@ -4,12 +4,20 @@
 //   - handleSeatClick의 seat 객체 필드명 변경 (label→seatNumber, layoutId→seatLayoutId)
 //   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
-import { useNavigate, useParams } from "react-router-dom";
+// - 2026-08-07 (#181):
+//   - URL 직접 진입 시 상세 canBook과 동일 조건으로 가드
+//   - 불가 시 /concerts/:id 로 replace redirect
+//   - 허용 시 detail로 concertStore hydrate (직접 진입 대비)
+// - 2026-08-15 (#181 리뷰):
+//   - performanceId 변경 시 selectedSeat 초기화 (교차 공연 HOLD 방지)
+//   - 가드용 detail/counts는 fresh 조회로 최신 기준 판정
+import { useEffect, useMemo } from "react";
+import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { useMemo } from "react";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
-import { useSeats } from "@/hooks/queries/useSeats";
+import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
+import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { useHoldSeat } from "@/hooks/mutations/useHoldSeat";
 import useSeatStore from "@/stores/reservation/seatStore";
@@ -17,6 +25,10 @@ import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import { toast } from "react-toastify";
 import type { SeatWithStatus } from "@/types/domain/seat";
+import {
+  canBookConcert,
+  shouldFetchSeatCounts,
+} from "@/utils/concert/canBookConcert";
 
 export default function SeatSelectionPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,14 +37,96 @@ export default function SeatSelectionPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const toggleSeat = useSeatStore((s) => s.toggleSeat);
+  const resetSeat = useSeatStore((s) => s.reset);
   const startTimer = useTimerStore((s) => s.startTimer);
+  const setConcert = useConcertStore((s) => s.setConcert);
   const currentConcert = useConcertStore((s) => s.currentConcert);
 
-  const { data: seats, isLoading, isError } = useSeats(performanceId);
-  const holdSeatMutation = useHoldSeat(performanceId ?? 0);
+  // URL의 공연이 바뀌면 이전 공연 selectedSeat 잔존 방지
+  useEffect(() => {
+    if (!performanceId || isNaN(performanceId)) return;
+    resetSeat();
+  }, [performanceId, resetSeat]);
 
-  // SSE 구독
-  useSeatEventStream(performanceId);
+  const {
+    data: concert,
+    isLoading: concertLoading,
+    isFetching: concertFetching,
+    isError: concertError,
+  } = useConcertDetail(performanceId, { fresh: true });
+
+  const shouldFetchSeats =
+    !!concert && shouldFetchSeatCounts(concert.status);
+  const {
+    data: seatCounts,
+    isLoading: seatCountsLoading,
+    isFetching: seatCountsFetching,
+    isError: seatCountsError,
+  } = useSeatCounts(performanceId, shouldFetchSeats, { fresh: true });
+
+  const seatsReady =
+    shouldFetchSeats &&
+    !!seatCounts &&
+    !seatCountsLoading &&
+    !seatCountsFetching &&
+    !seatCountsError;
+  const remaining = seatsReady ? seatCounts.availableCount : null;
+
+  const canEnter =
+    !!concert &&
+    canBookConcert({
+      status: concert.status,
+      seatsReady,
+      remaining,
+    });
+
+  // 가드 판정 전(상세·seat-counts fresh 조회)에는 좌석맵/SSE를 열지 않음
+  const guardPending =
+    !!performanceId &&
+    !isNaN(performanceId) &&
+    (concertLoading ||
+      concertFetching ||
+      (!concertError &&
+        !!concert &&
+        shouldFetchSeats &&
+        (seatCountsLoading || seatCountsFetching)));
+
+  const { data: seats, isLoading, isError } = useSeats(
+    performanceId,
+    canEnter,
+  );
+  const holdSeatMutation = useHoldSeat(performanceId ?? 0);
+  useSeatEventStream(performanceId, canEnter);
+
+  // 직접 URL 진입 시에도 결제 플로우용 store를 맞춤
+  useEffect(() => {
+    if (!canEnter || !concert || !seatsReady || remaining === null) return;
+
+    const venueDisplay = concert.venue ?? concert.address ?? "";
+    setConcert({
+      id: concert.id,
+      title: concert.title,
+      price: concert.price,
+      showDate: concert.showDate,
+      showTime: concert.showTime,
+      venue: venueDisplay,
+      performer: concert.performer,
+      genre: concert.genre,
+      imageMainUrl: concert.imageMainUrl,
+      address: concert.address,
+      durationMinutes: concert.durationMinutes,
+      totalSeats: seatCounts!.totalCount,
+      remainingSeats: remaining,
+      status: concert.status,
+    });
+  }, [
+    canEnter,
+    concert,
+    seatsReady,
+    remaining,
+    seatCounts,
+    setConcert,
+  ]);
 
   const stats = useMemo(() => {
     if (!seats) return { total: 0, available: 0, holding: 0, sold: 0 };
@@ -44,11 +138,28 @@ export default function SeatSelectionPage() {
     };
   }, [seats]);
 
-  // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
-  const totalAmount = currentConcert?.price ?? 0;
+  const totalAmount = currentConcert?.price ?? concert?.price ?? 0;
+
+  if (!performanceId || isNaN(performanceId)) {
+    return <Navigate to="/concerts" replace />;
+  }
+
+  if (guardPending) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="bg-white border border-border rounded-xl p-12 text-center text-text-secondary">
+          예매 가능 여부를 확인하는 중...
+        </div>
+      </div>
+    );
+  }
+
+  // 상세 실패·좌석 정보 실패·예매 불가 → 상세로 복귀 (#181)
+  if (concertError || !concert || seatCountsError || !canEnter) {
+    return <Navigate to={`/concerts/${performanceId}`} replace />;
+  }
 
   function handleSeatClick(seat: SeatWithStatus) {
-    // Seat 도메인 타입에 맞게 필드 정렬
     toggleSeat({
       id: seat.id,
       seatLayoutId: seat.seatLayoutId,

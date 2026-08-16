@@ -39,6 +39,10 @@ import { MapPin, Calendar } from "lucide-react";
 import type { ConcertSummary } from "@/types/domain/concert";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
+import {
+  canBookConcert,
+  shouldFetchSeatCounts,
+} from "@/utils/concert/canBookConcert";
 import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -58,7 +62,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
 
   // Detail과 동일: ON_SALE일 때만 seat-counts 조회 (#178 리뷰)
   // seatsReady에도 포함해야 enabled=false + 캐시 hit 시 옛 숫자가 안 보임
-  const shouldFetchSeats = concert.status === "ON_SALE";
+  const shouldFetchSeats = shouldFetchSeatCounts(concert.status);
   const {
     data: seatCounts,
     isLoading: seatCountsLoading,
@@ -77,9 +81,12 @@ function ConcertCard({ concert }: ConcertCardProps) {
     ? seatCounts.totalCount
     : (concert.totalSeats ?? 0);
 
-  // 예매 CTA 활성: ON_SALE + seat-counts 성공 + availableCount > 0
-  const canBook =
-    seatsReady && concert.status === "ON_SALE" && (remaining ?? 0) > 0;
+  // 예매 CTA 활성: ON_SALE + seat-counts 성공 + availableCount > 0 (#181 공통)
+  const canBook = canBookConcert({
+    status: concert.status,
+    seatsReady,
+    remaining,
+  });
 
   // ON_SALE + 잔여 0 (기술적 매진). CLOSED/CANCELED와 구분
   const isSoldOut = seatsReady && remaining === 0;
