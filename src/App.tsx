@@ -35,6 +35,8 @@ import AdminConcertFormPage from "@/pages/Admin/AdminConcertFormPage";
 import AdminCharacterCreatorPage from "@/pages/Admin/AdminCharacterCreatorPage";
 import DevNavPage from "@/pages/Dev/DevNavPage";
 
+import OAuthCallbackPage from "./pages/Auth/OAuthCallbackPage";
+
 function App() {
   return (
     <ErrorBoundary>
@@ -46,6 +48,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/dev" element={<DevNavPage />} />
+          <Route
+            path="/oauth/callback/:provider"
+            element={<OAuthCallbackPage />}
+          />
 
           {/* ────────────────────────────────────────
             사용자 영역 — UserLayout

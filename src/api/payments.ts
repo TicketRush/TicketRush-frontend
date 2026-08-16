@@ -1,32 +1,40 @@
-// 결제 API — 모두 가상 스펙 (백엔드 payment-service 진행 중)
+// 결제 API — 백엔드 payment-service swagger (2026-06-30) 스펙 반영
+//
+// 백엔드 endpoint 매핑:
+//   paymentConfirmApi        → POST /api/v1/payment/confirm
+//   paymentCancelApi         → POST /api/v1/payment/{paymentId}/cancel
+//   getPaymentHistoryApi     → GET  /api/v1/payment/history (신규)
+//   getPaymentDetailApi      → GET  /api/v1/payment/{paymentId} (신규)
+//
+// 주요 변경:
+//   - paymentInitApi 완전 삭제 (백엔드에 별도 init API 없음. SDK가 직접 처리)
+//   - paymentConfirmApi 요청 구조 변경 (bookingId, seatId, provider 필요)
+//   - paymentCancelApi 시그니처 변경 (paymentKey → paymentId, PaymentCancelRequest 추가)
 
 import type {
-  PaymentInitRequest,
-  PaymentInitResponse,
   PaymentConfirmRequest,
   PaymentConfirmResponse,
+  PaymentCancelRequest,
+  PaymentCancelResponse,
+  PaymentHistoryItem,
+  PaymentDetail,
 } from "@/types/domain/payment";
 import {
-  mockPaymentInit,
   mockPaymentConfirm,
   mockPaymentCancel,
+  mockGetPaymentHistory,
+  mockGetPaymentDetail,
 } from "./mocks/payments";
 // import apiClient from "./instance";
 
-const USE_MOCK = true;
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
-export async function paymentInitApi(
-  req: PaymentInitRequest,
-): Promise<PaymentInitResponse> {
-  if (USE_MOCK) return mockPaymentInit(req);
-  // const res = await apiClient.post<PaymentInitResponse>(
-  //   "/api/v1/payment/init",
-  //   req,
-  // );
-  // return res.data;
-  throw new Error("Real API not implemented");
-}
-
+/**
+ * 결제 확정 (백엔드 확정).
+ *
+ * SDK(Toss 등)로부터 받은 paymentKey와 예매/좌석 정보를 전송.
+ * 백엔드가 검증 후 결제 확정 + 좌석 SOLD 처리.
+ */
 export async function paymentConfirmApi(
   req: PaymentConfirmRequest,
 ): Promise<PaymentConfirmResponse> {
@@ -39,8 +47,38 @@ export async function paymentConfirmApi(
   throw new Error("Real API not implemented");
 }
 
-export async function paymentCancelApi(paymentKey: string): Promise<void> {
-  if (USE_MOCK) return mockPaymentCancel(paymentKey);
-  // await apiClient.post(`/api/v1/payment/${paymentKey}/cancel`);
+/** 결제 취소(환불) (백엔드 확정) */
+export async function paymentCancelApi(
+  paymentId: number,
+  req: PaymentCancelRequest,
+): Promise<PaymentCancelResponse> {
+  if (USE_MOCK) return mockPaymentCancel(paymentId, req);
+  // const res = await apiClient.post<PaymentCancelResponse>(
+  //   `/api/v1/payment/${paymentId}/cancel`,
+  //   req,
+  // );
+  // return res.data;
+  throw new Error("Real API not implemented");
+}
+
+/** 결제 내역 조회 — 마이페이지용 (신규) */
+export async function getPaymentHistoryApi(): Promise<PaymentHistoryItem[]> {
+  if (USE_MOCK) return mockGetPaymentHistory();
+  // const res = await apiClient.get<PaymentHistoryItem[]>(
+  //   "/api/v1/payment/history",
+  // );
+  // return res.data;
+  throw new Error("Real API not implemented");
+}
+
+/** 결제 단건 상세 조회 (신규) */
+export async function getPaymentDetailApi(
+  paymentId: number,
+): Promise<PaymentDetail> {
+  if (USE_MOCK) return mockGetPaymentDetail(paymentId);
+  // const res = await apiClient.get<PaymentDetail>(
+  //   `/api/v1/payment/${paymentId}`,
+  // );
+  // return res.data;
   throw new Error("Real API not implemented");
 }

@@ -32,16 +32,16 @@ const GENRES: { value: Genre; label: string }[] = [
 
 const INITIAL_FORM: ConcertFormData = {
   title: "",
-  artist: "",
+  performer: "",
   genre: "CONCERT",
   venue: "",
   address: "",
   date: "",
   time: "",
   price: 0,
-  duration: 0,
+  durationMinutes: 0,
   description: "",
-  posterUrl: "",
+  imageMainUrl: "",
   facilities: [],
   notices: [],
 };
@@ -251,11 +251,11 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   function validateForm() {
     if (!form.title.trim()) return "공연명을 입력해주세요.";
-    if (!form.artist.trim()) return "부제목 또는 아티스트명을 입력해주세요.";
+    if (!form.performer.trim()) return "출연진을 입력해주세요.";
     if (!form.genre) return "장르를 선택해주세요.";
     if (!form.date) return "공연 날짜를 선택해주세요.";
     if (!form.time) return "공연 시간을 선택해주세요.";
-    if (!form.duration || form.duration <= 0) {
+    if (!form.durationMinutes || form.durationMinutes <= 0) {
       return "공연 러닝타임을 입력해주세요.";
     }
     if (!form.venue.trim()) return "공연장명을 입력해주세요.";
@@ -341,12 +341,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
             />
           </Field>
 
-          <Field label="부제목 / 아티스트" required>
+          <Field label="출연진" required>
             <FormInput
-              value={form.artist}
-              onChange={(v) => update("artist", v)}
+              value={form.performer}
+              onChange={(v) => update("performer", v)}
               onKeyDown={handleEnterMoveNext}
-              placeholder="예: Special Performance 2026"
+              placeholder="예: BTS"
             />
           </Field>
 
@@ -390,8 +390,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
             <Field label="러닝타임(분)" required>
               <FormInput
                 type="number"
-                value={form.duration === 0 ? "" : String(form.duration)}
-                onChange={(v) => update("duration", Number(v || 0))}
+                value={
+                  form.durationMinutes === 0
+                    ? ""
+                    : String(form.durationMinutes)
+                }
+                onChange={(v) => update("durationMinutes", Number(v || 0))}
                 onKeyDown={handleEnterMoveNext}
                 placeholder="예: 120"
               />
