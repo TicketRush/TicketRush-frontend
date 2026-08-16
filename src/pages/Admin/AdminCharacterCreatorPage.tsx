@@ -18,6 +18,7 @@ interface CharacterConfig {
 }
 
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const DEFAULT_RETURN_TO = "/admin/concerts/new";
 
 const SKIN_TONES: { value: SkinTone; label: string; color: string }[] = [
   { value: "light", label: "Light", color: "#f7c6a8" },
@@ -106,12 +107,42 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   background: "#e9ddff",
 };
 
+function loadSavedCharacter(): CharacterConfig {
+  const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
+
+  if (!savedCharacter) {
+    return DEFAULT_CHARACTER;
+  }
+
+  try {
+    return JSON.parse(savedCharacter) as CharacterConfig;
+  } catch {
+    localStorage.removeItem(CHARACTER_STORAGE_KEY);
+    return DEFAULT_CHARACTER;
+  }
+}
+
+function resolveAdminReturnTo(returnTo: string | null): string {
+  if (!returnTo) {
+    return DEFAULT_RETURN_TO;
+  }
+
+  const isAdminPath = /^\/admin(?:\/|$)/.test(returnTo);
+
+  if (!isAdminPath) {
+    return DEFAULT_RETURN_TO;
+  }
+
+  return returnTo;
+}
+
 export default function AdminCharacterCreatorPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [character, setCharacter] =
-    useState<CharacterConfig>(DEFAULT_CHARACTER);
+  const [character, setCharacter] = useState<CharacterConfig>(() =>
+    loadSavedCharacter(),
+  );
 
   const selectedSkinTone = SKIN_TONES.find(
     (skinTone) => skinTone.value === character.skinTone,
@@ -134,7 +165,7 @@ export default function AdminCharacterCreatorPage() {
   function handleApply() {
     localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(character));
 
-    const returnTo = searchParams.get("returnTo") ?? "/admin/concerts/new";
+    const returnTo = resolveAdminReturnTo(searchParams.get("returnTo"));
     navigate(returnTo);
   }
 
@@ -142,7 +173,7 @@ export default function AdminCharacterCreatorPage() {
     const returnTo = searchParams.get("returnTo");
 
     if (returnTo) {
-      navigate(returnTo);
+      navigate(resolveAdminReturnTo(returnTo));
       return;
     }
 
@@ -157,7 +188,9 @@ export default function AdminCharacterCreatorPage() {
             <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold tracking-wider text-slate-300">
               3D CHARACTER CREATOR
             </span>
+
             <h1 className="mt-3 text-3xl font-bold">3D 캐릭터 제작소</h1>
+
             <p className="mt-2 text-sm text-slate-400">
               귀여운 치비 스타일 캐릭터를 만들어보세요.
             </p>
@@ -186,6 +219,7 @@ export default function AdminCharacterCreatorPage() {
                       className="mx-auto h-10 w-32 rounded-full"
                       style={{ backgroundColor: skinTone.color }}
                     />
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {skinTone.label}
                     </p>
@@ -203,6 +237,7 @@ export default function AdminCharacterCreatorPage() {
                     onClick={() => update("hairStyle", hairStyle.value)}
                   >
                     <div className="text-2xl">{hairStyle.icon}</div>
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {hairStyle.label}
                     </p>
@@ -210,7 +245,10 @@ export default function AdminCharacterCreatorPage() {
                 ))}
               </div>
 
-              <p className="mt-5 text-sm font-bold text-slate-800">헤어 컬러</p>
+              <p className="mt-5 text-sm font-bold text-slate-800">
+                헤어 컬러
+              </p>
+
               <div className="mt-3 grid grid-cols-7 gap-2">
                 {HAIR_COLORS.map((color) => (
                   <ColorButton
@@ -233,10 +271,12 @@ export default function AdminCharacterCreatorPage() {
                   >
                     <div className="flex items-start gap-3 text-left">
                       <span className="text-2xl">{outfit.icon}</span>
+
                       <div>
                         <p className="text-sm font-bold text-slate-800">
                           {outfit.name}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-500">
                           {outfit.description}
                         </p>
@@ -246,7 +286,10 @@ export default function AdminCharacterCreatorPage() {
                 ))}
               </div>
 
-              <p className="mt-5 text-sm font-bold text-slate-800">의상 컬러</p>
+              <p className="mt-5 text-sm font-bold text-slate-800">
+                의상 컬러
+              </p>
+
               <div className="mt-3 grid grid-cols-10 gap-2">
                 {OUTFIT_COLORS.map((color) => (
                   <ColorButton
@@ -268,6 +311,7 @@ export default function AdminCharacterCreatorPage() {
                     onClick={() => update("accessory", accessory.value)}
                   >
                     <div className="text-2xl">{accessory.icon}</div>
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {accessory.label}
                     </p>
@@ -285,6 +329,7 @@ export default function AdminCharacterCreatorPage() {
                     onClick={() => update("pose", pose.value)}
                   >
                     <div className="text-2xl">{pose.icon}</div>
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {pose.label}
                     </p>
@@ -305,6 +350,7 @@ export default function AdminCharacterCreatorPage() {
                       className="mx-auto h-10 w-16 rounded"
                       style={{ backgroundColor: background.color }}
                     />
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {background.label}
                     </p>
@@ -322,16 +368,16 @@ export default function AdminCharacterCreatorPage() {
             <h2 className="mt-4 text-sm font-bold">미리보기</h2>
 
             <div
-                className="mt-4 h-72 overflow-hidden rounded-lg"
-                style={{ backgroundColor: character.background }}
+              className="mt-4 h-72 overflow-hidden rounded-lg"
+              style={{ backgroundColor: character.background }}
             >
-                <CharacterModelViewer
-                    modelUrl="/models/chibi-base.glb"
-                    skinColor={selectedSkinTone?.color ?? "#f7c6a8"}
-                    hairColor={character.hairColor}
-                    outfitColor={character.outfitColor}
-                    hairStyle={character.hairStyle}
-                />
+              <CharacterModelViewer
+                modelUrl="/models/chibi-base.glb"
+                skinColor={selectedSkinTone?.color ?? "#f7c6a8"}
+                hairColor={character.hairColor}
+                outfitColor={character.outfitColor}
+                hairStyle={character.hairStyle}
+              />
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
