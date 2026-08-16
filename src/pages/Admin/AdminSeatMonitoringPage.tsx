@@ -126,7 +126,9 @@ export default function AdminSeatMonitoringPage() {
                       : rate >= 80
                         ? "text-[#1D7DFF]"
                         : "text-admin-text";
-                  const isSoldOut = c.status === "SOLD_OUT";
+                  const isSoldOut =
+                    c.status === "CLOSED" ||
+                    c.totalSeats - c.soldSeats <= 0;
                   return (
                     <tr
                       key={c.id}

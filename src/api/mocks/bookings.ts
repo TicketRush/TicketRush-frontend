@@ -1,7 +1,19 @@
 // Mock 예매 — 메모리 저장소
+//
+// 백엔드 booking-service swagger (2026-06-30) 스펙 반영.
+//
+// 주요 변경:
+//   - BookingCreateRequest → BookingPendingRequest (userId 매개변수 제거, 백엔드가 토큰에서 추출)
+//   - BookingDetail 필드명 정렬:
+//     - performanceArtist → performancePerformer
+//     - performancePosterUrl → performanceImageMainUrl
+//     - seatLabel → seatNumber
+//   - MOCK_CONCERTS 참조 필드 변경 (concert.artist → performer 등)
+//   - _findMockBookingById 신규 추가 (mock_payments에서 사용)
+
 import { mockDelay, mockError } from "./_helpers";
 import type {
-  BookingCreateRequest,
+  BookingPendingRequest,
   BookingPendingResponse,
   BookingDetail,
   BookingListItem,
@@ -21,13 +33,13 @@ const bookingStore: BookingDetail[] = [
     status: "CONFIRMED",
     performanceId: 1,
     performanceTitle: "BTS World Tour: Beyond the Stars",
-    performanceArtist: "BTS",
+    performancePerformer: "BTS",
     performanceVenue: "잠실 올림픽 주경기장",
     performanceDate: "2026-07-20",
     performanceTime: "18:00",
-    performancePosterUrl: POSTER,
+    performanceImageMainUrl: POSTER,
     seatId: 23,
-    seatLabel: "B-11",
+    seatNumber: "B-11",
     price: 132000,
     paidAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
@@ -39,13 +51,13 @@ const bookingStore: BookingDetail[] = [
     status: "CONFIRMED",
     performanceId: 4,
     performanceTitle: "Jazz Night Live",
-    performanceArtist: "나윤선 트리오",
+    performancePerformer: "나윤선 트리오",
     performanceVenue: "LG아트센터",
     performanceDate: "2026-06-28",
     performanceTime: "20:00",
-    performancePosterUrl: POSTER,
+    performanceImageMainUrl: POSTER,
     seatId: 50,
-    seatLabel: "E-2",
+    seatNumber: "E-2",
     price: 66000,
     paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
@@ -57,13 +69,13 @@ const bookingStore: BookingDetail[] = [
     status: "CANCELLED",
     performanceId: 3,
     performanceTitle: "Classical Evening: Beethoven Symphony",
-    performanceArtist: "서울시향",
+    performancePerformer: "서울시향",
     performanceVenue: "예술의전당 콘서트홀",
     performanceDate: "2026-08-10",
     performanceTime: "19:00",
-    performancePosterUrl: POSTER,
+    performanceImageMainUrl: POSTER,
     seatId: 88,
-    seatLabel: "H-4",
+    seatNumber: "H-4",
     price: 55000,
     paidAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
@@ -78,7 +90,7 @@ function genBookingNumber(): string {
 }
 
 export async function mockCreateBooking(
-  req: BookingCreateRequest,
+  req: BookingPendingRequest,
 ): Promise<BookingPendingResponse> {
   await mockDelay(400);
 
@@ -87,15 +99,14 @@ export async function mockCreateBooking(
     await mockError("CONCERT_NOT_FOUND", "공연 정보를 찾을 수 없습니다.");
   }
 
-  // 좌석 정보 — mock seats와 같은 로직 (앞열일수록 비쌈)
+  // 좌석 정보 — seatId에서 seatNumber 파생 (mock_seats와 같은 로직)
   const COLS_CNT = 12;
   const seatId = req.seatId;
   const idx = seatId - 1;
   const rowIdx = Math.floor(idx / COLS_CNT);
   const colIdx = idx % COLS_CNT;
   const rowLetter = String.fromCharCode("A".charCodeAt(0) + rowIdx);
-  const seatLabel = `${rowLetter}-${colIdx + 1}`;
-  const price = 50000 + rowIdx * 10000;
+  const seatNumber = `${rowLetter}-${colIdx + 1}`;
 
   const bookingNumber = genBookingNumber();
   const booking: BookingDetail = {
@@ -104,14 +115,16 @@ export async function mockCreateBooking(
     status: "PENDING",
     performanceId: req.performanceId,
     performanceTitle: concert!.title,
-    performanceArtist: concert!.artist,
-    performanceVenue: concert!.venue,
-    performanceDate: concert!.date,
-    performanceTime: concert!.time,
-    performancePosterUrl: concert!.posterUrl,
+    performancePerformer: concert!.performer,
+    // venue는 optional (백엔드에 없음) → address fallback
+    performanceVenue: concert!.venue ?? concert!.address,
+    performanceDate: concert!.showDate,
+    performanceTime: concert!.showTime,
+    performanceImageMainUrl: concert!.imageMainUrl,
     seatId: req.seatId,
-    seatLabel,
-    price,
+    seatNumber,
+    // 좌석 단위 가격 없음 → 공연 단위 가격 사용 (백엔드 스펙)
+    price: concert!.price,
     paidAt: null,
     createdAt: new Date().toISOString(),
     cancelledAt: null,
@@ -153,8 +166,8 @@ export async function mockGetMyBookings(
     performanceVenue: b.performanceVenue,
     performanceDate: b.performanceDate,
     performanceTime: b.performanceTime,
-    performancePosterUrl: b.performancePosterUrl,
-    seatLabel: b.seatLabel,
+    performanceImageMainUrl: b.performanceImageMainUrl,
+    seatNumber: b.seatNumber,
     price: b.price,
     createdAt: b.createdAt,
   }));
@@ -163,6 +176,12 @@ export async function mockGetMyBookings(
     items,
     hasNext: bookingStore.length > size,
   };
+}
+
+/** 내 예매 수 조회 — GET /booking/me/count 대응 */
+export async function mockGetMyBookingCount(): Promise<{ count: number }> {
+  await mockDelay(200);
+  return { count: bookingStore.length };
 }
 
 export async function mockCancelBooking(bookingNumber: string): Promise<void> {
@@ -191,11 +210,22 @@ export function _updateMockBookingStatus(
   }
 }
 
-/** booking detail 직접 조회 (mock 내부용) */
+/** bookingNumber로 booking 조회 (mock 내부용) */
 export function _findMockBooking(
   bookingNumber: string,
 ): BookingDetail | undefined {
   return bookingStore.find((b) => b.bookingNumber === bookingNumber);
+}
+
+/**
+ * bookingId(숫자)로 booking 조회 (mock 내부용).
+ *
+ * 백엔드 PaymentConfirmRequest는 bookingId(long)를 씀 → mock_payments에서 사용.
+ */
+export function _findMockBookingById(
+  bookingId: number,
+): BookingDetail | undefined {
+  return bookingStore.find((b) => b.bookingId === bookingId);
 }
 
 /** 좌석 ID로 booking 조회 (mock 내부용 — 좌석 모니터링 패널) */
