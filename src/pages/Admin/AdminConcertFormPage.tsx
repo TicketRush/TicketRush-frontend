@@ -20,6 +20,7 @@ import type { ConcertFormData } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
+  normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
@@ -36,22 +37,24 @@ const GENRES: { value: Genre; label: string }[] = [
 
 const INITIAL_FORM: ConcertFormData = {
   title: "",
-  artist: "",
+  performer: "",
   genre: "CONCERT",
   venue: "",
   address: "",
   date: "",
   time: "",
   price: 0,
-  duration: 0,
+  durationMinutes: 0,
   description: "",
-  posterUrl: "",
+  imageMainUrl: "",
   facilities: [],
   notices: [],
 };
 
 const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const DEFAULT_HAIR_COLOR = "#151515";
+const DEFAULT_OUTFIT_COLOR = "#60A5FA";
 
 interface Props {
   mode: "create" | "edit";
@@ -64,6 +67,7 @@ type CharacterHairStyle =
   | "ponytail"
   | "wave"
   | "rainbow";
+
 type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterDraft {
@@ -88,19 +92,34 @@ function loadSavedCharacter(): CharacterDraft | null {
   try {
     const parsed = JSON.parse(savedCharacter) as Omit<
       CharacterDraft,
-      "skinTone" | "skinColor"
+      "skinTone" | "skinColor" | "hairColor" | "outfitColor"
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
+      hairColor?: unknown;
+      outfitColor?: unknown;
     };
+
     const resolvedSkin = resolveStoredSkinTone(
       parsed.skinTone,
       parsed.skinColor,
     );
 
+    const resolvedHairColor =
+      typeof parsed.hairColor === "string"
+        ? normalizeHexColor(parsed.hairColor)
+        : null;
+
+    const resolvedOutfitColor =
+      typeof parsed.outfitColor === "string"
+        ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
     return {
       ...parsed,
       ...resolvedSkin,
+      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
+      outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -209,6 +228,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   function handleMainImageFiles(files: File[]) {
     const file = files[0];
+
     if (!file) return;
 
     setMainImage(file);
@@ -263,13 +283,15 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   function validateForm() {
     if (!form.title.trim()) return "공연명을 입력해주세요.";
-    if (!form.artist.trim()) return "부제목 또는 아티스트명을 입력해주세요.";
+    if (!form.performer.trim()) return "출연진을 입력해주세요.";
     if (!form.genre) return "장르를 선택해주세요.";
     if (!form.date) return "공연 날짜를 선택해주세요.";
     if (!form.time) return "공연 시간을 선택해주세요.";
-    if (!form.duration || form.duration <= 0) {
+
+    if (!form.durationMinutes || form.durationMinutes <= 0) {
       return "공연 러닝타임을 입력해주세요.";
     }
+
     if (!form.venue.trim()) return "공연장명을 입력해주세요.";
     if (!form.address.trim()) return "상세 주소를 입력해주세요.";
     if (!form.price || form.price <= 0) return "티켓 가격을 입력해주세요.";
@@ -335,9 +357,11 @@ export default function AdminConcertFormPage({ mode }: Props) {
           <span className="rounded bg-admin-border px-2 py-1 text-[10px] font-bold tracking-wider">
             CONCERT FORM
           </span>
+
           <h1 className="mt-3 text-3xl font-bold">
             {mode === "create" ? "공연 등록" : "공연 수정"}
           </h1>
+
           <p className="mt-2 text-sm text-admin-text-secondary">
             새로운 공연 정보를 입력하세요.
           </p>
@@ -353,12 +377,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
             />
           </Field>
 
-          <Field label="부제목 / 아티스트" required>
+          <Field label="출연진" required>
             <FormInput
-              value={form.artist}
-              onChange={(v) => update("artist", v)}
+              value={form.performer}
+              onChange={(v) => update("performer", v)}
               onKeyDown={handleEnterMoveNext}
-              placeholder="예: Special Performance 2026"
+              placeholder="예: BTS"
             />
           </Field>
 
@@ -402,8 +426,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
             <Field label="러닝타임(분)" required>
               <FormInput
                 type="number"
-                value={form.duration === 0 ? "" : String(form.duration)}
-                onChange={(v) => update("duration", Number(v || 0))}
+                value={
+                  form.durationMinutes === 0
+                    ? ""
+                    : String(form.durationMinutes)
+                }
+                onChange={(v) => update("durationMinutes", Number(v || 0))}
                 onKeyDown={handleEnterMoveNext}
                 placeholder="예: 120"
               />
@@ -570,6 +598,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
                       <span className="line-clamp-2">
                         {galleryImages[index].name}
                       </span>
+
                       <button
                         type="button"
                         onClick={() => removeGalleryImage(index)}
@@ -595,6 +624,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
             className="flex h-12 items-center justify-center gap-2 rounded-lg bg-primary px-6 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Save size={16} />
+
             {isPending
               ? "저장 중..."
               : mode === "create"
@@ -616,7 +646,13 @@ export default function AdminConcertFormPage({ mode }: Props) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-xl border border-admin-border bg-admin-card p-6 shadow-sm">
       <h2 className="mb-4 text-base font-bold">{title}</h2>
@@ -640,6 +676,7 @@ function Field({
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
       </p>
+
       {children}
     </div>
   );
@@ -686,6 +723,7 @@ function UploadBox({
 }) {
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
+
     onFilesSelected(files);
     event.target.value = "";
   }
@@ -799,6 +837,7 @@ function EditableTimeInput({
     />
   );
 }
+
 function CharacterCreatorLinkBox({
   character,
   onClick,
@@ -849,8 +888,8 @@ function CharacterCreatorLinkBox({
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) / 헤어: {character.hairStyle} / 포즈:{" "}
-          {character.pose}
+          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
+          헤어: {character.hairStyle} / 포즈: {character.pose}
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">

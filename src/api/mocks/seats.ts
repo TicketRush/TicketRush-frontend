@@ -1,9 +1,31 @@
 // Mock 좌석 — 메모리 상태 + SSE 시뮬레이터
+//
+// 백엔드 seat-service swagger (2026-06-30) 스펙 반영.
+//
+// 주요 변경:
+//   - Seat.seatNumber → seatNumber (백엔드 필드명)
+//   - Seat.seatLayoutId → seatLayoutId
+//   - Seat 제거 (백엔드 스펙엔 좌석 단위 가격 없음. 공연 단위 가격만 사용)
+//   - SeatAvailability → SeatCounts로 이름 변경 + 확장 (holdCount, soldCount 추가)
+//   - SeatHoldResponse 관련 mock 유지 (실 API 연동 시 예매 생성으로 대체 예정)
+//
+// ⚠️ 실 API 매핑 계획:
+//   mockGetSeats      → GET  /api/v1/seat/{performanceId}/seat-layouts + 상태 동기화
+//   mockGetSeatCounts → GET  /api/v1/seat/{performanceId}/seat-counts
+//   mockHoldSeat      → POST /api/v1/booking (예매 생성이 좌석 HOLD를 겸함)
+//   mockReleaseSeat   → PATCH /api/v1/booking/{bookingId}/cancel
+//   mockConfirmSold   → 백엔드 내부 자동 처리 (POST /payment/confirm 성공 시)
+//   mockSubscribeSeats → GET /api/v1/seat/{performanceId}/seat-status/stream (SSE)
+//
+// - 2026-08-06 (이슈 #177):
+//   - availableCount를 MOCK_CONCERTS.remainingSeats에 맞춰 시드
+//     (ON_SALE 매진 = remainingSeats 0 → availableCount 0 고정)
+
 import { mockDelay, mockError, shouldThrow } from "./_helpers";
+import { MOCK_CONCERTS } from "./concerts";
 import type {
   SeatWithStatus,
-  SeatAvailability,
-  SeatHoldResponse,
+  SeatCounts,
   SeatStatus,
   SeatUpdateEvent,
 } from "@/types/domain/seat";
@@ -11,6 +33,18 @@ import type {
 const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 const COLS = 12;
 const HOLD_DURATION_MS = 5 * 60 * 1000;
+const TOTAL_SEATS = ROWS.length * COLS;
+
+/**
+ * mockHoldSeat 반환 타입 (백엔드에 실제 API 없음, mock 편의용).
+ * 실 API 연동 시 사용 안 함.
+ */
+interface MockHoldResult {
+  holdId: string;
+  seatId: number;
+  expiresAt: string;
+  holdDurationMs: number;
+}
 
 // 공연별 좌석 상태 캐시 (메모리)
 const seatStateByPerformance: Map<number, Map<number, SeatStatus>> = new Map();
@@ -18,17 +52,24 @@ const seatStateByPerformance: Map<number, Map<number, SeatStatus>> = new Map();
 function ensureSeatState(performanceId: number) {
   if (seatStateByPerformance.has(performanceId)) return;
 
+  const concert = MOCK_CONCERTS.find((c) => c.id === performanceId);
+  const availableTarget = Math.max(
+    0,
+    Math.min(TOTAL_SEATS, concert?.remainingSeats ?? Math.floor(TOTAL_SEATS * 0.6)),
+  );
+
+  // remainingSeats만큼 AVAILABLE, 나머지는 SOLD(일부 HOLD)로 고정 시드
+  // → #177 매진(id=2, remainingSeats=0) 등 시나리오를 재현 가능하게 함
   const map = new Map<number, SeatStatus>();
-  let seatId = 1;
-  ROWS.forEach(() => {
-    for (let col = 1; col <= COLS; col++) {
-      const r = Math.random();
-      let status: SeatStatus = "AVAILABLE";
-      if (r < 0.15) status = "HOLD";
-      else if (r < 0.25) status = "SOLD";
-      map.set(seatId++, status);
+  for (let seatId = 1; seatId <= TOTAL_SEATS; seatId++) {
+    if (seatId <= availableTarget) {
+      map.set(seatId, "AVAILABLE");
+    } else if ((seatId - availableTarget) % 8 === 0) {
+      map.set(seatId, "HOLD");
+    } else {
+      map.set(seatId, "SOLD");
     }
-  });
+  }
   seatStateByPerformance.set(performanceId, map);
 }
 
@@ -41,16 +82,15 @@ export async function mockGetSeats(
   const statusMap = seatStateByPerformance.get(performanceId)!;
   const seats: SeatWithStatus[] = [];
   let seatId = 1;
-  ROWS.forEach((row, rowIdx) => {
+  ROWS.forEach((row) => {
     for (let col = 1; col <= COLS; col++) {
       seats.push({
         id: seatId,
-        layoutId: seatId,
+        seatLayoutId: seatId,
+        seatNumber: `${row}-${col}`,
+        // 파생 필드 (프론트 편의)
         row,
         col,
-        label: `${row}-${col}`,
-        // 앞열일수록 비쌈
-        price: 50000 + rowIdx * 10000,
         status: statusMap.get(seatId)!,
       });
       seatId++;
@@ -62,23 +102,32 @@ export async function mockGetSeats(
 
 export async function mockGetSeatCounts(
   performanceId: number,
-): Promise<SeatAvailability> {
+): Promise<SeatCounts> {
   await mockDelay(200);
   ensureSeatState(performanceId);
 
   const statusMap = seatStateByPerformance.get(performanceId)!;
   let available = 0;
+  let hold = 0;
+  let sold = 0;
   statusMap.forEach((status) => {
     if (status === "AVAILABLE") available++;
+    else if (status === "HOLD") hold++;
+    else if (status === "SOLD") sold++;
   });
 
-  return { availableCount: available, totalCount: statusMap.size };
+  return {
+    totalCount: statusMap.size,
+    availableCount: available,
+    holdCount: hold,
+    soldCount: sold,
+  };
 }
 
 export async function mockHoldSeat(
   performanceId: number,
   seatId: number,
-): Promise<SeatHoldResponse> {
+): Promise<MockHoldResult> {
   await mockDelay(300);
   ensureSeatState(performanceId);
 
@@ -94,11 +143,7 @@ export async function mockHoldSeat(
     );
   }
   if (current === "SOLD") {
-    await mockError(
-      "SEAT_ALREADY_SOLD",
-      "이미 판매된 좌석입니다.",
-      100,
-    );
+    await mockError("SEAT_ALREADY_SOLD", "이미 판매된 좌석입니다.", 100);
   }
 
   statusMap.set(seatId, "HOLD");
@@ -153,7 +198,10 @@ export async function mockConfirmSold(
 // ── SSE 시뮬레이터 ─────────────────────────────────────
 type Listener = (event: SeatUpdateEvent) => void;
 const listeners: Map<number, Set<Listener>> = new Map();
-const intervalByPerformance: Map<number, NodeJS.Timeout> = new Map();
+const intervalByPerformance: Map<
+  number,
+  ReturnType<typeof setInterval>
+> = new Map();
 
 function notifyListeners(performanceId: number, event: SeatUpdateEvent) {
   listeners.get(performanceId)?.forEach((l) => l(event));

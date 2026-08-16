@@ -10,6 +10,7 @@ import {
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
+
 type HairStyle = "short" | "long" | "bun" | "ponytail" | "wave" | "rainbow";
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
@@ -29,10 +30,11 @@ interface BackgroundPreset {
   id: string;
   label: string;
   color: string;
-  category: "pastel" | "performance" | "dark";
 }
 
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const DEFAULT_RETURN_TO = "/admin/concerts/new";
+
 const HAIR_STYLES: { value: HairStyle; label: string; icon: string }[] = [
   { value: "short", label: "숏컷", icon: "👱" },
   { value: "long", label: "단발", icon: "👩" },
@@ -97,30 +99,20 @@ const POSES: { value: Pose; label: string; icon: string }[] = [
 ];
 
 const BACKGROUNDS: BackgroundPreset[] = [
-  { id: "lavender", label: "라벤더", color: "#E9DDFF", category: "pastel" },
-  { id: "pink", label: "핑크", color: "#FFD6E8", category: "pastel" },
-  { id: "sky-blue", label: "스카이블루", color: "#DBEAFE", category: "pastel" },
-  { id: "mint", label: "민트", color: "#D9F5EC", category: "pastel" },
-  { id: "cream", label: "크림", color: "#FFF3D6", category: "pastel" },
-  { id: "coral", label: "코랄", color: "#FFD2C8", category: "pastel" },
-  { id: "concert", label: "콘서트", color: "#4C3D91", category: "performance" },
-  { id: "magic-show", label: "마술쇼", color: "#24123D", category: "dark" },
-  { id: "opera", label: "오페라", color: "#6B1F2B", category: "dark" },
-  {
-    id: "festival",
-    label: "페스티벌",
-    color: "#10B981",
-    category: "performance",
-  },
-  { id: "musical", label: "뮤지컬", color: "#8B5CF6", category: "performance" },
-  {
-    id: "fan-meeting",
-    label: "팬미팅",
-    color: "#F0ABFC",
-    category: "performance",
-  },
-  { id: "classic", label: "클래식", color: "#D6C6A5", category: "pastel" },
-  { id: "dark-gray", label: "다크 그레이", color: "#343A40", category: "dark" },
+  { id: "lavender", label: "라벤더", color: "#E9DDFF" },
+  { id: "pink", label: "핑크", color: "#FFD6E8" },
+  { id: "sky-blue", label: "스카이블루", color: "#DBEAFE" },
+  { id: "mint", label: "민트", color: "#D9F5EC" },
+  { id: "cream", label: "크림", color: "#FFF3D6" },
+  { id: "coral", label: "코랄", color: "#FFD2C8" },
+  { id: "concert", label: "콘서트", color: "#4C3D91" },
+  { id: "magic-show", label: "마술쇼", color: "#24123D" },
+  { id: "opera", label: "오페라", color: "#6B1F2B" },
+  { id: "festival", label: "페스티벌", color: "#10B981" },
+  { id: "musical", label: "뮤지컬", color: "#8B5CF6" },
+  { id: "fan-meeting", label: "팬미팅", color: "#F0ABFC" },
+  { id: "classic", label: "클래식", color: "#D6C6A5" },
+  { id: "dark-gray", label: "다크 그레이", color: "#343A40" },
 ];
 
 const DEFAULT_CHARACTER: CharacterConfig = {
@@ -153,14 +145,17 @@ function loadSavedCharacter(): CharacterConfig {
       hairColor?: unknown;
       outfitColor?: unknown;
     };
+
     const resolvedSkin = resolveStoredSkinTone(
       parsed.skinTone,
       parsed.skinColor,
     );
+
     const resolvedHairColor =
       typeof parsed.hairColor === "string"
         ? normalizeHexColor(parsed.hairColor)
         : null;
+
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
@@ -179,20 +174,45 @@ function loadSavedCharacter(): CharacterConfig {
   }
 }
 
+function resolveAdminReturnTo(returnTo: string | null): string {
+  if (!returnTo) {
+    return DEFAULT_RETURN_TO;
+  }
+
+  const isAdminPath = /^\/admin(?:\/|$)/.test(returnTo);
+
+  if (!isAdminPath) {
+    return DEFAULT_RETURN_TO;
+  }
+
+  return returnTo;
+}
+
 export default function AdminCharacterCreatorPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [character, setCharacter] =
-    useState<CharacterConfig>(() => loadSavedCharacter());
-  const [skinHexInput, setSkinHexInput] = useState(character.skinColor);
+  const [character, setCharacter] = useState<CharacterConfig>(() =>
+    loadSavedCharacter(),
+  );
+
+  const [skinHexInput, setSkinHexInput] = useState(
+    () => character.skinColor,
+  );
   const [skinHexError, setSkinHexError] = useState("");
-  const [hairHexInput, setHairHexInput] = useState(character.hairColor);
+
+  const [hairHexInput, setHairHexInput] = useState(
+    () => character.hairColor,
+  );
   const [hairHexError, setHairHexError] = useState("");
-  const [outfitHexInput, setOutfitHexInput] = useState(character.outfitColor);
+
+  const [outfitHexInput, setOutfitHexInput] = useState(
+    () => character.outfitColor,
+  );
   const [outfitHexError, setOutfitHexError] = useState("");
+
   const [backgroundHexInput, setBackgroundHexInput] = useState(
-    character.background,
+    () => character.background,
   );
   const [backgroundHexError, setBackgroundHexError] = useState("");
 
@@ -211,6 +231,7 @@ export default function AdminCharacterCreatorPage() {
   const selectedBackgroundPreset = BACKGROUNDS.find((background) =>
     isSameHexColor(background.color, character.background),
   );
+
   const isCustomBackground = !selectedBackgroundPreset;
 
   function update<K extends keyof CharacterConfig>(
@@ -246,6 +267,7 @@ export default function AdminCharacterCreatorPage() {
     update("skinColor", normalized);
     setSkinHexInput(normalized);
     setSkinHexError("");
+
     return true;
   }
 
@@ -285,6 +307,7 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
+    setSkinHexInput(character.skinColor);
     setSkinHexError(
       "예: #F7C6A8처럼 6자리 HEX 색상 코드를 입력해주세요.",
     );
@@ -300,6 +323,7 @@ export default function AdminCharacterCreatorPage() {
     update("hairColor", normalized);
     setHairHexInput(normalized);
     setHairHexError("");
+
     return true;
   }
 
@@ -339,6 +363,7 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
+    setHairHexInput(character.hairColor);
     setHairHexError(
       "예: #151515처럼 6자리 HEX 색상 코드를 입력해주세요.",
     );
@@ -354,6 +379,7 @@ export default function AdminCharacterCreatorPage() {
     update("outfitColor", normalized);
     setOutfitHexInput(normalized);
     setOutfitHexError("");
+
     return true;
   }
 
@@ -393,6 +419,7 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
+    setOutfitHexInput(character.outfitColor);
     setOutfitHexError(
       "예: #60A5FA처럼 6자리 HEX 색상 코드를 입력해주세요.",
     );
@@ -400,11 +427,15 @@ export default function AdminCharacterCreatorPage() {
 
   function applyBackgroundColor(value: string) {
     const normalized = normalizeHexColor(value);
-    if (!normalized) return false;
+
+    if (!normalized) {
+      return false;
+    }
 
     update("background", normalized);
     setBackgroundHexInput(normalized);
     setBackgroundHexError("");
+
     return true;
   }
 
@@ -413,6 +444,7 @@ export default function AdminCharacterCreatorPage() {
     setBackgroundHexInput(upperValue);
 
     const normalized = normalizeHexColor(upperValue);
+
     if (normalized) {
       update("background", normalized);
       setBackgroundHexError("");
@@ -444,6 +476,7 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
+    setBackgroundHexInput(character.background);
     setBackgroundHexError(
       "예: #E9DDFF처럼 6자리 HEX 색상 코드를 입력해주세요.",
     );
@@ -451,12 +484,16 @@ export default function AdminCharacterCreatorPage() {
 
   function handleReset() {
     setCharacter(DEFAULT_CHARACTER);
+
     setSkinHexInput(DEFAULT_CHARACTER.skinColor);
     setSkinHexError("");
+
     setHairHexInput(DEFAULT_CHARACTER.hairColor);
     setHairHexError("");
+
     setOutfitHexInput(DEFAULT_CHARACTER.outfitColor);
     setOutfitHexError("");
+
     setBackgroundHexInput(DEFAULT_CHARACTER.background);
     setBackgroundHexError("");
   }
@@ -491,16 +528,19 @@ export default function AdminCharacterCreatorPage() {
     }
 
     localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(character));
-    const returnTo = searchParams.get("returnTo") ?? "/admin/concerts/new";
+
+    const returnTo = resolveAdminReturnTo(searchParams.get("returnTo"));
     navigate(returnTo);
   }
 
   function handleBack() {
     const returnTo = searchParams.get("returnTo");
+
     if (returnTo) {
-      navigate(returnTo);
+      navigate(resolveAdminReturnTo(returnTo));
       return;
     }
+
     navigate(-1);
   }
 
@@ -512,7 +552,9 @@ export default function AdminCharacterCreatorPage() {
             <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-bold tracking-wider text-slate-300">
               3D CHARACTER CREATOR
             </span>
+
             <h1 className="mt-3 text-3xl font-bold">3D 캐릭터 제작소</h1>
+
             <p className="mt-2 text-sm text-slate-400">
               귀여운 치비 스타일 캐릭터를 만들어보세요.
             </p>
@@ -544,6 +586,7 @@ export default function AdminCharacterCreatorPage() {
                       className="mx-auto h-10 w-full max-w-32 rounded-full"
                       style={{ backgroundColor: skinTone.color }}
                     />
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {skinTone.label}
                     </p>
@@ -557,6 +600,7 @@ export default function AdminCharacterCreatorPage() {
                     <h3 className="text-sm font-bold text-slate-800">
                       사용자 지정 피부색
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
                     </p>
@@ -577,6 +621,7 @@ export default function AdminCharacterCreatorPage() {
                     >
                       컬러 피커
                     </label>
+
                     <input
                       id="custom-skin-color-picker"
                       type="color"
@@ -596,6 +641,7 @@ export default function AdminCharacterCreatorPage() {
                     >
                       HEX 색상 코드
                     </label>
+
                     <input
                       id="custom-skin-hex"
                       type="text"
@@ -615,12 +661,14 @@ export default function AdminCharacterCreatorPage() {
                           : "border-slate-300 focus:border-primary"
                       }`}
                     />
+
                     <p
                       id="custom-skin-hex-help"
                       className="mt-1 text-[11px] text-slate-500"
                     >
                       # 없이 6자리만 입력해도 자동으로 적용됩니다.
                     </p>
+
                     {skinHexError && (
                       <p
                         id="custom-skin-hex-error"
@@ -635,11 +683,13 @@ export default function AdminCharacterCreatorPage() {
                     <p className="mb-2 text-xs font-bold text-slate-700">
                       현재 적용 색상
                     </p>
+
                     <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
                       <span
                         className="h-7 w-7 shrink-0 rounded border border-slate-200"
                         style={{ backgroundColor: character.skinColor }}
                       />
+
                       <code className="text-xs font-bold text-slate-700">
                         {character.skinColor.toUpperCase()}
                       </code>
@@ -658,6 +708,7 @@ export default function AdminCharacterCreatorPage() {
                     onClick={() => update("hairStyle", hairStyle.value)}
                   >
                     <div className="text-2xl">{hairStyle.icon}</div>
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {hairStyle.label}
                     </p>
@@ -668,6 +719,7 @@ export default function AdminCharacterCreatorPage() {
               <p className="mt-5 text-sm font-bold text-slate-800">
                 헤어 컬러
               </p>
+
               <div className="mt-3 grid grid-cols-7 gap-2">
                 {HAIR_COLORS.map((color) => (
                   <ColorButton
@@ -685,6 +737,7 @@ export default function AdminCharacterCreatorPage() {
                     <h3 className="text-sm font-bold text-slate-800">
                       사용자 지정 헤어 컬러
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
                     </p>
@@ -705,11 +758,14 @@ export default function AdminCharacterCreatorPage() {
                     >
                       컬러 피커
                     </label>
+
                     <input
                       id="custom-hair-color-picker"
                       type="color"
                       value={character.hairColor}
-                      onChange={(event) => applyHairColor(event.target.value)}
+                      onChange={(event) =>
+                        applyHairColor(event.target.value)
+                      }
                       className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
                       aria-label="사용자 지정 헤어 컬러 선택"
                     />
@@ -722,6 +778,7 @@ export default function AdminCharacterCreatorPage() {
                     >
                       HEX 색상 코드
                     </label>
+
                     <input
                       id="custom-hair-hex"
                       type="text"
@@ -741,12 +798,14 @@ export default function AdminCharacterCreatorPage() {
                           : "border-slate-300 focus:border-primary"
                       }`}
                     />
+
                     <p
                       id="custom-hair-hex-help"
                       className="mt-1 text-[11px] text-slate-500"
                     >
                       # 없이 6자리만 입력해도 자동으로 적용됩니다.
                     </p>
+
                     {hairHexError && (
                       <p
                         id="custom-hair-hex-error"
@@ -761,11 +820,13 @@ export default function AdminCharacterCreatorPage() {
                     <p className="mb-2 text-xs font-bold text-slate-700">
                       현재 적용 색상
                     </p>
+
                     <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
                       <span
                         className="h-7 w-7 shrink-0 rounded border border-slate-200"
                         style={{ backgroundColor: character.hairColor }}
                       />
+
                       <code className="text-xs font-bold text-slate-700">
                         {character.hairColor.toUpperCase()}
                       </code>
@@ -785,10 +846,12 @@ export default function AdminCharacterCreatorPage() {
                   >
                     <div className="flex items-start gap-3 text-left">
                       <span className="text-2xl">{outfit.icon}</span>
+
                       <div>
                         <p className="text-sm font-bold text-slate-800">
                           {outfit.name}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-500">
                           {outfit.description}
                         </p>
@@ -801,6 +864,7 @@ export default function AdminCharacterCreatorPage() {
               <p className="mt-5 text-sm font-bold text-slate-800">
                 의상 컬러
               </p>
+
               <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
                 {OUTFIT_COLORS.map((color) => (
                   <ColorButton
@@ -818,6 +882,7 @@ export default function AdminCharacterCreatorPage() {
                     <h3 className="text-sm font-bold text-slate-800">
                       사용자 지정 의상 컬러
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
                     </p>
@@ -838,11 +903,14 @@ export default function AdminCharacterCreatorPage() {
                     >
                       컬러 피커
                     </label>
+
                     <input
                       id="custom-outfit-color-picker"
                       type="color"
                       value={character.outfitColor}
-                      onChange={(event) => applyOutfitColor(event.target.value)}
+                      onChange={(event) =>
+                        applyOutfitColor(event.target.value)
+                      }
                       className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
                       aria-label="사용자 지정 의상 컬러 선택"
                     />
@@ -855,6 +923,7 @@ export default function AdminCharacterCreatorPage() {
                     >
                       HEX 색상 코드
                     </label>
+
                     <input
                       id="custom-outfit-hex"
                       type="text"
@@ -874,12 +943,14 @@ export default function AdminCharacterCreatorPage() {
                           : "border-slate-300 focus:border-primary"
                       }`}
                     />
+
                     <p
                       id="custom-outfit-hex-help"
                       className="mt-1 text-[11px] text-slate-500"
                     >
                       # 없이 6자리만 입력해도 자동으로 적용됩니다.
                     </p>
+
                     {outfitHexError && (
                       <p
                         id="custom-outfit-hex-error"
@@ -894,11 +965,13 @@ export default function AdminCharacterCreatorPage() {
                     <p className="mb-2 text-xs font-bold text-slate-700">
                       현재 적용 색상
                     </p>
+
                     <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
                       <span
                         className="h-7 w-7 shrink-0 rounded border border-slate-200"
                         style={{ backgroundColor: character.outfitColor }}
                       />
+
                       <code className="text-xs font-bold text-slate-700">
                         {character.outfitColor.toUpperCase()}
                       </code>
@@ -917,6 +990,7 @@ export default function AdminCharacterCreatorPage() {
                     onClick={() => update("accessory", accessory.value)}
                   >
                     <div className="text-2xl">{accessory.icon}</div>
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {accessory.label}
                     </p>
@@ -934,6 +1008,7 @@ export default function AdminCharacterCreatorPage() {
                     onClick={() => update("pose", pose.value)}
                   >
                     <div className="text-2xl">{pose.icon}</div>
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {pose.label}
                     </p>
@@ -958,6 +1033,7 @@ export default function AdminCharacterCreatorPage() {
                       className="mx-auto h-10 w-16 rounded border border-slate-200"
                       style={{ backgroundColor: background.color }}
                     />
+
                     <p className="mt-2 text-xs font-bold text-slate-800">
                       {background.label}
                     </p>
@@ -971,6 +1047,7 @@ export default function AdminCharacterCreatorPage() {
                     <h3 className="text-sm font-bold text-slate-800">
                       사용자 지정 배경색
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
                     </p>
@@ -991,6 +1068,7 @@ export default function AdminCharacterCreatorPage() {
                     >
                       컬러 피커
                     </label>
+
                     <input
                       id="custom-background-color-picker"
                       type="color"
@@ -1010,6 +1088,7 @@ export default function AdminCharacterCreatorPage() {
                     >
                       HEX 색상 코드
                     </label>
+
                     <input
                       id="custom-background-hex"
                       type="text"
@@ -1029,12 +1108,14 @@ export default function AdminCharacterCreatorPage() {
                           : "border-slate-300 focus:border-primary"
                       }`}
                     />
+
                     <p
                       id="custom-background-hex-help"
                       className="mt-1 text-[11px] text-slate-500"
                     >
                       # 없이 6자리만 입력해도 자동으로 적용됩니다.
                     </p>
+
                     {backgroundHexError && (
                       <p
                         id="custom-background-hex-error"
@@ -1049,11 +1130,13 @@ export default function AdminCharacterCreatorPage() {
                     <p className="mb-2 text-xs font-bold text-slate-700">
                       현재 적용 색상
                     </p>
+
                     <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
                       <span
                         className="h-7 w-7 shrink-0 rounded border border-slate-200"
                         style={{ backgroundColor: character.background }}
                       />
+
                       <code className="text-xs font-bold text-slate-700">
                         {character.background.toUpperCase()}
                       </code>
@@ -1068,6 +1151,7 @@ export default function AdminCharacterCreatorPage() {
             <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
               PREVIEW
             </span>
+
             <h2 className="mt-4 text-sm font-bold">미리보기</h2>
 
             <div

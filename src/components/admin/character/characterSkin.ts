@@ -97,11 +97,11 @@ export function resolveStoredSkinTone(
   }
 
   if (isSkinTonePreset(skinTone)) {
-    return {
-      skinTone,
-      skinColor: normalizedColor ?? getSkinTonePresetColor(skinTone),
-    };
-  }
+  return {
+    skinTone,
+    skinColor: getSkinTonePresetColor(skinTone),
+  };
+}
 
   if (normalizedColor) {
     const matchedPreset = findSkinTonePresetByColor(normalizedColor);

@@ -1,4 +1,7 @@
-
+// AdminSeatMap
+//
+// 백엔드 스펙 반영 변경:
+//   - seat.seatNumber → seat.seatNumber (aria-label)
 import { memo } from "react";
 import type { SeatWithStatus } from "@/types/domain/seat";
 
@@ -129,7 +132,7 @@ const AdminSeatItem = memo(
               "#B9F8CF";
           }
         }}
-        aria-label={`좌석 ${seat.label} ${seat.status}`}
+        aria-label={`좌석 ${seat.seatNumber} ${seat.status}`}
       >
         {seat.col}
       </button>
