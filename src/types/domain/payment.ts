@@ -8,9 +8,12 @@ export type PaymentStatus =
   | "CONFIRMING" // 백엔드 confirm 진행 중
   | "SUCCESS" // 성공
   | "FAILED" // 실패
-  | "EXPIRED"; // 타이머 만료
+  | "EXPIRED" // 타이머 만료
+  | "CANCELLED"; // 사용자가 명시적으로 취소
 
-export type PaymentMethod = "CARD" | "KAKAOPAY" | "NAVERPAY" | "TOSSPAY";
+export type PaymentProvider = "KAKAO" | "NAVER" | "TOSS";
+
+export type PaymentMethod = "CARD" | "KAKAO" | "NAVER" | "TOSS" | "SIMPLE_PAY";
 
 // ── 결제 init (가상) ─────────────────────────────────
 export interface PaymentInitRequest {
@@ -29,21 +32,50 @@ export interface PaymentInitResponse {
 
 // ── 결제 confirm (가상) ──────────────────────────────
 export interface PaymentConfirmRequest {
+  bookingId: number;
+  seatId: number;
   paymentKey: string;
   orderId: string;
   amount: number;
+  provider: PaymentProvider;
 }
 
 export interface PaymentConfirmResponse {
-  paymentKey: string;
-  orderId: string;
-  amount: number;
+  paymentId: number;
+  status: "COMPLETED" | "FAILED" | "CANCELLED";
   paidAt: string;
-  bookingNumber: string;
+  amount: number;
 }
 
 // ── 결제 cancel (가상) ───────────────────────────────
 export interface PaymentCancelRequest {
-  paymentKey: string;
   reason: string;
+}
+
+export interface PaymentCancelResponse {
+  paymentId: number;
+  status: "CANCELLED" | "REFUNDED";
+  cancelledAt: string;
+}
+
+export interface PaymentHistoryItem {
+  paymentId: number;
+  bookingNumber: string;
+  amount: number;
+  status: string;
+  paidAt: string;
+  provider: PaymentProvider;
+  method: PaymentMethod;
+}
+
+export interface PaymentDetail {
+  paymentId: number;
+  bookingId: number;
+  bookingNumber: string;
+  amount: number;
+  provider: PaymentProvider;
+  status: string;
+  paidAt: string;
+  cancelledAt: string | null;
+  method: PaymentMethod;
 }

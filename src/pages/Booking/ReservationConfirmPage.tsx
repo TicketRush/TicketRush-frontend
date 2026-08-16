@@ -1,3 +1,8 @@
+// 예매 확인 페이지
+//
+// 백엔드 스펙 반영 변경:
+//   - selectedSeat.seatNumber → seatNumber
+//   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Clock, ArrowLeft, AlertCircle } from "lucide-react";
@@ -32,8 +37,8 @@ export default function ReservationConfirmPage() {
   if (!selectedSeat) return null;
 
   const remainingSeconds = Math.ceil(remainingMs / 1000);
-  // 좌석 가격 우선, 없으면 공연 단가 fallback
-  const totalAmount = selectedSeat.price ?? currentConcert?.price ?? 0;
+  // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
+  const totalAmount = currentConcert?.price ?? 0;
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
@@ -66,7 +71,7 @@ export default function ReservationConfirmPage() {
 
           <div className="flex flex-wrap gap-2 mb-4">
             <span className="px-3 py-1.5 rounded bg-primary text-white text-sm font-bold">
-              {selectedSeat.label}
+              {selectedSeat.seatNumber}
             </span>
           </div>
 

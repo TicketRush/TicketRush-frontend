@@ -31,7 +31,9 @@ export default function AdminConcertTable({
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => (
-        <span className="font-mono text-xs">E{String(row.original.id).padStart(3, "0")}</span>
+        <span className="font-mono text-xs">
+          E{String(row.original.id).padStart(3, "0")}
+        </span>
       ),
     },
     {
@@ -57,7 +59,12 @@ export default function AdminConcertTable({
       header: "점유율",
       cell: ({ getValue }) => {
         const rate = (getValue() as number) * 100;
-        const color = rate >= 90 ? "text-green-400" : rate >= 50 ? "text-blue-400" : "text-gray-400";
+        const color =
+          rate >= 90
+            ? "text-green-400"
+            : rate >= 50
+              ? "text-blue-400"
+              : "text-gray-400";
         return <span className={`font-bold ${color}`}>{rate.toFixed(0)}%</span>;
       },
     },
@@ -72,7 +79,9 @@ export default function AdminConcertTable({
       cell: ({ getValue }) => {
         const s = STATUS_LABELS[getValue() as string] ?? STATUS_LABELS.ON_SALE;
         return (
-          <span className={`px-2 py-1 rounded text-xs font-semibold ${s.color}`}>
+          <span
+            className={`px-2 py-1 rounded text-xs font-semibold ${s.color}`}
+          >
             {s.label}
           </span>
         );

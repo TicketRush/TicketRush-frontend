@@ -1,3 +1,7 @@
+// AdminSeatDetailPanel
+//
+// 백엔드 스펙 반영 변경:
+//   - detail.seatNumber → detail.seatNumber (3곳)
 import { Clock, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AdminSeatDetail } from "@/types/domain/admin";
@@ -60,7 +64,7 @@ export default function AdminSeatDetailPanel({
   return (
     <Panel title="좌석 상세 정보">
       <div className="text-center py-8">
-        <p className="text-base font-bold mb-1">{detail.seatLabel}</p>
+        <p className="text-base font-bold mb-1">{detail.seatNumber}</p>
         <p className="text-sm text-seat-available">예약 가능</p>
       </div>
     </Panel>
@@ -90,7 +94,7 @@ function HoldDetail({
     <Panel title="좌석 상세 정보">
       <div className="text-center mb-4">
         <div className="inline-block bg-seat-holding text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
-          {detail.seatLabel}
+          {detail.seatNumber}
         </div>
         <p className="text-xs text-admin-text-secondary">
           예약 진행중 (타이머)
@@ -140,7 +144,7 @@ function SoldDetail({
     <Panel title="좌석 상세 정보">
       <div className="text-center mb-4">
         <div className="inline-block bg-seat-sold text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
-          {detail.seatLabel}
+          {detail.seatNumber}
         </div>
         <p className="text-xs text-admin-text-secondary">판매 완료</p>
       </div>
