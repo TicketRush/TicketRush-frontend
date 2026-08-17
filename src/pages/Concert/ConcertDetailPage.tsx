@@ -11,6 +11,9 @@
 //   - useSeatCounts import 경로 정정: @/hooks/queries/useSeats
 // - 2026-08-02 (#134 리뷰):
 //   - seat-counts 로딩/실패 시 totalSeats fallback으로 예매 열지 않음
+// - 2026-08-06 (이슈 #177):
+//   - ON_SALE일 때만 seat-counts 조회
+//   - 잔여 미확정 시 "-" (Sidebar), 예매는 기존처럼 차단
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -25,6 +28,10 @@ import { useSeatCounts } from "@/hooks/queries/useSeats";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import { useConcertStore } from "@/stores/reservation/concertStore";
+import {
+  canBookConcert,
+  shouldFetchSeatCounts,
+} from "@/utils/concert/canBookConcert";
 import samplePoster from "@/assets/images/sample-poster.svg";
 
 export default function ConcertDetailPage() {
@@ -34,13 +41,13 @@ export default function ConcertDetailPage() {
 
   const concertId = id ? Number(id) : undefined;
   const { data, isLoading, isError } = useConcertDetail(concertId);
-  // 잔여 좌석 별도 조회 — seat-service
-  // 로딩/실패 시 totalSeats fallback으로 예매를 열지 않음 (#134 리뷰)
+  // ON_SALE일 때만 seat-counts 조회 (#177). 그 외 상태는 "-" 표시
+  const shouldFetchSeats = !!data && shouldFetchSeatCounts(data.status);
   const {
     data: seatCounts,
     isLoading: seatCountsLoading,
     isError: seatCountsError,
-  } = useSeatCounts(concertId);
+  } = useSeatCounts(concertId, shouldFetchSeats);
 
   if (!concertId || isNaN(concertId))
     return <Navigate to="/concerts" replace />;
@@ -65,16 +72,23 @@ export default function ConcertDetailPage() {
     );
   }
 
-  const seatsReady = !!seatCounts && !seatCountsLoading && !seatCountsError;
-  // 표시/예매 판단은 seat-counts 확정 후에만 사용 (미확인 시 0으로 두고 버튼 비활성)
+  const seatsReady =
+    shouldFetchSeats &&
+    !!seatCounts &&
+    !seatCountsLoading &&
+    !seatCountsError;
+  // 표시/예매 판단은 seat-counts 확정 후에만 사용 (미확인 시 null → "-")
   const total = seatsReady
     ? seatCounts.totalCount
     : (data.totalSeats ?? 0);
-  const remaining = seatsReady ? seatCounts.availableCount : 0;
+  const remaining = seatsReady ? seatCounts.availableCount : null;
 
-  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0
-  const isOnSale =
-    seatsReady && data.status === "ON_SALE" && remaining > 0;
+  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0 (#181 공통)
+  const isOnSale = canBookConcert({
+    status: data.status,
+    seatsReady,
+    remaining,
+  });
 
   // venue fallback
   const venueDisplay = data.venue ?? data.address ?? "";
@@ -94,7 +108,7 @@ export default function ConcertDetailPage() {
       address: data!.address,
       durationMinutes: data!.durationMinutes,
       totalSeats: total,
-      remainingSeats: remaining,
+      remainingSeats: remaining ?? 0,
       status: data!.status,
     });
     navigate(`/concerts/${data!.id}/seats`);
@@ -224,8 +238,9 @@ export default function ConcertDetailPage() {
             duration={data.durationMinutes}
             isOnSale={isOnSale}
             status={data.status}
-            seatsLoading={seatCountsLoading}
-            seatsError={seatCountsError}
+            bookingOpenAt={data.bookingOpenAt}
+            seatsLoading={shouldFetchSeats && seatCountsLoading}
+            seatsError={shouldFetchSeats && seatCountsError}
             notices={
               data.notices && data.notices.length > 0
                 ? data.notices

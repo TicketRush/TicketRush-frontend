@@ -3,15 +3,15 @@
 // 백엔드 auth-service, user-service 스펙 반영 (2026-07-19 백엔드 코드 직접 확인)
 //
 // 주요 변경:
-//   - UserRole: "USER" → "MEMBER" (백엔드 실제 값)
+//   - UserRole: DB / 로그인 / JWT / /me 모두 "MEMBER" | "ADMIN" 통일
 //   - OauthLoginResponse: email/role 없음 (userId, name, isNewUser, 토큰류만)
-//   - EmailLoginResponse: name/joinedAt/expiresIn 없음 (userId, email, role, 토큰만)
-//   - MeResponse: userId/role/joinedAt 없음 (name, email, createdAt만)
+//   - MeResponse: name, email, createdAt, role (BE #558/#568)
 //   - EmailCheckResponse: isDuplicated → exists
 //   - EmailAuthConsumeRequest 제거 (해당 엔드포인트 존재하지 않음)
 //   - DevAuthTokenResponse: LoginResponse와 동일 구조로 정정
 
 export type OauthProvider = "KAKAO" | "NAVER" | "GOOGLE";
+/** authStore / AdminRoute / 로그인·/me·JWT 공통 권한 */
 export type UserRole = "MEMBER" | "ADMIN";
 
 // ── 소셜 로그인 ───────────────────────────────────────
@@ -48,6 +48,7 @@ export interface EmailLoginRequest {
 /**
  * POST /api/v1/auth/login 응답
  * 백엔드 LoginResponse DTO: name/joinedAt/expiresIn 없음.
+ * role: MEMBER | ADMIN (/me·JWT와 동일)
  */
 export interface EmailLoginResponse {
   userId: number;
@@ -111,12 +112,13 @@ export interface TokenReissueResponse {
 // ── 내 정보 (백엔드 확정) ─────────────────────────────
 /**
  * GET /api/v1/user/me 응답
- * 백엔드 응답: name, email, createdAt만 존재.
+ * BE #558/#568: name, email, createdAt, role (DB enum 그대로 MEMBER|ADMIN)
  */
 export interface MeResponse {
   name: string;
   email: string;
   createdAt: string;
+  role: UserRole;
 }
 
 // ── Dev Auth 토큰 (개발용) ────────────────────────────

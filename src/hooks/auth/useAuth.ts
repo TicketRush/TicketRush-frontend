@@ -4,24 +4,17 @@
 //   - setAuth 호출부에 refreshToken 매개변수 추가 (refresh 토큰 자동 재발급 지원)
 //   - 소셜 로그인 응답에 email/role/joinedAt 없음 반영 (백엔드 OauthLoginResponse)
 //   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
-//   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt) 보강
+//   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt/role) 보강 (#137)
+//   - authStore.role SSOT = /me.role (BE role = MEMBER | ADMIN 통일)
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
 import useAuthStore from "@/stores/global/authStore";
 import type { UserRole } from "@/types/domain/auth";
 
-// ⚠️ Dev/데모용 — 관리자 계정 화이트리스트 (backend role 없을 때 fallback)
-// 백엔드에서 응답에 role 필드가 확정되면 이 화이트리스트는 제거
-const ADMIN_EMAIL_WHITELIST = ["admin@ticketrush.com"];
-
-function determineRole(email: string | undefined, backendRole?: string): UserRole {
-  if (backendRole === "ADMIN") return "ADMIN";
-  if (backendRole === "MEMBER") return "MEMBER";
-  if (email && ADMIN_EMAIL_WHITELIST.includes(email.toLowerCase().trim())) {
-    return "ADMIN";
-  }
-  return "MEMBER";
+/** BE role → UserRole. 알 수 없는 값은 MEMBER로 안전하게 처리 */
+function toUserRole(backendRole?: string): UserRole {
+  return backendRole === "ADMIN" ? "ADMIN" : "MEMBER";
 }
 
 export function useSocialLogin() {
@@ -31,8 +24,8 @@ export function useSocialLogin() {
   return useMutation({
     mutationFn: socialLoginApi,
     onSuccess: async (data) => {
-      // 소셜 로그인 응답에는 email/role 없음 → MEMBER 고정, /me로 프로필 보강
-      const role: UserRole = "MEMBER";
+      // 소셜 응답 body에 role 없음 → /me 전 임시 MEMBER, 보강 후 me.role 사용
+      let role: UserRole = "MEMBER";
 
       setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
@@ -44,6 +37,7 @@ export function useSocialLogin() {
 
       try {
         const me = await getMeApi();
+        role = toUserRole(me.role);
         setAuth(data.accessToken, data.refreshToken, {
           userId: data.userId,
           name: me.name ?? data.name ?? "",
@@ -52,10 +46,10 @@ export function useSocialLogin() {
           joinedAt: me.createdAt ?? new Date().toISOString(),
         });
       } catch {
-        // /me 실패해도 로그인 자체는 유지
+        // /me 실패해도 로그인 자체는 유지 (role은 임시 MEMBER)
       }
 
-      navigate("/");
+      navigate(role === "ADMIN" ? "/admin" : "/");
     },
   });
 }
@@ -67,9 +61,9 @@ export function useEmailLogin() {
   return useMutation({
     mutationFn: emailLoginApi,
     onSuccess: async (data, variables) => {
-      const role = determineRole(variables.email, data.role);
+      // /me 전: 로그인 응답 role. /me 성공 시 me.role로 덮어씀 (SSOT).
+      let role = toUserRole(data.role);
 
-      // 이메일 로그인 응답에 name/joinedAt 없음 → 임시값 후 /me 보강
       setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
         name: "",
@@ -80,6 +74,7 @@ export function useEmailLogin() {
 
       try {
         const me = await getMeApi();
+        role = toUserRole(me.role);
         setAuth(data.accessToken, data.refreshToken, {
           userId: data.userId,
           name: me.name ?? "",

@@ -4,6 +4,8 @@
 //   백엔드가 인가 코드(code)만 붙여 프론트로 리다이렉트
 //   → POST /api/v1/auth/social/login { provider, code } 로 토큰 교환
 //
+// role은 소셜 응답에 없음 → useSocialLogin이 getMeApi()의 me.role로 authStore 반영 (#137)
+//
 // ⚠️ React StrictMode는 useEffect를 두 번 실행한다. OAuth code는 1회용이라
 //   두 번째 호출이 실패한다. 모듈 스코프 Set(exchangedCodes)으로 동일 code 재사용을 막는다.
 import { useEffect, useRef } from "react";
