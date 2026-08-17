@@ -5,6 +5,7 @@
 // - unmount 시 EventSource.close + clearTimeout/clearInterval
 // - 선택 좌석이 HOLD/SOLD 등으로 바뀌면 seatStore 선택 해제 (+ 토스트)
 // - QA: URL `?forceHoldSelected=1` 이면 mock/실API와 무관하게 선택 좌석을 주기적으로 HOLD
+// - enabled=false (#181 예매 가능 가드 판정 전/불가) 이면 SSE·polling·QA 타이머 모두 열지 않음
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { subscribeSeatStream } from "@/api/seats";
@@ -34,13 +35,14 @@ function isForceHoldSelectedEnabled(): boolean {
 
 export function useSeatEventStream(
   performanceId: number | undefined,
+  enabled: boolean = true,
   options?: UseSeatEventStreamOptions,
 ) {
   const queryClient = useQueryClient();
   const shouldPreserveSelection = options?.shouldPreserveSelection;
 
   useEffect(() => {
-    if (!performanceId) return;
+    if (!performanceId || !enabled) return;
 
     let disposed = false;
     let pollingId: ReturnType<typeof setInterval> | null = null;
@@ -122,11 +124,11 @@ export function useSeatEventStream(
       stopPolling();
       unsubscribe();
     };
-  }, [performanceId, queryClient, shouldPreserveSelection]);
+  }, [performanceId, enabled, queryClient, shouldPreserveSelection]);
 
   // ── QA 전용: ?forceHoldSelected=1 (mock 여부 무관) ──
   useEffect(() => {
-    if (!performanceId || !isForceHoldSelectedEnabled()) return;
+    if (!performanceId || !enabled || !isForceHoldSelectedEnabled()) return;
 
     console.warn(
       "[QA] forceHoldSelected=1 — 좌석을 선택하면 약 2초 뒤 HOLD + 선택 해제 토스트가 납니다.",
@@ -164,5 +166,5 @@ export function useSeatEventStream(
     }, FORCE_HOLD_INTERVAL_MS);
 
     return () => clearInterval(timerId);
-  }, [performanceId, queryClient, shouldPreserveSelection]);
+  }, [performanceId, enabled, queryClient, shouldPreserveSelection]);
 }

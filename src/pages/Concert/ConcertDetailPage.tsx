@@ -28,6 +28,10 @@ import { useSeatCounts } from "@/hooks/queries/useSeats";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import { useConcertStore } from "@/stores/reservation/concertStore";
+import {
+  canBookConcert,
+  shouldFetchSeatCounts,
+} from "@/utils/concert/canBookConcert";
 import samplePoster from "@/assets/images/sample-poster.svg";
 
 export default function ConcertDetailPage() {
@@ -38,7 +42,7 @@ export default function ConcertDetailPage() {
   const concertId = id ? Number(id) : undefined;
   const { data, isLoading, isError } = useConcertDetail(concertId);
   // ON_SALE일 때만 seat-counts 조회 (#177). 그 외 상태는 "-" 표시
-  const shouldFetchSeats = !!data && data.status === "ON_SALE";
+  const shouldFetchSeats = !!data && shouldFetchSeatCounts(data.status);
   const {
     data: seatCounts,
     isLoading: seatCountsLoading,
@@ -79,12 +83,12 @@ export default function ConcertDetailPage() {
     : (data.totalSeats ?? 0);
   const remaining = seatsReady ? seatCounts.availableCount : null;
 
-  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0
-  const isOnSale =
-    seatsReady &&
-    data.status === "ON_SALE" &&
-    remaining !== null &&
-    remaining > 0;
+  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0 (#181 공통)
+  const isOnSale = canBookConcert({
+    status: data.status,
+    seatsReady,
+    remaining,
+  });
 
   // venue fallback
   const venueDisplay = data.venue ?? data.address ?? "";
