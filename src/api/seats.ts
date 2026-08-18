@@ -1,10 +1,11 @@
 // 좌석 API — 백엔드 seat-service (develop, 2026-07-25 소스 확인) 스펙 반영
 //
 // 백엔드 endpoint 매핑:
-//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts
-//   fetchSeats            → GET /api/v1/seat/{performanceId}/seat-layouts
-//   fetchSeatNumbers      → GET /api/v1/seat/numbers
-//   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (SSE)
+//   fetchSeatCounts / fetchSeatLayouts → 이슈 #122 실 API
+//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts  (이슈 #121/#122)
+//   fetchSeats / fetchSeatLayouts → GET /api/v1/seat/{performanceId}/seat-layouts (이슈 #122)
+//   fetchSeatNumbers      → GET /api/v1/seat/numbers?seatIds=1&seatIds=2   (이슈 #122)
+//   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (이슈 #123 SSE)
 //
 // ⚠️ 백엔드 응답이 snake_case (total_count 등) 이지만
 // instance.ts의 axios-case-converter가 camelCase로 자동 변환.
@@ -111,7 +112,7 @@ export async function fetchSeatCounts(
 // -------------------------------------------------------
 
 /**
- * 공연 좌석 배치 + 상태 조회.
+ * 공연 좌석 배치 + 상태 조회 (이슈 #122).
  * 백엔드: GET /api/v1/seat/{performanceId}/seat-layouts
  *
  * 응답: SeatLayoutResponse[]
@@ -133,9 +134,15 @@ export async function fetchSeats(
   return (res.data ?? []).map(mapSeatLayout);
 }
 
+/** 이슈 #122 네이밍 별칭 — fetchSeats와 동일 (좌석 배치 실 API) */
+export const fetchSeatLayouts = fetchSeats;
+
 /**
- * 좌석 ID 배열로 좌석 번호 조회.
+ * 좌석 ID 배열로 좌석 번호 조회 (이슈 #122).
  * 백엔드: GET /api/v1/seat/numbers?seatIds=1&seatIds=2
+ *
+ * Spring 반복 파라미터 형식 유지: seatIds=1&seatIds=2
+ * (axios 기본 직렬화의 seatIds[]= 형태 방지)
  *
  * 사용처: 예매 목록 페이지에서 seatId만 있는 예매 항목의 좌석 번호 조회 등.
  */
@@ -155,7 +162,11 @@ export async function fetchSeatNumbers(
 
   const res = await apiClient.get<BackendSeatNumberResponse[]>(
     "/api/v1/seat/numbers",
-    { params: { seatIds } },
+    {
+      params: { seatIds },
+      // indexes: null → seatIds=1&seatIds=2 (repeat)
+      paramsSerializer: { indexes: null },
+    },
   );
   return res.data ?? [];
 }
