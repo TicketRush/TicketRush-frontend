@@ -6,7 +6,7 @@
 //   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
 //   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt/role) 보강 (#137)
 //   - authStore.role SSOT = /me.role (BE role = MEMBER | ADMIN 통일)
-//   - 로그인 성공 시 저장된 복귀 경로가 있으면 그곳으로 이동 (#101)
+//   - 로그인 성공 시 저장된 복귀 경로가 있으면 그곳으로 이동, 단 ADMIN은 항상 /admin (#101)
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
@@ -19,9 +19,15 @@ function toUserRole(backendRole?: string): UserRole {
   return backendRole === "ADMIN" ? "ADMIN" : "MEMBER";
 }
 
-/** 예매 흐름에서 밀려온 경우 그 경로를 우선하고, 없으면 역할별 기본 진입점 */
+/**
+ * 관리자는 팀 규칙상 복귀 경로와 무관하게 항상 /admin으로 보낸다.
+ * 회원은 예매 흐름에서 밀려온 경로를 우선한다.
+ */
 function resolveLandingPath(role: UserRole): string {
-  return consumeLoginRedirect() ?? (role === "ADMIN" ? "/admin" : "/");
+  // 관리자여서 쓰지 않더라도 꺼내서 비운다. 남겨두면 다음 회원 로그인에 새어나간다.
+  const redirect = consumeLoginRedirect();
+  if (role === "ADMIN") return "/admin";
+  return redirect ?? "/";
 }
 
 export function useSocialLogin() {
