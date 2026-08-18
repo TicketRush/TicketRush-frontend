@@ -45,6 +45,27 @@ export default {
         },
         placeholder: "#B2BEC3",
         "disabled-bg": "#E5E7EB",
+
+        // 공통 토큰 (#96) — Figma 사용자 영역에서 추출
+        //
+        // 주의 안내 박스. 예매 확인의 "제한 시간 내 미결제 시 자동 해제" 같은 곳에 쓴다.
+        warning: {
+          bg: "#FFFBEB",
+          border: "#FFD230",
+        },
+        // 포스터 이미지가 없을 때 자리를 채우는 옅은 그레이. Figma는
+        // fallback → fallback-end 로 내려가는 그라데이션이다.
+        poster: {
+          fallback: "#F0F2F4",
+          "fallback-end": "#EAECEF",
+        },
+        // 사용자 영역 좌석 상태. 관리자(admin.seat)와 색 체계가 완전히 다르다.
+        seat: {
+          selected: "#00C950",
+          available: "#6C5CE7",
+          holding: "#FF4757",
+          sold: "#99A1AF",
+        },
         timer: {
           warning: "#C10007",
         },
@@ -116,6 +137,9 @@ export default {
       },
       boxShadow: {
         button: "0 2px 8px rgba(108, 92, 231, 0.3)",
+        // Figma 카드에는 테두리가 없고 이 옅은 그림자만 있다 (#96).
+        // 카드 아래로 약 7px 퍼지며 가장 진한 지점이 #F5F5F5였다.
+        card: "0 2px 8px rgba(0, 0, 0, 0.04)",
       },
       animation: {
         "admin-seat-blink": "adminSeatBlink 1.2s ease-in-out infinite",
