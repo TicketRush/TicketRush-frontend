@@ -13,6 +13,8 @@ import { useEmailLogin } from "@/hooks/auth/useAuth";
 import { getOauthUrlApi } from "@/api/auth";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
+import emailIcon from "@/assets/icons/email.svg";
+import lockIcon from "@/assets/icons/lock.svg";
 
 type SocialProvider = "kakao" | "naver" | "google";
 
@@ -100,7 +102,7 @@ export default function LoginPage() {
         >
           <Input
             label="이메일"
-            icon={<span>✉</span>}
+            icon={<img src={emailIcon} alt="" className="w-4 h-4" />}
             required
             type="email"
             placeholder="user@example.com"
@@ -109,7 +111,7 @@ export default function LoginPage() {
           />
           <Input
             label="비밀번호"
-            icon={<span>🔒</span>}
+            icon={<img src={lockIcon} alt="" className="w-4 h-4" />}
             required
             type="password"
             placeholder="비밀번호를 입력해주세요"
@@ -146,7 +148,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="kakao"
-            size="md"
+            size="oauth"
             className="flex-1"
             loading={pendingProvider === "kakao"}
             disabled={pendingProvider !== null}
@@ -157,7 +159,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="naver"
-            size="md"
+            size="oauth"
             className="flex-1"
             loading={pendingProvider === "naver"}
             disabled={pendingProvider !== null}
@@ -168,7 +170,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="google"
-            size="md"
+            size="oauth"
             className="flex-1"
             loading={pendingProvider === "google"}
             disabled={pendingProvider !== null}
