@@ -11,7 +11,10 @@ import { toast } from "react-toastify";
 import { loginSchema, type LoginFormData } from "../../schemas/auth";
 import { useEmailLogin } from "@/hooks/auth/useAuth";
 import { getOauthUrlApi } from "@/api/auth";
-import { saveLoginRedirect } from "@/utils/auth/loginRedirect";
+import {
+  applyLoginRedirectFromLocation,
+  clearLoginRedirect,
+} from "@/utils/auth/loginRedirect";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
 import emailIcon from "@/assets/icons/email.svg";
@@ -43,9 +46,10 @@ export default function LoginPage() {
     setFocus("email");
   }, [setFocus]);
 
-  // 예매 흐름에서 밀려온 경우 복귀 경로를 보관해두고 로그인 성공 시 사용한다 (#101)
+  // 예매 흐름에서 밀려온 경우에만 복귀 경로를 보관한다.
+  // 헤더에서 직접 들어오면 이전에 포기한 예매 경로를 비운다 (#101)
   useEffect(() => {
-    saveLoginRedirect((location.state as { from?: unknown } | null)?.from);
+    applyLoginRedirectFromLocation(location.state);
   }, [location.state]);
 
   const onSubmit = (data: LoginFormData) => {
@@ -89,7 +93,14 @@ export default function LoginPage() {
   return (
     <div className="relative flex justify-center min-h-screen px-6 pt-20 pb-10 bg-[#f8f9fa]">
       <div className="absolute top-6 left-6">
-        <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            clearLoginRedirect();
+            navigate(-1);
+          }}
+        >
           ← 뒤로가기
         </Button>
       </div>
@@ -189,7 +200,14 @@ export default function LoginPage() {
 
         <p className="font-pretendard text-sm text-text-secondary text-center mt-6">
           계정이 없으신가요?{" "}
-          <Link to="/signup" className="text-primary font-semibold underline">
+          <Link
+            to="/signup"
+            state={{
+              from: (location.state as { from?: unknown } | null)?.from,
+              preserveRedirect: true,
+            }}
+            className="text-primary font-semibold underline"
+          >
             회원가입
           </Link>
         </p>

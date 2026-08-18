@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyLoginRedirectFromLocation,
   consumeLoginRedirect,
+  resolveLandingPath,
   saveLoginRedirect,
   toInternalPath,
 } from "./loginRedirect";
@@ -30,6 +32,9 @@ describe("toInternalPath", () => {
   it("인증 페이지로 되돌아가는 경로는 차단한다", () => {
     expect(toInternalPath("/login")).toBeNull();
     expect(toInternalPath("/signup")).toBeNull();
+    expect(toInternalPath("/login?next=/admin")).toBeNull();
+    expect(toInternalPath("/signup#form")).toBeNull();
+    expect(toInternalPath("/login/")).toBeNull();
   });
 
   it("값이 없거나 형태가 다르면 null", () => {
@@ -75,6 +80,41 @@ describe("saveLoginRedirect / consumeLoginRedirect", () => {
   });
 
   it("저장된 값이 없으면 null", () => {
+    expect(consumeLoginRedirect()).toBeNull();
+  });
+});
+
+describe("applyLoginRedirectFromLocation / resolveLandingPath", () => {
+  beforeEach(() => {
+    vi.stubGlobal("sessionStorage", createSessionStorageStub());
+  });
+
+  it("from이 없으면 이전에 저장한 경로를 지운다", () => {
+    saveLoginRedirect("/concerts/123/seats");
+    applyLoginRedirectFromLocation(undefined);
+    expect(consumeLoginRedirect()).toBeNull();
+  });
+
+  it("preserveRedirect면 from이 없어도 저장값을 유지한다", () => {
+    saveLoginRedirect("/concerts/123/seats");
+    applyLoginRedirectFromLocation({ preserveRedirect: true });
+    expect(consumeLoginRedirect()).toBe("/concerts/123/seats");
+  });
+
+  it("ADMIN은 복귀 경로를 무시하고 /admin으로 보낸다", () => {
+    saveLoginRedirect("/concerts/123/seats");
+    expect(resolveLandingPath("ADMIN")).toBe("/admin");
+    expect(consumeLoginRedirect()).toBeNull();
+  });
+
+  it("MEMBER는 복귀 경로를 따른다", () => {
+    saveLoginRedirect("/concerts/123/seats");
+    expect(resolveLandingPath("MEMBER")).toBe("/concerts/123/seats");
+  });
+
+  it("role 미확정이면 회원도 복귀하지 않는다", () => {
+    saveLoginRedirect("/concerts/123/seats");
+    expect(resolveLandingPath("MEMBER", { allowRedirect: false })).toBe("/");
     expect(consumeLoginRedirect()).toBeNull();
   });
 });

@@ -137,7 +137,8 @@ export default function SignupPage() {
       }),
     onSuccess: () => {
       toast.success("회원가입이 완료되었습니다.");
-      navigate("/login");
+      // 예매 흐름에서 저장한 복귀 경로를 로그인 페이지가 지우지 않게 한다
+      navigate("/login", { state: { preserveRedirect: true } });
     },
     onError: (error: unknown) => {
       const apiError = ApiError.fromUnknown(error);
@@ -402,7 +403,11 @@ export default function SignupPage() {
         {/* 푸터 */}
         <p className="font-pretendard text-sm text-text-secondary text-center mt-6">
           이미 계정이 있으신가요?{" "}
-          <Link to="/login" className="text-primary font-semibold underline">
+          <Link
+            to="/login"
+            state={{ preserveRedirect: true }}
+            className="text-primary font-semibold underline"
+          >
             로그인
           </Link>
         </p>
