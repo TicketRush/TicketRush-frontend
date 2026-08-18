@@ -1,17 +1,19 @@
 // 좌석 API — 백엔드 seat-service swagger (2026-07-07) 스펙 반영
 //
 // 백엔드 endpoint 매핑:
-//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts  (이슈 #121)
-//   fetchSeats            → GET /api/v1/seat/{performanceId}/seat-layouts (이슈 #122)
-//   fetchSeatNumbers      → GET /api/v1/seat/numbers                      (이슈 #122)
+//   fetchSeatCounts / fetchSeatLayouts → 이슈 #122 실 API
+//   fetchSeatCounts       → GET /api/v1/seat/{performanceId}/seat-counts  (이슈 #121/#122)
+//   fetchSeats / fetchSeatLayouts → GET /api/v1/seat/{performanceId}/seat-layouts (이슈 #122)
+//   fetchSeatNumbers      → GET /api/v1/seat/numbers?seatIds=1&seatIds=2   (이슈 #122)
 //   subscribeSeatStream   → GET /api/v1/seat/{performanceId}/seat-status/stream (이슈 #123 SSE)
 //
 // ⚠️ 백엔드 응답이 snake_case (total_count 등) 이지만
 // instance.ts의 axios-case-converter가 camelCase로 자동 변환.
 //
-// ⚠️ SSE 이벤트 payload 스펙 미확정 (백엔드 swagger에 SseEmitter만 있음).
-// 현재 프론트는 { seatId, status, timestamp } 가정 스펙 사용.
-// 실제 스펙 확정 시 매핑 로직 조정 필요.
+// 변경 이력:
+// - 2026-07-15 (이슈 #121 fix):
+//   - parseSeatNumber → safeParseSeatNumber로 변경 (throw 대신 fallback 반환)
+//     seatNumber 형식이 예외적일 때 좌석 배치 전체가 깨지지 않도록 방어
 import type {
   SeatCounts,
   SeatStatus,
@@ -56,16 +58,18 @@ interface BackendSeatNumberResponse {
 /**
  * 백엔드 SeatLayoutResponse → 프론트 SeatWithStatus.
  * seatNumber "A-1"에서 row("A"), col(1) 파생.
+ *
+ * safeParseSeatNumber 사용: 파싱 실패 시 { row: "?", col: 0 } fallback.
+ * (전체 좌석맵이 깨지지 않도록 방어)
  */
 function mapSeatLayout(item: BackendSeatLayoutResponse): SeatWithStatus {
-  // 잘못된 형식의 seatNumber가 와도 좌석맵 전체가 깨지지 않도록 안전 파싱 사용
-  const { row, col } = safeParseSeatNumber(item.seatNumber);
+  const parsed = safeParseSeatNumber(item.seatNumber);
   return {
     id: item.seatId,
     seatLayoutId: item.seatLayoutId,
     seatNumber: item.seatNumber,
-    row,
-    col,
+    row: parsed.row,
+    col: parsed.col,
     status: item.seatStatus,
   };
 }
@@ -101,7 +105,7 @@ export async function fetchSeatCounts(
 // -------------------------------------------------------
 
 /**
- * 공연 좌석 배치 + 상태 조회.
+ * 공연 좌석 배치 + 상태 조회 (이슈 #122).
  * 백엔드: GET /api/v1/seat/{performanceId}/seat-layouts
  *
  * 응답: SeatLayoutResponse[]
@@ -123,9 +127,15 @@ export async function fetchSeats(
   return (res.data ?? []).map(mapSeatLayout);
 }
 
+/** 이슈 #122 네이밍 별칭 — fetchSeats와 동일 (좌석 배치 실 API) */
+export const fetchSeatLayouts = fetchSeats;
+
 /**
- * 좌석 ID 배열로 좌석 번호 조회.
+ * 좌석 ID 배열로 좌석 번호 조회 (이슈 #122).
  * 백엔드: GET /api/v1/seat/numbers?seatIds=1&seatIds=2
+ *
+ * Spring 반복 파라미터 형식 유지: seatIds=1&seatIds=2
+ * (axios 기본 직렬화의 seatIds[]= 형태 방지)
  *
  * 사용처: 예매 목록 페이지에서 seatId만 있는 예매 항목의 좌석 번호 조회 등.
  */
@@ -145,7 +155,11 @@ export async function fetchSeatNumbers(
 
   const res = await apiClient.get<BackendSeatNumberResponse[]>(
     "/api/v1/seat/numbers",
-    { params: { seatIds } },
+    {
+      params: { seatIds },
+      // indexes: null → seatIds=1&seatIds=2 (repeat)
+      paramsSerializer: { indexes: null },
+    },
   );
   return res.data ?? [];
 }
@@ -179,7 +193,6 @@ export function subscribeSeatStream(
 
   // ⚠️ EventSource는 브라우저 표준 API. 인증 헤더 미지원 (쿠키만 자동 포함).
   // 백엔드가 JWT 헤더 인증을 요구한다면 EventSourcePolyfill 등 라이브러리 필요.
-  // 이 부분은 백엔드 인증 방식 확정 후 조정.
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
   const url = `${baseUrl}/api/v1/seat/${performanceId}/seat-status/stream`;
 
@@ -188,7 +201,6 @@ export function subscribeSeatStream(
   eventSource.onmessage = (message) => {
     try {
       const parsed = JSON.parse(message.data);
-      // ⚠️ 백엔드 payload 스펙 확정 후 필드 매핑 조정
       onEvent({
         seatId: parsed.seatId,
         status: parsed.status ?? parsed.seatStatus,
@@ -201,10 +213,48 @@ export function subscribeSeatStream(
 
   eventSource.onerror = (error) => {
     console.error("[SSE] 연결 오류:", error);
-    // EventSource는 자동 재연결 시도. 로깅만 남기고 그대로 유지.
   };
 
   return () => {
     eventSource.close();
   };
+}
+
+// -------------------------------------------------------
+// Deprecated stubs — 백엔드 seat-service에 HOLD/RELEASE API 없음
+// (#121 CI: useHoldSeat/useReleaseSeat가 아직 import하므로 stub 유지)
+// 실 연동은 #124에서 createBooking / cancelBooking으로 대체.
+// -------------------------------------------------------
+
+/**
+ * @deprecated 백엔드에 좌석 HOLD API 없음. POST /api/v1/booking 사용 (#124).
+ * Mock에서만 캐시 갱신용으로 seatId를 반환한다.
+ */
+export async function holdSeat(
+  _performanceId: number,
+  seatId: number,
+): Promise<{ seatId: number }> {
+  if (USE_MOCK) {
+    await mockDelay(300);
+    return { seatId };
+  }
+  throw new Error(
+    "holdSeat is not supported by backend. Use POST /api/v1/booking (#124).",
+  );
+}
+
+/**
+ * @deprecated 백엔드에 좌석 RELEASE API 없음. DELETE /api/v1/booking/{bookingNumber} 사용 (#124).
+ */
+export async function releaseSeat(
+  _performanceId: number,
+  _seatId: number,
+): Promise<void> {
+  if (USE_MOCK) {
+    await mockDelay(200);
+    return;
+  }
+  throw new Error(
+    "releaseSeat is not supported by backend. Use DELETE /api/v1/booking/{bookingNumber} (#124).",
+  );
 }

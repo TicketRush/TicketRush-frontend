@@ -51,7 +51,8 @@ export type PaymentStatus =
   | "CONFIRMING"
   | "SUCCESS"
   | "FAILED"
-  | "EXPIRED";
+  | "EXPIRED"
+  | "CANCELLED";
 
 /** 환불 상태 — 백엔드 enum과 일치 */
 export type RefundStatus = "PENDING" | "COMPLETED" | "FAILED";

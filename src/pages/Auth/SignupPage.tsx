@@ -1,10 +1,16 @@
 // 회원가입 페이지
 //
-// 백엔드 스펙 반영 변경:
+// 백엔드 스펙 반영 변경 (2026-07-19):
 //   - signupApi 파라미터에 passwordConfirm 추가 (백엔드 스펙 요구)
-//   - 회원가입 흐름에 consumeEmailAuthApi 단계 추가:
-//     send → verify → consume(신규) → signup
-//     consume은 백엔드 임시 인증 상태를 소비하여 재사용 방지 목적
+//   - ⚠️ consumeEmailAuthApi 단계 제거: send → verify → signup 2단계로 확정.
+//     "consume" 엔드포인트는 실제로 존재하지 않음 (404 NoResourceFoundException 확인).
+//   - 이미 가입된 이메일: 인증번호 발송 단계에서 AUTH_EMAIL_ALREADY_EXISTS,
+//     회원가입 단계에서 USER_EMAIL_ALREADY_EXISTS로 각각 안내 문구 처리.
+//
+// 변경 이력 (이슈 #119):
+//   - 소셜 버튼에 LoginPage와 동일한 OAuth 시작 로직 연결
+//     * getOauthUrlApi(provider) → window.location.href 리다이렉트
+//     * 실패 시 toast, pendingProvider로 로딩·중복 클릭 방지
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -16,9 +22,11 @@ import { signupSchema, type SignupFormData } from "../../schemas/auth";
 import {
   sendEmailVerificationApi,
   verifyEmailCodeApi,
-  consumeEmailAuthApi,
   signupApi,
+  getOauthUrlApi,
 } from "@/api/auth";
+import { ApiError } from "@/api/errors/errorMapper";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
 import backbtnIcon from "@/assets/icons/arrow-back.svg";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
@@ -27,11 +35,9 @@ import emailIcon from "@/assets/icons/email.svg";
 import checkIcon from "@/assets/icons/check.svg";
 import lockIcon from "@/assets/icons/lock.svg";
 
-import { getOauthUrlApi } from "@/api/auth";
+type SocialProvider = "kakao" | "naver" | "google";
 
 export default function SignupPage() {
-  type SocialProvider = "kakao" | "naver" | "google";
-
   const navigate = useNavigate();
 
   // 이메일 인증 상태
@@ -41,6 +47,11 @@ export default function SignupPage() {
   // 비밀번호 토글
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+
+  // 소셜 로그인/가입 진행 중인 provider (중복 클릭 방지) — LoginPage와 동일
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
+    null,
+  );
 
   const {
     register,
@@ -78,8 +89,13 @@ export default function SignupPage() {
       setResendCountdown(180); // 3분 쿨다운
       toast.success("인증번호가 발송되었습니다. (mock: 123456)");
     },
-    onError: () => {
-      toast.error("인증번호 발송에 실패했습니다.");
+    onError: (error: unknown) => {
+      const apiError = ApiError.fromUnknown(error);
+      if (apiError.code === ERROR_CODES.AUTH_EMAIL_ALREADY_EXISTS) {
+        setError("email", { message: "이미 가입된 이메일입니다" });
+        return;
+      }
+      toast.error(apiError.message || "인증번호 발송에 실패했습니다.");
     },
   });
 
@@ -101,36 +117,27 @@ export default function SignupPage() {
   });
 
   // 회원가입 mutation
-  // 백엔드 스펙: consume → signup 순서 필수
-  //   consume은 백엔드가 임시로 저장한 "이메일 인증 완료" 상태를 소비.
-  //   consume 성공 후 signup 실패 시, 사용자는 인증부터 다시 시작해야 함.
+  // 이메일 인증(send → verify) 완료 후 바로 signupApi 호출.
+  // ⚠️ "consume" 단계는 존재하지 않음 (제거됨, 2026-07-18 백엔드 확인).
   const signupMutation = useMutation({
-    mutationFn: async (data: SignupFormData) => {
-      // 1. 이메일 인증 상태 소비 (백엔드 스펙 요구)
-      await consumeEmailAuthApi(data.email);
-      // 2. 회원가입 (passwordConfirm 포함)
-      return signupApi({
+    mutationFn: (data: SignupFormData) =>
+      signupApi({
         name: data.name,
         email: data.email,
         password: data.password,
         passwordConfirm: data.passwordConfirm,
-      });
-    },
+      }),
     onSuccess: () => {
       toast.success("회원가입이 완료되었습니다.");
       navigate("/login");
     },
     onError: (error: unknown) => {
-      const maybeResp = (error as { response?: { status?: number } } | null)
-        ?.response;
-      if (maybeResp?.status === 409) {
-        setError("email", { message: "이미 사용 중인 이메일입니다" });
+      const apiError = ApiError.fromUnknown(error);
+      // 실 백엔드는 409가 아니라 400 + USER_EMAIL_ALREADY_EXISTS로 응답
+      if (apiError.code === ERROR_CODES.USER_EMAIL_ALREADY_EXISTS) {
+        setError("email", { message: "이미 가입된 이메일입니다" });
       } else {
-        const err =
-          error instanceof Error
-            ? error
-            : new Error("회원가입에 실패했습니다.");
-        toast.error(err.message);
+        toast.error(apiError.message || "회원가입에 실패했습니다.");
       }
     },
   });
@@ -152,16 +159,14 @@ export default function SignupPage() {
     signupMutation.mutate(data);
   };
 
-  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
-    null,
-  );
-
+  /** LoginPage와 동일 — 소셜은 가입/로그인 구분 없이 OAuth URL로 시작 */
   async function handleSocialLogin(provider: SocialProvider) {
     if (pendingProvider) return;
 
     setPendingProvider(provider);
     try {
       const { url } = await getOauthUrlApi(provider);
+      // 이후: BE 콜백 → /oauth/callback/:provider?code=... → social/login
       window.location.href = url;
     } catch (error) {
       const message =
@@ -310,7 +315,7 @@ export default function SignupPage() {
           <PasswordInput
             label="비밀번호"
             icon={lockIcon}
-            placeholder="비밀번호를 입력해주세요 (8자 이상)"
+            placeholder="영소문자, 숫자, 특수문자 포함 12자 이상"
             show={showPassword}
             onToggle={() => setShowPassword((p) => !p)}
             error={errors.password?.message}
@@ -349,12 +354,13 @@ export default function SignupPage() {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* OAuth */}
+        {/* OAuth — LoginPage와 동일 핸들러 (이슈 #119) */}
         <div className="flex gap-3">
           <Button
             variant="kakao"
             size="oauth"
             className="flex-1"
+            type="button"
             loading={pendingProvider === "kakao"}
             disabled={pendingProvider !== null}
             onClick={() => handleSocialLogin("kakao")}
@@ -365,6 +371,7 @@ export default function SignupPage() {
             variant="naver"
             size="oauth"
             className="flex-1"
+            type="button"
             loading={pendingProvider === "naver"}
             disabled={pendingProvider !== null}
             onClick={() => handleSocialLogin("naver")}
@@ -375,6 +382,7 @@ export default function SignupPage() {
             variant="google"
             size="oauth"
             className="flex-1"
+            type="button"
             loading={pendingProvider === "google"}
             disabled={pendingProvider !== null}
             onClick={() => handleSocialLogin("google")}

@@ -1,16 +1,14 @@
 // Mock 인증
 //
-// 백엔드 auth-service, user-service swagger (2026-07-02) 스펙 반영.
+// 백엔드 auth-service, user-service 스펙 반영 (2026-07-19 백엔드 코드 직접 확인)
 //
-// 주요 변경 (신규 추가):
-//   - mockEmailAuthSend (회원가입 이메일 인증 코드 발송)
-//   - mockEmailAuthVerify (인증 코드 확인)
-//   - mockEmailAuthConsume (인증 상태 소비)
-//   - mockSignup (회원가입)
-//   - mockCheckEmail (이메일 중복 확인)
-//   - mockDevAuthToken (Dev Auth 토큰 발급)
-//   - mockGetMe (내 정보 조회)
-//   - mockGetOauthUrl (OAuth URL 조회 - 기존 mockOauthUrl 리팩터링)
+// 주요 변경:
+//   - mockSocialLogin: email/role/joinedAt 제거 (실 응답에 없음)
+//   - mockEmailLogin: role MEMBER|ADMIN (/me·로그인 응답 동일)
+//   - mockEmailAuthConsume 제거 (해당 엔드포인트 존재하지 않음)
+//   - mockCheckEmail: isDuplicated → exists
+//   - mockGetMe: name/email/createdAt/role 반환 (#137)
+//   - mockDevAuthToken: LoginResponse와 동일 구조로 정정
 
 import { mockDelay, mockError } from "./_helpers";
 import type {
@@ -22,7 +20,6 @@ import type {
   TokenReissueResponse,
   EmailAuthSendRequest,
   EmailAuthVerifyRequest,
-  EmailAuthConsumeRequest,
   SignupRequest,
   SignupResponse,
   EmailCheckResponse,
@@ -35,18 +32,24 @@ import type {
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** mockGetMe가 로그인 세션 role을 반영하도록 보관 (DB/me = MEMBER|ADMIN) */
+let mockSessionRole: UserRole = "MEMBER";
+let mockSessionEmail = "user@example.com";
+let mockSessionName = "김철수";
+
 // ── 소셜 로그인 ───────────────────────────────────────
 export async function mockSocialLogin(
   req: SocialOauthLoginRequest,
 ): Promise<OauthLoginResponse> {
   await mockDelay(500);
 
+  mockSessionRole = "MEMBER";
+  mockSessionName = `${req.provider}_TestUser`;
+  mockSessionEmail = `${req.provider.toLowerCase()}_user@example.com`;
+
   return {
     userId: 1,
-    name: `${req.provider}_TestUser`,
-    email: `${req.provider.toLowerCase()}_user@example.com`,
-    role: "MEMBER",
-    joinedAt: "2025-01-15T00:00:00",
+    name: mockSessionName,
     isNewUser: false,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
@@ -69,20 +72,17 @@ export async function mockEmailLogin(
     );
   }
 
-  // 관리자 테스트용
-  const role: UserRole =
-    req.email === "admin@ticketrush.com" ? "ADMIN" : "MEMBER";
+  const isAdmin = req.email === "admin@ticketrush.com";
+  mockSessionRole = isAdmin ? "ADMIN" : "MEMBER";
+  mockSessionEmail = req.email;
+  mockSessionName = isAdmin ? "관리자" : "김철수";
 
   return {
     userId: 1,
-    name: req.email.split("@")[0],
     email: req.email,
-    role,
-    joinedAt: "2025-01-15T00:00:00",
+    role: mockSessionRole,
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
-    accessTokenExpiresIn: ONE_HOUR_MS,
-    refreshTokenExpiresIn: ONE_WEEK_MS,
   };
 }
 
@@ -92,7 +92,7 @@ export async function mockGetOauthUrl(
 ): Promise<OauthUrlResponse> {
   await mockDelay(200);
   return {
-    url: `https://mock-oauth.example.com/${provider}?client_id=mock&redirect_uri=http://localhost:5173/auth/callback/${provider}`,
+    url: `https://mock-oauth.example.com/${provider}?client_id=mock&redirect_uri=http://localhost:5173/oauth/callback/${provider}`,
   };
 }
 
@@ -112,13 +112,16 @@ export async function mockReissue(): Promise<TokenReissueResponse> {
   };
 }
 
-// ── 회원가입 이메일 인증 3단계 (신규) ──────────────────
+// ── 회원가입 이메일 인증 2단계 ──────────────────────
 /** 1단계 — 인증 코드 발송 */
 export async function mockEmailAuthSend(
-  _req: EmailAuthSendRequest,
+  req: EmailAuthSendRequest,
 ): Promise<{ sent: boolean }> {
   await mockDelay(500);
-  // mock에선 무조건 성공. 실제로는 SMTP로 이메일 발송.
+  // 이미 가입된 이메일 테스트용 (실 백엔드: AUTH_EMAIL_ALREADY_EXISTS)
+  if (req.email === "exists@test.com") {
+    await mockError("AUTH_400_007", "이미 가입된 이메일입니다.");
+  }
   return { sent: true };
 }
 
@@ -129,31 +132,23 @@ export async function mockEmailAuthVerify(
   await mockDelay(400);
   // mock: 인증 코드가 "123456"이면 성공, 아니면 실패
   if (req.authNumber !== "123456") {
-    await mockError("AUTH_CODE_INVALID", "인증 코드가 일치하지 않습니다.");
+    await mockError("AUTH_400_010", "인증번호가 일치하지 않습니다.");
   }
   return { verified: true };
 }
 
-/** 3단계 — 인증 상태 소비 (회원가입 직전) */
-export async function mockEmailAuthConsume(
-  _req: EmailAuthConsumeRequest,
-): Promise<void> {
-  await mockDelay(200);
-  // mock에선 noop
-}
-
-// ── 회원가입 (신규) ───────────────────────────────────
+// ── 회원가입 ───────────────────────────────────────────
 export async function mockSignup(req: SignupRequest): Promise<SignupResponse> {
   await mockDelay(700);
 
-  // 이메일 중복 체크
+  // 이메일 중복 체크 (실 백엔드: USER_EMAIL_ALREADY_EXISTS)
   if (req.email === "exists@test.com") {
-    await mockError("USER_EMAIL_DUPLICATED", "이미 사용 중인 이메일입니다.");
+    await mockError("USER_400_008", "이미 가입된 이메일입니다.");
   }
 
   // 비밀번호 확인 매칭
   if (req.password !== req.passwordConfirm) {
-    await mockError("USER_PASSWORD_MISMATCH", "비밀번호가 일치하지 않습니다.");
+    await mockError("USER_400_006", "비밀번호와 비밀번호 확인이 일치하지 않습니다.");
   }
 
   return {
@@ -163,37 +158,37 @@ export async function mockSignup(req: SignupRequest): Promise<SignupResponse> {
   };
 }
 
-// ── 이메일 중복 확인 (신규) ───────────────────────────
+// ── 이메일 중복 확인 ──────────────────────────────────
 export async function mockCheckEmail(
   email: string,
 ): Promise<EmailCheckResponse> {
   await mockDelay(300);
   return {
-    isDuplicated: email === "exists@test.com",
+    exists: email === "exists@test.com",
   };
 }
 
-// ── Dev Auth 토큰 발급 (신규 — 개발 편의용) ───────────
+// ── Dev Auth 토큰 발급 (개발 편의용) ───────────────────
 export async function mockDevAuthToken(
-  _req: DevAuthTokenRequest,
+  req: DevAuthTokenRequest,
 ): Promise<DevAuthTokenResponse> {
   await mockDelay(300);
   return {
+    userId: req.userId,
+    email: `dev-user-${req.userId}@example.com`,
+    role: "MEMBER",
     accessToken: `mock-access-${Date.now()}`,
     refreshToken: `mock-refresh-${Date.now()}`,
-    accessTokenExpiresIn: ONE_HOUR_MS,
-    refreshTokenExpiresIn: ONE_WEEK_MS,
   };
 }
 
-// ── 내 정보 조회 (신규) ───────────────────────────────
+// ── 내 정보 조회 ──────────────────────────────────────
 export async function mockGetMe(): Promise<MeResponse> {
   await mockDelay(300);
   return {
-    userId: 1,
-    email: "user@example.com",
-    name: "김철수",
-    joinedAt: "2025-01-15T00:00:00",
-    role: "MEMBER", // ⚠️ 백엔드 실제 응답엔 없음. 추가 요청 필요
+    email: mockSessionEmail,
+    name: mockSessionName,
+    createdAt: "2025-01-15T00:00:00",
+    role: mockSessionRole,
   };
 }

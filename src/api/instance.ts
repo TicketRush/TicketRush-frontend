@@ -24,6 +24,11 @@
 //   - refresh 실패 시 원인 로깅 (console.error)
 //   - window.location.href → replace: 히스토리 정리
 //   - PUBLIC_ENDPOINTS에 as const, API_BASE_URL 상수화, 구조 분해 적용
+// - 2026-07-21 (백엔드 소스 직접 확인):
+//   - applyCaseMiddleware에 ignoreParams: true 추가.
+//     GET 쿼리 파라미터는 Jackson 네이밍 전략과 무관하게 컨트롤러의 Java 필드명
+//     그대로(camelCase) 바인딩되므로, snake_case 자동 변환이 minPrice/maxPrice/
+//     cursorId/seatIds 같은 다단어 파라미터를 조용히 깨뜨리고 있었음.
 // -------------------------------------------------------
 
 import axios, { type AxiosResponse, type AxiosError } from "axios";
@@ -116,8 +121,20 @@ const rawClient = axios.create({
 // applyCaseMiddleware 옵션:
 //   ignoreHeaders: true — request 헤더 case 변환 방지
 //   (Authorization, X-Internal-Token 등 커스텀 헤더 이름 유지)
+//   ignoreParams: true — 2026-07-21, 백엔드 소스 직접 확인 후 추가.
+//     axios-case-converter는 기본적으로 GET 쿼리 파라미터(config.params)도
+//     camelCase → snake_case로 변환한다. 하지만 백엔드 컨트롤러의
+//     @RequestParam / @ModelAttribute 바인딩은 Jackson 네이밍 전략(snake_case
+//     직렬화, 응답 body에만 적용)과 무관하게 Java 필드명을 그대로(camelCase) 사용해
+//     매칭한다. 예:
+//       - PerformanceController: minPrice, maxPrice, CursorPageRequest.cursorId
+//       - SeatController#getSeatNumbers: @RequestParam List<Long> seatIds
+//     변환이 켜져 있으면 seatIds → seat_ids로 나가 버려 필수 파라미터가 아예
+//     안 잡히고(400), minPrice/maxPrice/cursorId도 조용히 무시된다.
+//     → 쿼리 파라미터는 변환하지 않고, 응답 바디(camel)와 요청 바디(snake)만 변환한다.
 const apiClient = applyCaseMiddleware(rawClient, {
   ignoreHeaders: true,
+  ignoreParams: true,
 });
 
 // -------------------------------------------------------
@@ -129,7 +146,12 @@ let refreshingPromise: Promise<string | null> | null = null;
  * 실제 refresh API 호출.
  * 성공 시 새 access token 반환, 실패 시 null 반환.
  *
- * raw axios 사용 (interceptor 미적용) — 무한 루프 방지 + case 변환 없이 snake_case 그대로.
+ * raw axios 사용 (interceptor 미적용) — 무한 루프 방지.
+ *
+ * ⚠️ 2026-07-18 실제 백엔드 스펙 확인(swagger-ui) 결과, 요청/응답 필드 모두
+ *   camelCase임이 확인됨 (TokenReissueRequest.refreshToken,
+ *   TokenReissueResponse.accessToken/refreshToken). 이전에는 snake_case로
+ *   잘못 가정되어 있어 refresh가 항상 실패(→ 강제 로그아웃)하는 버그였음.
  */
 async function performTokenRefresh(): Promise<string | null> {
   const currentRefreshToken = useAuthStore.getState().refreshToken;
@@ -138,22 +160,19 @@ async function performTokenRefresh(): Promise<string | null> {
   try {
     const res = await axios.post(
       `${API_BASE_URL}/api/v1/auth/reissue`,
-      { refresh_token: currentRefreshToken },
+      { refreshToken: currentRefreshToken },
       { headers: { "Content-Type": "application/json" } },
     );
 
-    // 백엔드 응답 예상: { is_success, code, result: { access_token, refresh_token } }
+    // 백엔드 응답: { isSuccess, code, result: { accessToken, refreshToken, ... } }
     const result = res.data?.result;
-    if (!result?.access_token) return null;
+    if (!result?.accessToken) return null;
 
     useAuthStore
       .getState()
-      .setTokens(
-        result.access_token,
-        result.refresh_token ?? currentRefreshToken,
-      );
+      .setTokens(result.accessToken, result.refreshToken ?? currentRefreshToken);
 
-    return result.access_token;
+    return result.accessToken;
   } catch (error) {
     // refresh 실패 원인 파악용 로깅
     // (프로덕션에서는 Sentry 등 모니터링 도구 연동 검토)
