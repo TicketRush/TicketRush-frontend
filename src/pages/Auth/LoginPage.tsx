@@ -80,7 +80,7 @@ export default function LoginPage() {
   return (
     <div className="relative flex justify-center min-h-screen px-6 pt-20 pb-10 bg-[#f8f9fa]">
       <div className="absolute top-6 left-6">
-        <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
+        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
           ← 뒤로가기
         </Button>
       </div>
