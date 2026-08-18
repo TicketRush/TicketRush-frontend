@@ -57,26 +57,50 @@ export default {
           fanmeeting: "#E679FF",
           ballet: "#C6B5FF",
         },
-        // 관리자 다크 테마
-        "admin-bg": "#000000",
-        "admin-card": "#151B2C",
-        "admin-border": "#252B3D",
-        "admin-text": "#E4E6EB",
-        "admin-text-secondary": "#9CA3AF",
-
-        // 좌석 상태 (사진의 색상 가이드 기준)
-        "seat-available": "#B9F8CF",
-        "seat-available-hover": "#71ECA3",
-        "seat-sold": "#99A1AF",
-        "seat-holding": "#FFF085",
-        "seat-blink": "#898355",
-
-        // 관리자 액션 색상
-        "admin-refund": "#942D12",
-        "admin-resend": "#414B59",
-        "admin-cancel": "#931818",
-        "admin-status-complete": "#00C950",
-        "admin-status-cancelled": "#FB2C36",
+        // 관리자 영역 (#107)
+        //
+        // 페이지 배경과 KPI·네비게이션 카드는 다크, 기간 설정·차트·공연 목록만
+        // 라이트 카드다. 두 계열이 한 화면에 공존하므로 card 아래에
+        // 다크(DEFAULT)와 라이트(bg/border)를 함께 둔다.
+        admin: {
+          bg: "#000000",
+          border: "#252B3D",
+          text: {
+            DEFAULT: "#E4E6EB",
+            secondary: "#9CA3AF",
+          },
+          card: {
+            DEFAULT: "#151B2C",
+            bg: "#FFFFFF",
+            border: "#D0D0D0",
+          },
+          dark: {
+            bg: "#1E2939",
+            border: "#4A5565",
+          },
+          accent: "#51A2FF",
+          kpi: {
+            events: "#51A2FF",
+            tickets: "#05DF72",
+            revenue: "#FF8904",
+            occupancy: "#C27AFF",
+          },
+          register: "#155DFC",
+          refund: "#942D12",
+          resend: "#414B59",
+          cancel: "#931818",
+          status: {
+            complete: "#00C950",
+            cancelled: "#FB2C36",
+          },
+          seat: {
+            available: "#B9F8CF",
+            "available-hover": "#71ECA3",
+            sold: "#99A1AF",
+            holding: "#FFF085",
+            "holding-blink": "#898355",
+          },
+        },
       },
       fontFamily: {
         pretendard: [
@@ -94,10 +118,12 @@ export default {
         button: "0 2px 8px rgba(108, 92, 231, 0.3)",
       },
       animation: {
-        "seat-blink": "seatBlink 1.2s ease-in-out infinite",
+        "admin-seat-blink": "adminSeatBlink 1.2s ease-in-out infinite",
       },
       keyframes: {
-        seatBlink: {
+        // keyframes에서는 토큰을 참조할 수 없어 값을 직접 적는다.
+        // admin.seat.holding / admin.seat.holding-blink 와 같은 값이어야 한다.
+        adminSeatBlink: {
           "0%, 100%": { backgroundColor: "#FFF085" },
           "50%": { backgroundColor: "#898355" },
         },

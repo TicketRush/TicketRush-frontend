@@ -93,16 +93,14 @@ const AdminSeatItem = memo(
       "flex-1 aspect-square min-w-0 rounded flex items-center justify-center font-bold transition-all cursor-pointer";
 
     let stateClass = "";
-    let bgStyle: React.CSSProperties = {};
 
     if (seat.status === "AVAILABLE") {
-      stateClass = "text-gray-800 hover:opacity-90";
-      bgStyle = { backgroundColor: "#B9F8CF" };
+      stateClass =
+        "bg-admin-seat-available hover:bg-admin-seat-available-hover text-gray-800";
     } else if (seat.status === "SOLD") {
-      stateClass = "text-gray-700";
-      bgStyle = { backgroundColor: "#99A1AF" };
+      stateClass = "bg-admin-seat-sold text-gray-700";
     } else if (seat.status === "HOLD") {
-      stateClass = "animate-seat-blink text-gray-800";
+      stateClass = "animate-admin-seat-blink text-gray-800";
     }
 
     return (
@@ -111,7 +109,6 @@ const AdminSeatItem = memo(
         onClick={() => onClick(seat)}
         className={`${baseClass} ${stateClass}`}
         style={{
-          ...bgStyle,
           minWidth: `${size}px`,
           minHeight: `${size}px`,
           maxWidth: `${size}px`,
@@ -119,18 +116,6 @@ const AdminSeatItem = memo(
           fontSize: `${fontSize}px`,
           outline: isSelected ? "2px solid white" : undefined,
           outlineOffset: isSelected ? "2px" : undefined,
-        }}
-        onMouseEnter={(e) => {
-          if (seat.status === "AVAILABLE") {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              "#71ECA3";
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (seat.status === "AVAILABLE") {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              "#B9F8CF";
-          }
         }}
         aria-label={`좌석 ${seat.seatNumber} ${seat.status}`}
       >
