@@ -99,7 +99,7 @@ export default function AdminBookingsPage() {
         />
         <StatCard
           icon={<UserMinus size={24} />}
-          badge="CANCELLED"
+          badge="CANCELED"
           badgeColor="red"
           value={stats?.cancelledBookings ?? 0}
           label="취소된 예매"
@@ -108,7 +108,7 @@ export default function AdminBookingsPage() {
 
       {/* 필터 탭 */}
       <div className="bg-admin-card border border-admin-border rounded-xl p-2 flex gap-1 inline-flex">
-        {(["ALL", "CONFIRMED", "PENDING", "CANCELLED"] as Tab[]).map((t) => (
+        {(["ALL", "CONFIRMED", "PENDING", "CANCELED"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
@@ -201,7 +201,7 @@ function labelFor(t: Tab) {
       return "완료";
     case "PENDING":
       return "대기";
-    case "CANCELLED":
+    case "CANCELED":
       return "취소";
     default:
       return t;

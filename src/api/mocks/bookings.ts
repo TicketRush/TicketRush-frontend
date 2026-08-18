@@ -1,15 +1,13 @@
 // Mock 예매 — 메모리 저장소
 //
-// 백엔드 booking-service swagger (2026-06-30) 스펙 반영.
+// 백엔드 booking-service swagger (2026-07-07) 스펙 반영.
 //
-// 주요 변경:
-//   - BookingCreateRequest → BookingPendingRequest (userId 매개변수 제거, 백엔드가 토큰에서 추출)
-//   - BookingDetail 필드명 정렬:
-//     - performanceArtist → performancePerformer
-//     - performancePosterUrl → performanceImageMainUrl
-//     - seatLabel → seatNumber
-//   - MOCK_CONCERTS 참조 필드 변경 (concert.artist → performer 등)
-//   - _findMockBookingById 신규 추가 (mock_payments에서 사용)
+// 변경 이력:
+// - 2026-06-30: BookingCreateRequest → BookingPendingRequest,
+//   performanceArtist → performancePerformer, seatLabel → seatNumber
+// - 2026-07-15 (이슈 #124):
+//   - BookingStatus 값 정정: "CANCELLED" → "CANCELED" (백엔드 스펠링)
+//   - venue → venue ?? address fallback (concert.venue optional 대응)
 
 import { mockDelay, mockError } from "./_helpers";
 import type {
@@ -66,7 +64,8 @@ const bookingStore: BookingDetail[] = [
   {
     bookingId: 3,
     bookingNumber: "Q8M14-RTYN3",
-    status: "CANCELLED",
+    // ⚠️ 스펠링 정정: CANCELLED → CANCELED (백엔드 스펙 일치)
+    status: "CANCELED",
     performanceId: 3,
     performanceTitle: "Classical Evening: Beethoven Symphony",
     performancePerformer: "서울시향",
@@ -80,6 +79,24 @@ const bookingStore: BookingDetail[] = [
     paidAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     cancelledAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    bookingId: 4,
+    bookingNumber: "P9D22-HOLD1",
+    status: "PENDING",
+    performanceId: 1,
+    performanceTitle: "BTS World Tour: Beyond the Stars",
+    performancePerformer: "BTS",
+    performanceVenue: "잠실 올림픽 주경기장",
+    performanceDate: "2026-07-20",
+    performanceTime: "18:00",
+    performanceImageMainUrl: POSTER,
+    seatId: 12,
+    seatNumber: "A-12",
+    price: 132000,
+    paidAt: null,
+    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    cancelledAt: null,
   },
 ];
 
@@ -123,7 +140,6 @@ export async function mockCreateBooking(
     performanceImageMainUrl: concert!.imageMainUrl,
     seatId: req.seatId,
     seatNumber,
-    // 좌석 단위 가격 없음 → 공연 단위 가격 사용 (백엔드 스펙)
     price: concert!.price,
     paidAt: null,
     createdAt: new Date().toISOString(),
@@ -155,8 +171,13 @@ export async function mockGetMyBookings(
 ): Promise<MyBookingsResponse> {
   await mockDelay(400);
 
-  const size = params.size ?? 100;
-  const sliced = bookingStore.slice(0, size);
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const filtered = params.status
+    ? bookingStore.filter((b) => b.status === params.status)
+    : bookingStore;
+  const start = page * size;
+  const sliced = filtered.slice(start, start + size);
 
   const items: BookingListItem[] = sliced.map((b) => ({
     bookingId: b.bookingId,
@@ -174,7 +195,7 @@ export async function mockGetMyBookings(
 
   return {
     items,
-    hasNext: bookingStore.length > size,
+    hasNext: start + size < filtered.length,
   };
 }
 
@@ -190,10 +211,11 @@ export async function mockCancelBooking(bookingNumber: string): Promise<void> {
   if (!booking) {
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
-  if (booking!.status === "CANCELLED") {
-    await mockError("BOOKING_ALREADY_CANCELLED", "이미 취소된 예매입니다.");
+  // ⚠️ 스펠링 정정: CANCELLED → CANCELED
+  if (booking!.status === "CANCELED") {
+    await mockError("BOOKING_ALREADY_CANCELED", "이미 취소된 예매입니다.");
   }
-  booking!.status = "CANCELLED";
+  booking!.status = "CANCELED";
   booking!.cancelledAt = new Date().toISOString();
 }
 
@@ -217,11 +239,7 @@ export function _findMockBooking(
   return bookingStore.find((b) => b.bookingNumber === bookingNumber);
 }
 
-/**
- * bookingId(숫자)로 booking 조회 (mock 내부용).
- *
- * 백엔드 PaymentConfirmRequest는 bookingId(long)를 씀 → mock_payments에서 사용.
- */
+/** bookingId(숫자)로 booking 조회 (mock 내부용) */
 export function _findMockBookingById(
   bookingId: number,
 ): BookingDetail | undefined {

@@ -10,7 +10,7 @@ export default function AdminRefundsPage() {
   const { data, isLoading } = useAdminBookings({
     page,
     size: 10,
-    status: "CANCELLED",
+    status: "CANCELED",
   });
   const { data: stats } = useAdminBookingStats();
 

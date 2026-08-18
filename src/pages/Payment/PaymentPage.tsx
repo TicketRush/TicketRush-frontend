@@ -10,6 +10,10 @@
 //   - selectedSeat 제거 → currentConcert 사용
 //   - paymentStore.setMethod에는 "SIMPLE_PAY" 저장 (3개 다 간편결제 카테고리)
 //     * 실 SDK 연동 시 paymentStore에 provider 필드 추가 예정
+//
+// 이슈 #124/#125:
+//   - 타이머 만료/이탈 시 cancelBooking으로 PENDING 해제
+//   - 결제 완료 이동은 store bookingNumber 사용 (하드코딩 제거)
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -24,6 +28,8 @@ import useSeatStore from "@/stores/reservation/seatStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import TimeoutModal from "@/components/payment/TimeoutModal";
 import PaymentFailedModal from "@/components/payment/FailedModal";
+import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
+import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import type { PaymentProvider } from "@/types/domain/payment";
 
 // 결제 제공자 3종 (카카오페이/네이버페이/토스페이는 모두 간편결제)
@@ -60,6 +66,7 @@ const PAYMENT_PROVIDERS: Array<{
 export default function PaymentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const performanceId = id ? Number(id) : 0;
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const currentConcert = useConcertStore((s) => s.currentConcert);
@@ -67,6 +74,7 @@ export default function PaymentPage() {
   const timerStatus = useTimerStore((s) => s.status);
 
   const paymentStatus = usePaymentStore((s) => s.status);
+  const bookingNumber = usePaymentStore((s) => s.bookingNumber);
   const setMethod = usePaymentStore((s) => s.setMethod);
   const expire = usePaymentStore((s) => s.expire);
   const fail = usePaymentStore((s) => s.fail);
@@ -75,13 +83,32 @@ export default function PaymentPage() {
   const startConfirming = usePaymentStore((s) => s.startConfirming);
   const reset = usePaymentStore((s) => s.reset);
 
+  const releaseSeatMutation = useReleaseSeat(performanceId);
+  const { handleCancelReservation } = useReservationLifecycle();
+
   const [selectedProvider, setSelectedProvider] =
     useState<PaymentProvider | null>(null);
   const [agreed, setAgreed] = useState(false);
 
-  // 타이머 만료 → paymentStore.expire (모달 띄움)
+  function releaseSeat() {
+    const bn = usePaymentStore.getState().bookingNumber;
+    if (!bn) return Promise.resolve();
+    return releaseSeatMutation.mutateAsync({
+      bookingNumber: bn,
+      seatId: selectedSeat?.id,
+    });
+  }
+
+  // 타이머 만료 → 서버 PENDING 취소 후 모달
   useTimerExpiry(() => {
-    expire();
+    void (async () => {
+      try {
+        await releaseSeat();
+      } catch {
+        /* 이미 만료됐을 수 있음 */
+      }
+      expire();
+    })();
   });
 
   useEffect(() => {
@@ -101,6 +128,11 @@ export default function PaymentPage() {
 
   async function handlePayment() {
     if (!selectedProvider || !agreed) return;
+    const bn = usePaymentStore.getState().bookingNumber;
+    if (!bn) {
+      fail("예매 정보가 없습니다. 좌석을 다시 선택해 주세요.");
+      return;
+    }
 
     try {
       startRequest("mock-payment-key");
@@ -118,9 +150,7 @@ export default function PaymentPage() {
       await new Promise((r) => setTimeout(r, 500));
       succeed();
 
-      // mock 예매 번호 — 실제로는 백엔드 응답
-      const bookingNumber = "X7B29-KLPW1";
-      navigate(`/reservations/${bookingNumber}`);
+      navigate(`/reservations/${bn}`);
     } catch (error: unknown) {
       const err =
         error instanceof Error ? error : new Error("결제에 실패했습니다.");
@@ -129,13 +159,23 @@ export default function PaymentPage() {
   }
 
   function handleCloseTimeoutModal() {
+    // 만료 시점에 이미 서버 취소 완료 → 클라 정리만
     reset();
     navigate(`/concerts/${id}/seats`);
   }
 
   function handleClosePaymentFailedModal() {
-    reset();
-    navigate(`/concerts/${id}/seats`);
+    // 결제 실패 후 좌석 페이지로 이탈 → PENDING 해제
+    handleCancelReservation({
+      onReleaseSeat: releaseSeat,
+      onNavigate: () => navigate(`/concerts/${id}/seats`),
+      message: "결제를 취소하고 좌석을 해제했습니다.",
+    });
+  }
+
+  function handleBack() {
+    // Confirm으로 복귀 — PENDING/HOLD는 유지 (이탈·만료 시에만 취소)
+    navigate(`/concerts/${id}/payment/confirm`);
   }
 
   // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
@@ -145,6 +185,7 @@ export default function PaymentPage() {
   const canPay =
     !!selectedProvider &&
     agreed &&
+    !!bookingNumber &&
     timerStatus === "running" &&
     paymentStatus !== "REQUESTING" &&
     paymentStatus !== "CONFIRMING";
@@ -155,8 +196,9 @@ export default function PaymentPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50"
+          onClick={handleBack}
+          disabled={releaseSeatMutation.isPending}
+          className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-60"
         >
           <ArrowLeft size={14} />
           뒤로가기
@@ -287,8 +329,9 @@ export default function PaymentPage() {
 
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="w-full py-2.5 rounded-lg bg-gray-100 text-text-secondary text-sm hover:bg-gray-200"
+              onClick={handleBack}
+              disabled={releaseSeatMutation.isPending}
+              className="w-full py-2.5 rounded-lg bg-gray-100 text-text-secondary text-sm hover:bg-gray-200 disabled:opacity-60"
             >
               ← 이전으로
             </button>
