@@ -83,6 +83,24 @@ const bookingStore: BookingDetail[] = [
     createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     cancelledAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
   },
+  {
+    bookingId: 4,
+    bookingNumber: "P9D22-HOLD1",
+    status: "PENDING",
+    performanceId: 1,
+    performanceTitle: "BTS World Tour: Beyond the Stars",
+    performancePerformer: "BTS",
+    performanceVenue: "잠실 올림픽 주경기장",
+    performanceDate: "2026-07-20",
+    performanceTime: "18:00",
+    performanceImageMainUrl: POSTER,
+    seatId: 12,
+    seatNumber: "A-12",
+    price: 132000,
+    paidAt: null,
+    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    cancelledAt: null,
+  },
 ];
 
 function genBookingNumber(): string {
@@ -118,7 +136,7 @@ export async function mockCreateBooking(
     performanceId: req.performanceId,
     performanceTitle: concert!.title,
     performancePerformer: concert!.performer,
-    // ⚠️ venue optional 대응
+    // venue는 optional (백엔드에 없음) → address fallback
     performanceVenue: concert!.venue ?? concert!.address,
     performanceDate: concert!.showDate,
     performanceTime: concert!.showTime,
@@ -156,8 +174,13 @@ export async function mockGetMyBookings(
 ): Promise<MyBookingsResponse> {
   await mockDelay(400);
 
-  const size = params.size ?? 100;
-  const sliced = bookingStore.slice(0, size);
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const filtered = params.status
+    ? bookingStore.filter((b) => b.status === params.status)
+    : bookingStore;
+  const start = page * size;
+  const sliced = filtered.slice(start, start + size);
 
   const items: BookingListItem[] = sliced.map((b) => ({
     bookingId: b.bookingId,
@@ -175,7 +198,7 @@ export async function mockGetMyBookings(
 
   return {
     items,
-    hasNext: bookingStore.length > size,
+    hasNext: start + size < filtered.length,
   };
 }
 

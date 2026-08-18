@@ -17,7 +17,10 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-border">
       <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/">
+        <Link
+          to="/"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
           <img src={logo} alt="TicketRush" className="h-8 w-auto" />
         </Link>
 

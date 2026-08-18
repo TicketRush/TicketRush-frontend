@@ -16,8 +16,13 @@
 //   mockReleaseSeat   → PATCH /api/v1/booking/{bookingId}/cancel
 //   mockConfirmSold   → 백엔드 내부 자동 처리 (POST /payment/confirm 성공 시)
 //   mockSubscribeSeats → GET /api/v1/seat/{performanceId}/seat-status/stream (SSE)
+//
+// - 2026-08-06 (이슈 #177):
+//   - availableCount를 MOCK_CONCERTS.remainingSeats에 맞춰 시드
+//     (ON_SALE 매진 = remainingSeats 0 → availableCount 0 고정)
 
 import { mockDelay, mockError, shouldThrow } from "./_helpers";
+import { MOCK_CONCERTS } from "./concerts";
 import type {
   SeatWithStatus,
   SeatCounts,
@@ -28,6 +33,7 @@ import type {
 const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 const COLS = 12;
 const HOLD_DURATION_MS = 5 * 60 * 1000;
+const TOTAL_SEATS = ROWS.length * COLS;
 
 /**
  * mockHoldSeat 반환 타입 (백엔드에 실제 API 없음, mock 편의용).
@@ -46,17 +52,24 @@ const seatStateByPerformance: Map<number, Map<number, SeatStatus>> = new Map();
 function ensureSeatState(performanceId: number) {
   if (seatStateByPerformance.has(performanceId)) return;
 
+  const concert = MOCK_CONCERTS.find((c) => c.id === performanceId);
+  const availableTarget = Math.max(
+    0,
+    Math.min(TOTAL_SEATS, concert?.remainingSeats ?? Math.floor(TOTAL_SEATS * 0.6)),
+  );
+
+  // remainingSeats만큼 AVAILABLE, 나머지는 SOLD(일부 HOLD)로 고정 시드
+  // → #177 매진(id=2, remainingSeats=0) 등 시나리오를 재현 가능하게 함
   const map = new Map<number, SeatStatus>();
-  let seatId = 1;
-  ROWS.forEach(() => {
-    for (let col = 1; col <= COLS; col++) {
-      const r = Math.random();
-      let status: SeatStatus = "AVAILABLE";
-      if (r < 0.15) status = "HOLD";
-      else if (r < 0.25) status = "SOLD";
-      map.set(seatId++, status);
+  for (let seatId = 1; seatId <= TOTAL_SEATS; seatId++) {
+    if (seatId <= availableTarget) {
+      map.set(seatId, "AVAILABLE");
+    } else if ((seatId - availableTarget) % 8 === 0) {
+      map.set(seatId, "HOLD");
+    } else {
+      map.set(seatId, "SOLD");
     }
-  });
+  }
   seatStateByPerformance.set(performanceId, map);
 }
 

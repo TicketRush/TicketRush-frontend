@@ -5,25 +5,46 @@
 //   - seat 삭제 (백엔드 스펙엔 좌석 단위 가격 없음)
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
 //
+// 이슈 #122:
+//   - 좌석맵: useSeats (seat-layouts)
+//   - 잔여/상태별 통계: useSeatCounts (seat-counts) — layouts 배열을 직접 집계하지 않음
+//
 // ⚠️ 아키텍처 변경 (이슈 #124):
 //   백엔드에 별도 좌석 HOLD API 없음. 예매 생성(POST /booking, PENDING 상태)이
 //   좌석 HOLD를 겸함. useHoldSeat(seatId만 전달) → useCreateBooking(performanceId+seatId)로 교체.
 //   생성 응답의 bookingNumber를 paymentStore.startBooking()에 전달해야
 //   결제 페이지/예매 확인 페이지에서 결제·취소 시 사용 가능.
-import { useNavigate, useParams } from "react-router-dom";
+// - 2026-08-07 (#181):
+//   - URL 직접 진입 시 상세 canBook과 동일 조건으로 가드
+//   - 불가 시 /concerts/:id 로 replace redirect
+//   - 허용 시 detail로 concertStore hydrate (직접 진입 대비)
+// - 2026-08-15 (#181 리뷰):
+//   - performanceId 변경 시 selectedSeat 초기화 (교차 공연 HOLD 방지)
+//   - 가드용 detail/counts는 fresh 조회로 최신 기준 판정
+import { useEffect } from "react";
+import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { useMemo } from "react";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
-import { useSeats } from "@/hooks/queries/useSeats";
+import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
+import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
+import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { toast } from "react-toastify";
+import {
+  ApiError,
+  isIgnorablePendingCancelError,
+} from "@/api/errors/errorMapper";
 import type { SeatWithStatus } from "@/types/domain/seat";
+import {
+  canBookConcert,
+  shouldFetchSeatCounts,
+} from "@/utils/concert/canBookConcert";
 
 export default function SeatSelectionPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,30 +53,131 @@ export default function SeatSelectionPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const toggleSeat = useSeatStore((s) => s.toggleSeat);
+  const resetSeat = useSeatStore((s) => s.reset);
   const startTimer = useTimerStore((s) => s.startTimer);
+  const resetTimer = useTimerStore((s) => s.reset);
+  const setConcert = useConcertStore((s) => s.setConcert);
   const currentConcert = useConcertStore((s) => s.currentConcert);
+  const bookingNumber = usePaymentStore((s) => s.bookingNumber);
+  const resetPayment = usePaymentStore((s) => s.reset);
 
-  const { data: seats, isLoading, isError } = useSeats(performanceId);
+  // URL의 공연이 바뀌면 이전 공연 selectedSeat 잔존 방지
+  useEffect(() => {
+    if (!performanceId || isNaN(performanceId)) return;
+    resetSeat();
+  }, [performanceId, resetSeat]);
+
+  const {
+    data: concert,
+    isLoading: concertLoading,
+    isFetching: concertFetching,
+    isError: concertError,
+  } = useConcertDetail(performanceId, { fresh: true });
+
+  const shouldFetchSeats =
+    !!concert && shouldFetchSeatCounts(concert.status);
+  const {
+    data: seatCounts,
+    isLoading: seatCountsLoading,
+    isFetching: seatCountsFetching,
+    isError: seatCountsError,
+  } = useSeatCounts(performanceId, shouldFetchSeats, { fresh: true });
+
+  const seatsReady =
+    shouldFetchSeats &&
+    !!seatCounts &&
+    !seatCountsLoading &&
+    !seatCountsFetching &&
+    !seatCountsError;
+  const remaining = seatsReady ? seatCounts.availableCount : null;
+
+  const canEnter =
+    !!concert &&
+    canBookConcert({
+      status: concert.status,
+      seatsReady,
+      remaining,
+    });
+
+  // 가드 판정 전(상세·seat-counts fresh 조회)에는 좌석맵/SSE를 열지 않음
+  const guardPending =
+    !!performanceId &&
+    !isNaN(performanceId) &&
+    (concertLoading ||
+      concertFetching ||
+      (!concertError &&
+        !!concert &&
+        shouldFetchSeats &&
+        (seatCountsLoading || seatCountsFetching)));
+
+  // #122: layouts → 좌석맵, counts → 하단 잔여/상태 통계
+  const { data: seats, isLoading, isError } = useSeats(
+    performanceId,
+    canEnter,
+  );
   const createBookingMutation = useCreateBooking();
+  const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);
+  useSeatEventStream(performanceId, canEnter);
 
-  // SSE 구독
-  useSeatEventStream(performanceId);
+  // 직접 URL 진입 시에도 결제 플로우용 store를 맞춤
+  useEffect(() => {
+    if (!canEnter || !concert || !seatsReady || remaining === null) return;
 
-  const stats = useMemo(() => {
-    if (!seats) return { total: 0, available: 0, holding: 0, sold: 0 };
-    return {
-      total: seats.length,
-      available: seats.filter((s) => s.status === "AVAILABLE").length,
-      holding: seats.filter((s) => s.status === "HOLD").length,
-      sold: seats.filter((s) => s.status === "SOLD").length,
-    };
-  }, [seats]);
+    const venueDisplay = concert.venue ?? concert.address ?? "";
+    setConcert({
+      id: concert.id,
+      title: concert.title,
+      price: concert.price,
+      showDate: concert.showDate,
+      showTime: concert.showTime,
+      venue: venueDisplay,
+      performer: concert.performer,
+      genre: concert.genre,
+      imageMainUrl: concert.imageMainUrl,
+      address: concert.address,
+      durationMinutes: concert.durationMinutes,
+      totalSeats: seatCounts!.totalCount,
+      remainingSeats: remaining,
+      status: concert.status,
+    });
+  }, [
+    canEnter,
+    concert,
+    seatsReady,
+    remaining,
+    seatCounts,
+    setConcert,
+  ]);
 
-  // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
-  const totalAmount = currentConcert?.price ?? 0;
+  const stats = {
+    total: seatCounts?.totalCount ?? 0,
+    available: seatCounts?.availableCount ?? 0,
+    holding: seatCounts?.holdCount ?? 0,
+    sold: seatCounts?.soldCount ?? 0,
+  };
+
+  const totalAmount = currentConcert?.price ?? concert?.price ?? 0;
+
+  if (!performanceId || isNaN(performanceId)) {
+    return <Navigate to="/concerts" replace />;
+  }
+
+  if (guardPending) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="bg-white border border-border rounded-xl p-12 text-center text-text-secondary">
+          예매 가능 여부를 확인하는 중...
+        </div>
+      </div>
+    );
+  }
+
+  // 상세 실패·좌석 정보 실패·예매 불가 → 상세로 복귀 (#181)
+  if (concertError || !concert || seatCountsError || !canEnter) {
+    return <Navigate to={`/concerts/${performanceId}`} replace />;
+  }
 
   function handleSeatClick(seat: SeatWithStatus) {
-    // Seat 도메인 타입에 맞게 필드 정렬
     toggleSeat({
       id: seat.id,
       seatLayoutId: seat.seatLayoutId,
@@ -65,9 +187,36 @@ export default function SeatSelectionPage() {
     });
   }
 
+  /**
+   * 기존 PENDING이 있으면 취소 후 payment store 초기화.
+   * - 이미 만료/취소/미존재 → 무시하고 store만 비움
+   * - 그 외 실패(네트워크·5xx 등) → store 유지한 채 throw (새 PENDING 생성 중단)
+   */
+  async function cancelExistingPending() {
+    const existing = usePaymentStore.getState().bookingNumber;
+    if (!existing) return;
+
+    try {
+      await releaseSeatMutation.mutateAsync({
+        bookingNumber: existing,
+        seatId: selectedSeat?.id,
+      });
+      resetPayment();
+    } catch (error: unknown) {
+      if (isIgnorablePendingCancelError(error)) {
+        resetPayment();
+        return;
+      }
+      throw ApiError.fromUnknown(error);
+    }
+  }
+
   async function handleConfirm() {
     if (!selectedSeat || !performanceId) return;
     try {
+      // Confirm → 뒤로 → 재확인 시 중복 PENDING 방지: 기존 예매 먼저 취소
+      await cancelExistingPending();
+
       // 예매(PENDING) 생성 = 좌석 HOLD. 응답의 bookingNumber를 결제 플로우 전체에서 사용.
       const booking = await createBookingMutation.mutateAsync({
         performanceId,
@@ -83,14 +232,34 @@ export default function SeatSelectionPage() {
     }
   }
 
+  async function handleBack() {
+    try {
+      if (bookingNumber) {
+        await cancelExistingPending();
+        resetSeat();
+        resetTimer();
+      }
+      navigate(`/concerts/${id}`);
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error
+          ? error
+          : new Error("기존 예매 취소에 실패했습니다. 다시 시도해 주세요.");
+      toast.error(err.message);
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between bg-white border border-border rounded-xl px-6 py-4">
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-gray-100"
+          onClick={handleBack}
+          disabled={
+            createBookingMutation.isPending || releaseSeatMutation.isPending
+          }
+          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-gray-100 disabled:opacity-60"
         >
           <X size={14} />
           뒤로가기
@@ -104,15 +273,23 @@ export default function SeatSelectionPage() {
         </div>
         <button
           type="button"
-          disabled={!selectedSeat || createBookingMutation.isPending}
+          disabled={
+            !selectedSeat ||
+            createBookingMutation.isPending ||
+            releaseSeatMutation.isPending
+          }
           onClick={handleConfirm}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-            selectedSeat && !createBookingMutation.isPending
+            selectedSeat &&
+            !createBookingMutation.isPending &&
+            !releaseSeatMutation.isPending
               ? "bg-primary text-white hover:opacity-90"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
-          {createBookingMutation.isPending ? "선점 중..." : "좌석 확인"}
+          {createBookingMutation.isPending || releaseSeatMutation.isPending
+            ? "선점 중..."
+            : "좌석 확인"}
         </button>
       </div>
 

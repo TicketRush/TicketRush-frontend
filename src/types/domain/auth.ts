@@ -1,33 +1,35 @@
 // 인증/유저 도메인 타입
 //
-// 백엔드 auth-service, user-service swagger (2026-07-02) 스펙 반영
+// 백엔드 auth-service, user-service 스펙 반영 (2026-07-19 백엔드 코드 직접 확인)
 //
 // 주요 변경:
-//   - EmailLoginResponse 필드 정리 (이미 email, role, joinedAt 있음)
-//   - 회원가입 이메일 인증 3단계 타입 신규 추가 (send/verify/consume)
-//   - 회원가입 요청 타입 신규 추가
-//   - Dev Auth 토큰 발급 타입 신규 추가 (개발 편의용)
-//   - User 인터페이스에 email, role, joinedAt 필드 추가
+//   - UserRole: DB / 로그인 / JWT / /me 모두 "MEMBER" | "ADMIN" 통일
+//   - OauthLoginResponse: email/role 없음 (userId, name, isNewUser, 토큰류만)
+//   - MeResponse: name, email, createdAt, role (BE #558/#568)
+//   - EmailCheckResponse: isDuplicated → exists
+//   - EmailAuthConsumeRequest 제거 (해당 엔드포인트 존재하지 않음)
+//   - DevAuthTokenResponse: LoginResponse와 동일 구조로 정정
 
 export type OauthProvider = "KAKAO" | "NAVER" | "GOOGLE";
+/** authStore / AdminRoute / 로그인·/me·JWT 공통 권한 */
 export type UserRole = "MEMBER" | "ADMIN";
 
-// ── 소셜 로그인 (백엔드 확정) ───────────────────────
+// ── 소셜 로그인 ───────────────────────────────────────
 export interface SocialOauthLoginRequest {
   provider: OauthProvider;
   code: string;
 }
 
+/**
+ * POST /api/v1/auth/social/login 응답
+ * 백엔드 OauthLoginResponse DTO: email/role/joinedAt 없음.
+ */
 export interface OauthLoginResponse {
   userId: number;
   name: string;
-  email: string;
-  role: UserRole;
-  joinedAt: string;
   isNewUser: boolean;
   accessToken: string;
   refreshToken: string;
-  /** 만료까지 남은 시간 (초) */
   accessTokenExpiresIn: number;
   refreshTokenExpiresIn: number;
 }
@@ -37,25 +39,27 @@ export interface OauthUrlResponse {
   url: string;
 }
 
-// ── 이메일 로그인 (백엔드 확정) ──────────────────────
+// ── 이메일 로그인 ──────────────────────────────────────
 export interface EmailLoginRequest {
   email: string;
   password: string;
 }
 
+/**
+ * POST /api/v1/auth/login 응답
+ * 백엔드 LoginResponse DTO: name/joinedAt/expiresIn 없음.
+ * role: MEMBER | ADMIN (/me·JWT와 동일)
+ */
 export interface EmailLoginResponse {
   userId: number;
-  name: string;
   email: string;
   role: UserRole;
-  joinedAt: string;
   accessToken: string;
   refreshToken: string;
-  accessTokenExpiresIn: number;
-  refreshTokenExpiresIn: number;
 }
 
-// ── 회원가입 이메일 인증 3단계 (백엔드 확정) ─────────
+// ── 회원가입 이메일 인증 2단계 (백엔드 확정) ──────────
+// ⚠️ "consume" 3단계는 존재하지 않음 (2026-07-18, 404 확인).
 /** 1단계 — 이메일에 인증 코드 발송 */
 export interface EmailAuthSendRequest {
   email: string;
@@ -68,16 +72,11 @@ export interface EmailAuthVerifyRequest {
   authNumber: string;
 }
 
-/** 3단계 — 인증 상태 소비 (회원가입 직전) */
-export interface EmailAuthConsumeRequest {
-  email: string;
-}
-
 // ── 회원가입 (백엔드 확정) ────────────────────────────
 /**
  * POST /api/v1/user/signup 요청
  *
- * 이메일 인증 3단계(send/verify/consume) 완료 후 호출.
+ * 이메일 인증(send/verify) 완료 후 바로 호출.
  */
 export interface SignupRequest {
   email: string;
@@ -95,20 +94,7 @@ export interface SignupResponse {
 
 // ── 이메일 중복 확인 (백엔드 확정) ────────────────────
 export interface EmailCheckResponse {
-  isDuplicated: boolean;
-}
-
-// ── 소셜 회원 등록 (백엔드 확정) ──────────────────────
-/**
- * POST /api/v1/user/social-login 요청
- *
- * 소셜 로그인 응답의 isNewUser=true일 때 회원 등록 목적으로 호출.
- */
-export interface SocialSignupRequest {
-  provider: OauthProvider;
-  providerId: string;
-  email: string;
-  name: string;
+  exists: boolean;
 }
 
 // ── 토큰 재발급 (백엔드 확정) ─────────────────────────
@@ -126,17 +112,13 @@ export interface TokenReissueResponse {
 // ── 내 정보 (백엔드 확정) ─────────────────────────────
 /**
  * GET /api/v1/user/me 응답
- *
- * ⚠️ 현재 백엔드 응답에 role 필드 없음.
- * (관리자 페이지 접근 판단용).
+ * BE #558/#568: name, email, createdAt, role (DB enum 그대로 MEMBER|ADMIN)
  */
 export interface MeResponse {
-  userId: number;
-  email: string;
   name: string;
-  joinedAt: string;
-  /** ⚠️ 백엔드 추가 대기 */
-  role?: UserRole;
+  email: string;
+  createdAt: string;
+  role: UserRole;
 }
 
 // ── Dev Auth 토큰 (개발용) ────────────────────────────
@@ -150,17 +132,19 @@ export interface DevAuthTokenRequest {
   userId: number;
 }
 
+/** 응답 구조는 LoginResponse와 동일 (userId, email, role, accessToken, refreshToken) */
 export interface DevAuthTokenResponse {
+  userId: number;
+  email: string;
+  role: UserRole;
   accessToken: string;
   refreshToken: string;
-  accessTokenExpiresIn: number;
-  refreshTokenExpiresIn: number;
 }
 
 // ── User 도메인 (프론트 authStore) ────────────────────
 /**
  * authStore에 저장되는 사용자 정보.
- * 로그인 응답의 일부를 저장.
+ * 로그인 응답에 없는 필드(email/name/joinedAt 등)는 getMeApi()로 비동기 보강.
  */
 export interface User {
   userId: number;

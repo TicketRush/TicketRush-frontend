@@ -66,6 +66,13 @@ export default function ReservationConfirmPage() {
     });
   }
 
+  function handleBack() {
+    handleCancelReservation({
+      onReleaseSeat: releaseSeat,
+      onNavigate: () => navigate(`/concerts/${id}/seats`),
+    });
+  }
+
   const remainingSeconds = Math.ceil(remainingMs / 1000);
   // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
   const totalAmount = currentConcert?.price ?? 0;
@@ -74,8 +81,9 @@ export default function ReservationConfirmPage() {
     <div className="max-w-5xl mx-auto px-6 py-8">
       <button
         type="button"
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 mb-6"
+        onClick={handleBack}
+        disabled={releaseSeatMutation.isPending}
+        className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 mb-6 disabled:opacity-60"
       >
         <ArrowLeft size={14} />
         뒤로가기
