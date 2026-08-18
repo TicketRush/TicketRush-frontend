@@ -29,7 +29,10 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex bg-admin-bg text-admin-text">
       {/* 사이드바 */}
-      <aside className="w-64 bg-admin-card border-r border-admin-border flex flex-col">
+      <aside
+        className="w-64 shrink-0 sticky top-0 h-screen overflow-y-auto
+          bg-admin-card border-r border-admin-border flex flex-col"
+      >
         {/* 로고 */}
         <div className="px-6 py-5 border-b border-admin-border">
           <p className="font-pretendard text-xs text-admin-text-secondary tracking-wider">
@@ -83,7 +86,7 @@ export default function AdminLayout() {
       </aside>
 
       {/* 메인 영역 */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-w-0 overflow-auto">
         <Outlet />
       </main>
     </div>
