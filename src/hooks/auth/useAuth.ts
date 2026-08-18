@@ -6,15 +6,22 @@
 //   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
 //   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt/role) 보강 (#137)
 //   - authStore.role SSOT = /me.role (BE role = MEMBER | ADMIN 통일)
+//   - 로그인 성공 시 저장된 복귀 경로가 있으면 그곳으로 이동 (#101)
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
 import useAuthStore from "@/stores/global/authStore";
+import { consumeLoginRedirect } from "@/utils/auth/loginRedirect";
 import type { UserRole } from "@/types/domain/auth";
 
 /** BE role → UserRole. 알 수 없는 값은 MEMBER로 안전하게 처리 */
 function toUserRole(backendRole?: string): UserRole {
   return backendRole === "ADMIN" ? "ADMIN" : "MEMBER";
+}
+
+/** 예매 흐름에서 밀려온 경우 그 경로를 우선하고, 없으면 역할별 기본 진입점 */
+function resolveLandingPath(role: UserRole): string {
+  return consumeLoginRedirect() ?? (role === "ADMIN" ? "/admin" : "/");
 }
 
 export function useSocialLogin() {
@@ -49,7 +56,7 @@ export function useSocialLogin() {
         // /me 실패해도 로그인 자체는 유지 (role은 임시 MEMBER)
       }
 
-      navigate(role === "ADMIN" ? "/admin" : "/");
+      navigate(resolveLandingPath(role));
     },
   });
 }
@@ -86,7 +93,7 @@ export function useEmailLogin() {
         // /me 실패해도 로그인 자체는 유지
       }
 
-      navigate(role === "ADMIN" ? "/admin" : "/");
+      navigate(resolveLandingPath(role));
     },
   });
 }

@@ -4,13 +4,14 @@
 //   - develop LoginPage UI/에러 처리(setFocus, errors.root) 유지
 //   - 소셜 로그인만 추가: getOauthUrlApi → 리다이렉트, provider별 loading·중복 클릭 방지
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "react-toastify";
 import { loginSchema, type LoginFormData } from "../../schemas/auth";
 import { useEmailLogin } from "@/hooks/auth/useAuth";
 import { getOauthUrlApi } from "@/api/auth";
+import { saveLoginRedirect } from "@/utils/auth/loginRedirect";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
 import emailIcon from "@/assets/icons/email.svg";
@@ -20,6 +21,7 @@ type SocialProvider = "kakao" | "naver" | "google";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const emailLogin = useEmailLogin();
 
   // 소셜 로그인 진행 중인 provider (중복 클릭 방지)
@@ -40,6 +42,11 @@ export default function LoginPage() {
   useEffect(() => {
     setFocus("email");
   }, [setFocus]);
+
+  // 예매 흐름에서 밀려온 경우 복귀 경로를 보관해두고 로그인 성공 시 사용한다 (#101)
+  useEffect(() => {
+    saveLoginRedirect((location.state as { from?: unknown } | null)?.from);
+  }, [location.state]);
 
   const onSubmit = (data: LoginFormData) => {
     emailLogin.mutate(data, {
