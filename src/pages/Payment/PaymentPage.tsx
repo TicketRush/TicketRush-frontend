@@ -26,6 +26,7 @@ import {
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
+import Button from "@/components/common/Button/Button";
 import TimeoutModal from "@/components/payment/TimeoutModal";
 import PaymentFailedModal from "@/components/payment/FailedModal";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
@@ -194,15 +195,15 @@ export default function PaymentPage() {
     <div className="max-w-6xl mx-auto px-6 py-8">
       {/* 헤더 */}
       <div className="flex items-center gap-3 mb-6">
-        <button
-          type="button"
-          onClick={handleBack}
+        <Button
+          variant="outline"
+          size="sm"
+          icon={<ArrowLeft size={14} />}
           disabled={releaseSeatMutation.isPending}
-          className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-60"
+          onClick={handleBack}
         >
-          <ArrowLeft size={14} />
           뒤로가기
-        </button>
+        </Button>
         <h1 className="text-2xl font-bold">결제 수단 선택</h1>
       </div>
 

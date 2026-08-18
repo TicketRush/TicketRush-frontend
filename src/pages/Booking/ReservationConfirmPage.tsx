@@ -10,6 +10,7 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Clock, ArrowLeft, AlertCircle } from "lucide-react";
+import Button from "@/components/common/Button/Button";
 import { CircularTimer } from "@/components/common/CircularTimer/CircularTimer";
 import {
   useTimerDisplay,
@@ -79,15 +80,16 @@ export default function ReservationConfirmPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
-      <button
-        type="button"
-        onClick={handleBack}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mb-6"
+        icon={<ArrowLeft size={14} />}
         disabled={releaseSeatMutation.isPending}
-        className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 mb-6 disabled:opacity-60"
+        onClick={handleBack}
       >
-        <ArrowLeft size={14} />
         뒤로가기
-      </button>
+      </Button>
 
       <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3">

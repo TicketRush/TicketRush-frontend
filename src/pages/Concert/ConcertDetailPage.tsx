@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
+import Button from "@/components/common/Button/Button";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import { useConcertStore } from "@/stores/reservation/concertStore";
@@ -117,14 +118,15 @@ export default function ConcertDetailPage() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* 상단 — 뒤로가기 */}
-      <button
-        type="button"
+      <Button
+        variant="outline"
+        size="sm"
+        className="mb-4"
+        icon={<ArrowLeft size={14} />}
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 mb-4"
       >
-        <ArrowLeft size={14} />
         공연 목록으로
-      </button>
+      </Button>
 
       {/* 7:3 grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6">

@@ -2,7 +2,14 @@ import { type ButtonHTMLAttributes, type ReactNode } from "react";
 import clsx from "clsx";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "kakao" | "naver" | "google";
+  variant?:
+    | "primary"
+    | "secondary"
+    | "outline"
+    | "danger"
+    | "kakao"
+    | "naver"
+    | "google";
 
   size?: "sm" | "md" | "lg" | "oauth";
   fullWidth?: boolean;
@@ -12,8 +19,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
+// border-none을 두면 안 된다. Tailwind가 border-style 유틸리티를 border-width보다
+// 뒤에 출력해서, variant가 border를 붙여도 style: none이 이겨 테두리가 사라진다.
+// 테두리가 없어야 하는 variant는 border 클래스를 안 쓰는 것으로 충분하다.
 const baseStyle =
-  "inline-flex items-center justify-center gap-2 border-none cursor-pointer " +
+  "inline-flex items-center justify-center gap-2 cursor-pointer " +
   "font-pretendard transition-all duration-150 ease-in-out " +
   "active:scale-[0.98]";
 
@@ -21,14 +31,17 @@ const variantStyles = {
   primary:
     "bg-primary text-white font-bold rounded-button shadow-button hover:opacity-90",
   secondary:
-    "bg-white text-text-secondary font-medium border border-border rounded-button hover:bg-[#f8f9fa]",
+    "bg-white text-text-secondary font-medium border border-border rounded-button hover:bg-secondary",
+  // 뒤로가기 / 공연 목록으로 같은 이동 버튼. secondary와 테두리는 같고 글자만 진하다.
+  outline:
+    "bg-white text-text font-medium border border-border rounded-button hover:bg-secondary",
   danger: "bg-danger text-white font-bold rounded-button hover:opacity-90",
   kakao:
     "bg-kakao text-kakao-text font-semibold border-2 border-kakao-border rounded-input hover:opacity-90",
   naver:
     "bg-naver text-naver-text font-semibold border-2 border-naver-border rounded-input hover:opacity-90",
   google:
-    "bg-google text-google-text font-semibold border-2 border-google-border rounded-input hover:bg-[#f8f9fa]",
+    "bg-google text-google-text font-semibold border-2 border-google-border rounded-input hover:bg-secondary",
 } as const;
 
 const sizeStyles = {
