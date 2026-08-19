@@ -183,7 +183,7 @@ const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
       seatCount: 1,
       unitPrice: concert.price,
       totalAmount: concert.price,
-      status: isCancelled ? "CANCELLED" : "CONFIRMED",
+      status: isCancelled ? "CANCELED" : "CONFIRMED",
       paymentMethod: PAYMENT_METHODS[i % PAYMENT_METHODS.length],
     });
   }
@@ -239,7 +239,7 @@ export async function mockGetAdminBookingStats(): Promise<AdminBookingStats> {
       (sum, b) => sum + b.totalAmount,
       0,
     ),
-    cancelledBookings: ADMIN_BOOKINGS.filter((b) => b.status === "CANCELLED")
+    cancelledBookings: ADMIN_BOOKINGS.filter((b) => b.status === "CANCELED")
       .length,
   };
 }
@@ -252,15 +252,15 @@ export async function mockAdminRefundBooking(
   if (!booking) {
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
-  if (booking!.status === "CANCELLED") {
+  if (booking!.status === "CANCELED") {
     await mockError("ALREADY_CANCELLED", "이미 취소된 예매입니다.");
   }
-  booking!.status = "CANCELLED";
+  booking!.status = "CANCELED";
 
   // 사용자 mock bookings 저장소도 함께 동기화 (있다면)
   const userSide = _findMockBooking(bookingNumber);
   if (userSide) {
-    _updateMockBookingStatus(bookingNumber, "CANCELLED");
+    _updateMockBookingStatus(bookingNumber, "CANCELED");
   }
 }
 

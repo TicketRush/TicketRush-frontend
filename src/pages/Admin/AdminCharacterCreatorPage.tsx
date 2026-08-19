@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
+import {
+  resolveStoredHairStyle,
+  type HairStyle,
+} from "@/components/admin/character/characterHair";
 
 type SkinTone = "light" | "medium" | "tan" | "dark";
-type HairStyle = "short" | "long" | "bun" | "ponytail" | "wave" | "rainbow";
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterConfig {
@@ -34,13 +37,16 @@ const SKIN_TONES: { value: SkinTone; label: string; color: string }[] = [
   { value: "dark", label: "Dark", color: "#8b5a2b" },
 ];
 
-const HAIR_STYLES: { value: HairStyle; label: string; icon: string }[] = [
-  { value: "short", label: "숏컷", icon: "👱" },
-  { value: "long", label: "단발", icon: "👩" },
-  { value: "bun", label: "양갈래", icon: "👧" },
+const HAIR_STYLES: {
+  value: HairStyle;
+  label: string;
+  icon: string;
+}[] = [
+  { value: "short", label: "단발", icon: "👱" },
+  { value: "long", label: "장발", icon: "👩" },
   { value: "ponytail", label: "포니테일", icon: "🎀" },
+  { value: "twintails", label: "양갈래", icon: "👧" },
   { value: "wave", label: "웨이브", icon: "🌀" },
-  { value: "rainbow", label: "무지개", icon: "🌈" },
 ];
 
 const HAIR_COLORS = [
@@ -54,12 +60,36 @@ const HAIR_COLORS = [
 ];
 
 const OUTFITS = [
-  { name: "무지개 블라우스", description: "가벼운 공연 의상", icon: "👗" },
-  { name: "마이크 콘서트", description: "K-POP 콘서트 대표룩", icon: "🎤" },
-  { name: "클래식 공연", description: "포멀한 공연 의상", icon: "🎻" },
-  { name: "DJ / 페스티벌", description: "EDM 페스티벌룩", icon: "🎸" },
-  { name: "발레 / 무용 공연", description: "무용 공연 의상", icon: "🩰" },
-  { name: "연극 / 극장", description: "무대 의상", icon: "🎩" },
+  {
+    name: "무지개 블라우스",
+    description: "가벼운 공연 의상",
+    icon: "👗",
+  },
+  {
+    name: "마이크 콘서트",
+    description: "K-POP 콘서트 대표룩",
+    icon: "🎤",
+  },
+  {
+    name: "클래식 공연",
+    description: "포멀한 공연 의상",
+    icon: "🎻",
+  },
+  {
+    name: "DJ / 페스티벌",
+    description: "EDM 페스티벌룩",
+    icon: "🎸",
+  },
+  {
+    name: "발레 / 무용 공연",
+    description: "무용 공연 의상",
+    icon: "🩰",
+  },
+  {
+    name: "연극 / 극장",
+    description: "무대 의상",
+    icon: "🎩",
+  },
 ];
 
 const OUTFIT_COLORS = [
@@ -144,7 +174,17 @@ function loadSavedCharacter(): CharacterConfig {
   }
 
   try {
-    return JSON.parse(savedCharacter) as CharacterConfig;
+    const parsed = JSON.parse(savedCharacter) as Omit<
+      CharacterConfig,
+      "hairStyle"
+    > & {
+      hairStyle?: unknown;
+    };
+
+    return {
+      ...parsed,
+      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+    };
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     return DEFAULT_CHARACTER;
@@ -324,7 +364,9 @@ export default function AdminCharacterCreatorPage() {
                   >
                     <div
                       className="mx-auto h-10 w-32 rounded-full"
-                      style={{ backgroundColor: skinTone.color }}
+                      style={{
+                        backgroundColor: skinTone.color,
+                      }}
                     />
 
                     <p className="mt-2 text-xs font-bold text-slate-800">
@@ -336,7 +378,7 @@ export default function AdminCharacterCreatorPage() {
             </CreatorSection>
 
             <CreatorSection title="헤어스타일">
-              <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                 {HAIR_STYLES.map((hairStyle) => (
                   <OptionCard
                     key={hairStyle.value}
@@ -694,9 +736,13 @@ function ColorButton({
       aria-pressed={selected}
       onClick={onClick}
       className={`h-12 rounded-lg border transition ${
-        selected ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200"
+        selected
+          ? "border-slate-900 ring-2 ring-slate-900"
+          : "border-slate-200"
       }`}
-      style={{ backgroundColor: color }}
+      style={{
+        backgroundColor: color,
+      }}
     />
   );
 }

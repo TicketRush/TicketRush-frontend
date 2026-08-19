@@ -22,7 +22,9 @@ const STYLES: Record<SeatStatus | "SELECTED", string> = {
 };
 
 function SeatItemImpl({ seat, isSelected, onClick }: SeatItemProps) {
-  const visualStatus = isSelected ? "SELECTED" : seat.status;
+  // HOLD/SOLD가 되면 isSelected보다 실제 status를 우선 (SSE로 선점된 좌석 SELECTED 잔상 방지)
+  const visualStatus =
+    isSelected && seat.status === "AVAILABLE" ? "SELECTED" : seat.status;
   const isClickable = seat.status === "AVAILABLE";
   const isSold = seat.status === "SOLD";
 

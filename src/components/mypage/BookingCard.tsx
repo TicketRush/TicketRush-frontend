@@ -4,13 +4,55 @@
 //   - booking.seatNumber → booking.seatNumber
 import { useNavigate } from "react-router-dom";
 import { Calendar, MapPin, Ticket, AlertCircle } from "lucide-react";
-import type { BookingListItem, BookingTab } from "@/types/domain/booking";
+import { toast } from "react-toastify";
+import type {
+  BookingListItem,
+  BookingStatus,
+  BookingTab,
+} from "@/types/domain/booking";
 import { toShowDateTime } from "@/utils/booking";
+import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
 
 interface BookingCardProps {
   booking: BookingListItem;
   tab: BookingTab;
 }
+
+const STATUS_BADGE: Record<
+  BookingStatus,
+  { label: string; bg: string; text: string }
+> = {
+  CONFIRMED: {
+    label: "예매 확정",
+    bg: "bg-[#00C950]/15",
+    text: "text-[#00C950]",
+  },
+  PENDING: {
+    label: "결제 대기",
+    bg: "bg-amber-100",
+    text: "text-amber-700",
+  },
+  CANCELED: {
+    label: "취소됨",
+    bg: "bg-[#FB2C36]/15",
+    text: "text-[#FB2C36]",
+  },
+  REFUNDING: {
+    label: "환불 중",
+    bg: "bg-blue-100",
+    text: "text-blue-700",
+  },
+  REFUNDED: {
+    label: "환불 완료",
+    bg: "bg-gray-100",
+    text: "text-gray-500",
+  },
+  EXPIRED: {
+    label: "만료됨",
+    bg: "bg-gray-100",
+    text: "text-gray-500",
+  },
+};
 
 /**
  * 예매 내역 단일 카드
@@ -18,7 +60,7 @@ interface BookingCardProps {
  * ─ 운영 정책 ─
  * [상태 태그 디자인]
  *  - 예매 확정(CONFIRMED): #00C950
- *  - 취소됨(CANCELLED)/기타: #FB2C36
+ *  - 취소됨(CANCELED)/기타: #FB2C36
  *
  * [환불 정책]
  *  - 공연 7일 전까지: [환불 신청] 활성화
@@ -32,6 +74,7 @@ interface BookingCardProps {
  */
 export function BookingCard({ booking, tab }: BookingCardProps) {
   const navigate = useNavigate();
+  const cancelBooking = useCancelBooking();
 
   // 공연 시작시각 = performanceDate + performanceTime
   const showDateTime = toShowDateTime(
@@ -48,15 +91,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   // ─ 지난 공연 여부 ─
   const isPastTab = tab === "past";
 
-  // ─ 상태 뱃지 ─
-  const statusBadge =
-    booking.status === "CONFIRMED"
-      ? { label: "예매 확정", bg: "bg-[#00C950]/15", text: "text-[#00C950]" }
-      : booking.status === "CANCELLED"
-        ? { label: "취소됨", bg: "bg-[#FB2C36]/15", text: "text-[#FB2C36]" }
-        : booking.status === "PENDING"
-          ? { label: "결제 대기", bg: "bg-amber-100", text: "text-amber-700" }
-          : { label: "만료됨", bg: "bg-gray-100", text: "text-gray-500" };
+  const statusBadge = STATUS_BADGE[booking.status] ?? STATUS_BADGE.EXPIRED;
 
   // ─ 핸들러 ─
   const handleViewTicket = () => {
@@ -70,9 +105,32 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
     }
   };
 
+  const handleCancelPending = async () => {
+    if (!window.confirm("결제 대기 예매를 취소할까요?")) return;
+    try {
+      await cancelBooking.mutateAsync(booking.bookingNumber);
+      toast.info("예매를 취소했습니다.");
+    } catch (error: unknown) {
+      const err =
+        error instanceof Error ? error : new Error("예매 취소에 실패했습니다.");
+      toast.error(err.message);
+    }
+  };
+
   // ─ 포맷팅 ─
   const formatShowDateTime = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  const createdAtLabel = (() => {
+    if (!booking.createdAt) return "-";
+    const d = new Date(booking.createdAt);
+    return Number.isNaN(d.getTime()) ? "-" : formatShowDateTime(d);
+  })();
+
+  const isTerminal =
+    booking.status === "CANCELED" ||
+    booking.status === "EXPIRED" ||
+    booking.status === "REFUNDED";
 
   return (
     <article className="bg-white border border-gray-200 rounded-lg p-6">
@@ -127,17 +185,40 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
 
         <div>
           <p className="text-xs text-gray-500 mb-2">예매일</p>
-          <p className="text-sm text-gray-900">
-            {formatShowDateTime(new Date(booking.createdAt))}
-          </p>
+          <p className="text-sm text-gray-900">{createdAtLabel}</p>
         </div>
       </div>
 
       {/* ─── 액션 버튼 ─── */}
-      {isPastTab ? (
+      {booking.status === "PENDING" ? (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={handleViewTicket}
+            className="flex items-center justify-center gap-2
+                       bg-primary text-white
+                       py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Ticket className="w-4 h-4" />
+            예매 이어가기
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelPending}
+            disabled={cancelBooking.isPending}
+            className="flex items-center justify-center gap-2
+                       border border-[#FB2C36] text-[#FB2C36]
+                       py-3 rounded-lg font-medium hover:bg-[#FB2C36]/5 transition-colors
+                       disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <AlertCircle className="w-4 h-4" />
+            {cancelBooking.isPending ? "취소 중..." : "예매 취소"}
+          </button>
+        </div>
+      ) : isPastTab ? (
         // 지난 공연: 티켓 보기만 (운영 정책: 환불 기능 제공 X)
-        // 단, 취소된 예매는 티켓 보기도 비활성
-        booking.status === "CANCELLED" ? null : (
+        // 단, 종료 상태 예매는 티켓 보기도 비활성
+        isTerminal ? null : (
           <button
             type="button"
             onClick={handleViewTicket}
@@ -155,7 +236,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           <button
             type="button"
             onClick={handleViewTicket}
-            disabled={booking.status === "CANCELLED"}
+            disabled={isTerminal}
             className="flex items-center justify-center gap-2
                        bg-primary text-white
                        py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors
@@ -185,9 +266,15 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
                          py-3 rounded-lg font-medium cursor-not-allowed"
             >
               <AlertCircle className="w-4 h-4" />
-              {booking.status === "CANCELLED"
+              {booking.status === "CANCELED"
                 ? "취소된 예매"
-                : "환불 불가 (D-7 미만)"}
+                : booking.status === "REFUNDING"
+                  ? "환불 진행 중"
+                  : booking.status === "REFUNDED"
+                    ? "환불 완료"
+                    : booking.status === "EXPIRED"
+                      ? "만료된 예매"
+                      : "환불 불가 (D-7 미만)"}
             </button>
           )}
         </div>

@@ -138,6 +138,7 @@ function App() {
           closeOnClick
           pauseOnHover
           draggable
+          style={{ zIndex: 9999 }}
         />
       </BrowserRouter>
     </ErrorBoundary>
