@@ -52,8 +52,9 @@ const sizeStyles = {
 } as const;
 
 const stateStyles = {
+  // border-none을 두면 outline/secondary/소셜 테두리가 비활성일 때 다시 사라진다.
   disabled:
-    "!bg-disabled-bg !text-text-disabled !border-none !shadow-none cursor-not-allowed opacity-100",
+    "!bg-disabled-bg !text-text-disabled !shadow-none cursor-not-allowed opacity-100",
 };
 
 // Spinner 컴포넌트 (로딩 UI)
