@@ -6,10 +6,12 @@
 //   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
 //   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt/role) 보강 (#137)
 //   - authStore.role SSOT = /me.role (BE role = MEMBER | ADMIN 통일)
+//   - 로그인 성공 시 저장된 복귀 경로가 있으면 그곳으로 이동, 단 ADMIN은 항상 /admin (#101)
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
 import useAuthStore from "@/stores/global/authStore";
+import { resolveLandingPath } from "@/utils/auth/loginRedirect";
 import type { UserRole } from "@/types/domain/auth";
 
 /** BE role → UserRole. 알 수 없는 값은 MEMBER로 안전하게 처리 */
@@ -26,6 +28,9 @@ export function useSocialLogin() {
     onSuccess: async (data) => {
       // 소셜 응답 body에 role 없음 → /me 전 임시 MEMBER, 보강 후 me.role 사용
       let role: UserRole = "MEMBER";
+      // /me 실패 시 role이 확정되지 않으므로 예매 복귀를 타지 않는다.
+      // 관리자인데 MEMBER로 남아 좌석 선택으로 가는 것을 막기 위함이다.
+      let allowRedirect = false;
 
       setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
@@ -38,6 +43,7 @@ export function useSocialLogin() {
       try {
         const me = await getMeApi();
         role = toUserRole(me.role);
+        allowRedirect = true;
         setAuth(data.accessToken, data.refreshToken, {
           userId: data.userId,
           name: me.name ?? data.name ?? "",
@@ -46,10 +52,10 @@ export function useSocialLogin() {
           joinedAt: me.createdAt ?? new Date().toISOString(),
         });
       } catch {
-        // /me 실패해도 로그인 자체는 유지 (role은 임시 MEMBER)
+        // /me 실패해도 로그인 자체는 유지 (role은 임시 MEMBER, 복귀 경로는 쓰지 않음)
       }
 
-      navigate(role === "ADMIN" ? "/admin" : "/");
+      navigate(resolveLandingPath(role, { allowRedirect }));
     },
   });
 }
@@ -86,7 +92,8 @@ export function useEmailLogin() {
         // /me 실패해도 로그인 자체는 유지
       }
 
-      navigate(role === "ADMIN" ? "/admin" : "/");
+      // 이메일 로그인은 응답에 role이 있어 /me가 실패해도 역할 규칙을 적용할 수 있다
+      navigate(resolveLandingPath(role));
     },
   });
 }
