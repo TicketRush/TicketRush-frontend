@@ -82,7 +82,7 @@ export default function AdminDashboardPage() {
       {/* 헤더 */}
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
+          <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg border-2 border-admin-dark-border px-2 py-1 rounded">
             ADMIN MODE
           </span>
           <h1 className="text-3xl font-bold mt-2">관리자 대시보드</h1>
@@ -94,14 +94,14 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => navigate("/admin/concerts/new")}
-            className="px-4 py-2 rounded-lg bg-primary text-white font-semibold flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-admin-register text-white font-semibold flex items-center gap-2"
           >
             <Plus size={16} /> 공연 등록
           </button>
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
           >
             <ArrowLeft size={16} /> 사용자 모드로
           </button>
@@ -114,6 +114,7 @@ export default function AdminDashboardPage() {
           icon={<Calendar size={24} />}
           badge="TOTAL"
           badgeColor="purple"
+          iconClassName="text-admin-kpi-events"
           value={data.stats.totalConcerts}
           label="등록된 공연"
         />
@@ -121,6 +122,7 @@ export default function AdminDashboardPage() {
           icon={<Users size={24} />}
           badge="SOLD"
           badgeColor="green"
+          iconClassName="text-admin-kpi-tickets"
           value={data.stats.soldTickets.toLocaleString()}
           label="판매된 티켓"
         />
@@ -128,6 +130,7 @@ export default function AdminDashboardPage() {
           icon={<DollarSign size={24} />}
           badge="REVENUE"
           badgeColor="orange"
+          iconClassName="text-admin-kpi-revenue"
           value={`₩${data.stats.totalRevenue.toLocaleString()}`}
           label="총 매출"
         />
@@ -135,6 +138,7 @@ export default function AdminDashboardPage() {
           icon={<TrendingUp size={24} />}
           badge="RATE"
           badgeColor="purple"
+          iconClassName="text-admin-kpi-occupancy"
           value={`${(data.stats.averageOccupancyRate * 100).toFixed(0)}%`}
           label="전체 좌석 판매율"
         />
@@ -181,8 +185,8 @@ export default function AdminDashboardPage() {
       <SalesChart data={data.concertSales} />
 
       {/* 전체 공연 목록 */}
-      <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
-        <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+      <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-6">
+        <span className="text-[10px] font-bold tracking-wider bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block mb-2">
           EVENTS LIST
         </span>
         <h3 className="text-base font-bold mb-4 text-gray-900">
@@ -215,8 +219,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="py-2 rounded text-white font-bold"
-                style={{ backgroundColor: "#931818" }}
+                className="py-2 rounded text-white font-bold bg-admin-cancel"
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? "삭제 중..." : "삭제"}
@@ -251,7 +254,7 @@ function ManagementCard({
       <div className="text-admin-text-secondary mb-4">{icon}</div>
       <h3 className="font-bold mb-2">{title}</h3>
       <p className="text-sm text-admin-text-secondary mb-4">{desc}</p>
-      <span className="text-sm text-primary flex items-center gap-1">
+      <span className="text-sm text-admin-accent flex items-center gap-1">
         {linkLabel} <ArrowRight size={14} />
       </span>
     </button>
