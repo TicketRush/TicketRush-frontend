@@ -140,7 +140,7 @@ export default function ReservationConfirmPage() {
         </div>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex gap-3">
+      <div className="bg-warning-bg border border-warning-border rounded-xl p-4 flex gap-3">
         <AlertCircle size={20} className="text-yellow-600 shrink-0 mt-0.5" />
         <div>
           <p className="font-semibold text-sm text-yellow-900 mb-1">

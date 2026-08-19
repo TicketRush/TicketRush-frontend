@@ -294,7 +294,7 @@ export default function SeatSelectionPage() {
       </div>
 
       {/* 예약 시간 안내 (상단 1개만) */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex gap-3">
+      <div className="bg-warning-bg border border-warning-border rounded-xl p-4 flex gap-3">
         <Clock size={20} className="shrink-0 mt-0.5 text-yellow-600" />
         <div>
           <p className="text-sm font-semibold mb-1 text-yellow-900">

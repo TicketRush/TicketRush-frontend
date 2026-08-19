@@ -211,7 +211,7 @@ export default function PaymentPage() {
         className={`rounded-xl p-4 mb-6 flex items-center justify-between ${
           isWarning
             ? "bg-red-50 border border-red-200"
-            : "bg-yellow-50 border border-yellow-200"
+            : "bg-warning-bg border border-warning-border"
         }`}
       >
         <div className="flex items-start gap-3">
