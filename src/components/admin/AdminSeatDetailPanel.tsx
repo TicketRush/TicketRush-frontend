@@ -121,8 +121,7 @@ function HoldDetail({
       <button
         type="button"
         onClick={() => onRelease(detail.seatId)}
-        className="w-full py-3 rounded font-bold text-white"
-        style={{ backgroundColor: "#942D12" }}
+        className="w-full py-3 rounded font-bold text-white bg-admin-refund"
       >
         예약 해제
       </button>
@@ -166,16 +165,14 @@ function SoldDetail({
         <button
           type="button"
           onClick={() => onRefund(detail.seatId)}
-          className="w-full py-3 rounded font-bold text-white"
-          style={{ backgroundColor: "#942D12" }}
+          className="w-full py-3 rounded font-bold text-white bg-admin-refund"
         >
           환불 처리
         </button>
         <button
           type="button"
           onClick={() => onShowReserver(detail.seatId)}
-          className="w-full py-3 rounded font-bold text-white"
-          style={{ backgroundColor: "#414B59" }}
+          className="w-full py-3 rounded font-bold text-white bg-admin-resend"
         >
           예매자 정보 보기
         </button>

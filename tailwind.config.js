@@ -95,6 +95,11 @@ export default {
             bg: "#FFFFFF",
             border: "#D0D0D0",
           },
+          // 라이트 카드 별칭. bg-admin-card는 다크, bg-admin-surface는 흰 카드.
+          surface: {
+            DEFAULT: "#FFFFFF",
+            border: "#D0D0D0",
+          },
           dark: {
             bg: "#1E2939",
             border: "#4A5565",
