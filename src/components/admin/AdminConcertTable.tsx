@@ -15,10 +15,10 @@ interface AdminConcertTableProps {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  ON_SALE: { label: "판매중", color: "bg-green-500/20 text-green-300" },
-  SOLD_OUT: { label: "매진", color: "bg-red-500/20 text-red-300" },
-  ENDED: { label: "종료", color: "bg-gray-500/20 text-gray-300" },
-  UPCOMING: { label: "예정", color: "bg-blue-500/20 text-blue-300" },
+  ON_SALE: { label: "판매중", color: "bg-green-100 text-green-700" },
+  SOLD_OUT: { label: "매진", color: "bg-red-100 text-red-700" },
+  ENDED: { label: "종료", color: "bg-gray-100 text-gray-600" },
+  UPCOMING: { label: "예정", color: "bg-blue-100 text-blue-700" },
 };
 
 export default function AdminConcertTable({
@@ -61,10 +61,10 @@ export default function AdminConcertTable({
         const rate = (getValue() as number) * 100;
         const color =
           rate >= 90
-            ? "text-green-400"
+            ? "text-green-600"
             : rate >= 50
-              ? "text-blue-400"
-              : "text-gray-400";
+              ? "text-blue-600"
+              : "text-gray-500";
         return <span className={`font-bold ${color}`}>{rate.toFixed(0)}%</span>;
       },
     },
@@ -95,14 +95,14 @@ export default function AdminConcertTable({
           <button
             type="button"
             onClick={() => onEdit(row.original.id)}
-            className="px-2 py-1 rounded bg-admin-border hover:bg-admin-border/80 text-xs flex items-center gap-1"
+            className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 text-xs flex items-center gap-1"
           >
             <Edit size={12} /> 수정
           </button>
           <button
             type="button"
             onClick={() => onDelete(row.original.id)}
-            className="px-2 py-1 rounded bg-admin-border hover:bg-red-500/30 text-xs flex items-center gap-1"
+            className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-red-50 text-xs flex items-center gap-1"
           >
             <Trash2 size={12} /> 삭제
           </button>
@@ -119,14 +119,14 @@ export default function AdminConcertTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left admin-table">
+      <table className="w-full text-sm text-left">
         <thead>
           {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-admin-border">
+            <tr key={hg.id} className="border-b border-gray-200 bg-gray-50">
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
-                  className="py-3 px-3 text-xs font-semibold text-admin-text-secondary"
+                  className="py-3 px-3 text-xs font-semibold text-gray-500"
                 >
                   {flexRender(h.column.columnDef.header, h.getContext())}
                 </th>
@@ -138,10 +138,10 @@ export default function AdminConcertTable({
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              className="border-b border-admin-border/50 hover:bg-admin-border/30"
+              className="border-b border-gray-100 hover:bg-gray-50"
             >
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="py-3 px-3 text-admin-text">
+                <td key={cell.id} className="py-3 px-3 text-gray-800">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}
