@@ -20,9 +20,9 @@ jobs:
           node-version: "20"
           cache: "npm" # npm 캐시를 사용하여 설치 속도 향상
 
-      # 라이브러리 설치
+      # 라이브러리 설치 (배포와 동일하게 lockfile 정합성 검증)
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # 타입 체크
       - name: Type check

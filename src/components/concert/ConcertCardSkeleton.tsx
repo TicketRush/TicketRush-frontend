@@ -3,9 +3,9 @@ import Skeleton from "../common/Skeleton/Skeleton";
 /** 공연 카드 로딩 스켈레톤 — ConcertCard와 동일한 레이아웃 */
 export default function ConcertCardSkeleton() {
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-100 bg-white shadow-sm">
+    <div className="rounded-xl overflow-hidden bg-white shadow-card">
       {/* 포스터 영역 (4:3) */}
-      <div className="aspect-[4/3] bg-gray-200 animate-pulse" />
+      <div className="aspect-[4/3] bg-gradient-to-b from-poster-fallback to-poster-fallback-end animate-pulse" />
 
       {/* 카드 내용 */}
       <div className="p-4 space-y-2">

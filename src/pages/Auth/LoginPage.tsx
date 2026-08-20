@@ -4,20 +4,27 @@
 //   - develop LoginPage UI/에러 처리(setFocus, errors.root) 유지
 //   - 소셜 로그인만 추가: getOauthUrlApi → 리다이렉트, provider별 loading·중복 클릭 방지
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "react-toastify";
 import { loginSchema, type LoginFormData } from "../../schemas/auth";
 import { useEmailLogin } from "@/hooks/auth/useAuth";
 import { getOauthUrlApi } from "@/api/auth";
+import {
+  applyLoginRedirectFromLocation,
+  clearLoginRedirect,
+} from "@/utils/auth/loginRedirect";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
+import emailIcon from "@/assets/icons/email.svg";
+import lockIcon from "@/assets/icons/lock.svg";
 
 type SocialProvider = "kakao" | "naver" | "google";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const emailLogin = useEmailLogin();
 
   // 소셜 로그인 진행 중인 provider (중복 클릭 방지)
@@ -38,6 +45,12 @@ export default function LoginPage() {
   useEffect(() => {
     setFocus("email");
   }, [setFocus]);
+
+  // 예매 흐름에서 밀려온 경우에만 복귀 경로를 보관한다.
+  // 헤더에서 직접 들어오면 이전에 포기한 예매 경로를 비운다 (#101)
+  useEffect(() => {
+    applyLoginRedirectFromLocation(location.state);
+  }, [location.state]);
 
   const onSubmit = (data: LoginFormData) => {
     emailLogin.mutate(data, {
@@ -80,7 +93,14 @@ export default function LoginPage() {
   return (
     <div className="relative flex justify-center min-h-screen px-6 pt-20 pb-10 bg-[#f8f9fa]">
       <div className="absolute top-6 left-6">
-        <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            clearLoginRedirect();
+            navigate(-1);
+          }}
+        >
           ← 뒤로가기
         </Button>
       </div>
@@ -100,7 +120,7 @@ export default function LoginPage() {
         >
           <Input
             label="이메일"
-            icon={<span>✉</span>}
+            icon={<img src={emailIcon} alt="" className="w-4 h-4" />}
             required
             type="email"
             placeholder="user@example.com"
@@ -109,7 +129,7 @@ export default function LoginPage() {
           />
           <Input
             label="비밀번호"
-            icon={<span>🔒</span>}
+            icon={<img src={lockIcon} alt="" className="w-4 h-4" />}
             required
             type="password"
             placeholder="비밀번호를 입력해주세요"
@@ -146,7 +166,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="kakao"
-            size="md"
+            size="oauth"
             className="flex-1"
             loading={pendingProvider === "kakao"}
             disabled={pendingProvider !== null}
@@ -157,7 +177,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="naver"
-            size="md"
+            size="oauth"
             className="flex-1"
             loading={pendingProvider === "naver"}
             disabled={pendingProvider !== null}
@@ -168,7 +188,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="google"
-            size="md"
+            size="oauth"
             className="flex-1"
             loading={pendingProvider === "google"}
             disabled={pendingProvider !== null}
@@ -180,7 +200,14 @@ export default function LoginPage() {
 
         <p className="font-pretendard text-sm text-text-secondary text-center mt-6">
           계정이 없으신가요?{" "}
-          <Link to="/signup" className="text-primary font-semibold underline">
+          <Link
+            to="/signup"
+            state={{
+              from: (location.state as { from?: unknown } | null)?.from,
+              preserveRedirect: true,
+            }}
+            className="text-primary font-semibold underline"
+          >
             회원가입
           </Link>
         </p>
