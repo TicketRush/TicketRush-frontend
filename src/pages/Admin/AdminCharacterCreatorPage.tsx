@@ -420,6 +420,7 @@ export default function AdminCharacterCreatorPage() {
                 skinColor={selectedSkinTone?.color ?? "#f7c6a8"}
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
+                outfitName={character.outfitName}
                 hairStyle={character.hairStyle}
               />
             </div>

@@ -11,6 +11,7 @@ interface CharacterModelViewerProps {
   skinColor: string;
   hairColor: string;
   outfitColor: string;
+  outfitName: string;
   hairStyle: HairStyle;
 }
 
@@ -21,6 +22,9 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   twintails: "/models/hair/hair_twintails.glb",
   wave: "/models/hair/hair_wave.glb",
 };
+
+const CONCERT_OUTFIT_NAME = "마이크 콘서트";
+const CONCERT_OUTFIT_URL = "/models/outfits/concert_outfit.glb";
 
 function getPartType(objectName: string) {
   const name = objectName.toLowerCase();
@@ -40,14 +44,16 @@ function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   outfitColor,
+  outfitName,
 }: Pick<
   CharacterModelViewerProps,
-  "modelUrl" | "skinColor" | "outfitColor"
+  "modelUrl" | "skinColor" | "outfitColor" | "outfitName"
 >) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
+    const isConcertOutfit = outfitName === CONCERT_OUTFIT_NAME;
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
@@ -64,6 +70,11 @@ function CharacterBody({
       }
 
       if (partType === "clothes") {
+        if (isConcertOutfit) {
+          object.visible = false;
+          return;
+        }
+
         object.material = new THREE.MeshStandardMaterial({
           color: outfitColor,
           roughness: 0.75,
@@ -72,7 +83,7 @@ function CharacterBody({
     });
 
     return clonedScene;
-  }, [gltf.scene, skinColor, outfitColor]);
+  }, [gltf.scene, skinColor, outfitColor, outfitName]);
 
   return <primitive object={scene} />;
 }
@@ -104,13 +115,26 @@ function HairModel({
   return <primitive object={scene} />;
 }
 
+function ConcertOutfitModel() {
+  const gltf = useGLTF(CONCERT_OUTFIT_URL);
+
+  const scene = useMemo(() => {
+    return gltf.scene.clone(true);
+  }, [gltf.scene]);
+
+  return <primitive object={scene} />;
+}
+
 function CharacterModel({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
   outfitColor,
+  outfitName,
   hairStyle,
 }: CharacterModelViewerProps) {
+  const isConcertOutfit = outfitName === CONCERT_OUTFIT_NAME;
+
   return (
     <Center>
       <group
@@ -122,9 +146,12 @@ function CharacterModel({
           modelUrl={modelUrl}
           skinColor={skinColor}
           outfitColor={outfitColor}
+          outfitName={outfitName}
         />
 
         <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+
+        {isConcertOutfit && <ConcertOutfitModel />}
       </group>
     </Center>
   );
@@ -135,6 +162,7 @@ export default function CharacterModelViewer({
   skinColor,
   hairColor,
   outfitColor,
+  outfitName,
   hairStyle,
 }: CharacterModelViewerProps) {
   return (
@@ -150,6 +178,7 @@ export default function CharacterModelViewer({
             skinColor={skinColor}
             hairColor={hairColor}
             outfitColor={outfitColor}
+            outfitName={outfitName}
             hairStyle={hairStyle}
           />
         </Suspense>
@@ -171,3 +200,4 @@ useGLTF.preload("/models/hair/hair_long.glb");
 useGLTF.preload("/models/hair/hair_ponytail.glb");
 useGLTF.preload("/models/hair/hair_twintails.glb");
 useGLTF.preload("/models/hair/hair_wave.glb");
+useGLTF.preload(CONCERT_OUTFIT_URL);

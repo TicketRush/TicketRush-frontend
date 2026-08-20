@@ -854,6 +854,7 @@ function CharacterCreatorLinkBox({
           skinColor={CHARACTER_SKIN_COLORS[character.skinTone]}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          outfitName={character.outfitName}
           hairStyle={character.hairStyle}
         />
       </div>
