@@ -14,11 +14,11 @@ interface SeatItemProps {
 
 const STYLES: Record<SeatStatus | "SELECTED", string> = {
   AVAILABLE:
-    "bg-white border border-gray-300 hover:border-primary hover:bg-primary/10 hover:-translate-y-0.5 hover:shadow-md text-gray-700",
-  HOLD: "bg-gray-200 border border-gray-300 cursor-not-allowed text-gray-400",
-  SOLD: "bg-gray-400 border border-gray-500 cursor-not-allowed text-white",
+    "bg-white border border-seat-available hover:bg-seat-available/10 hover:-translate-y-0.5 hover:shadow-md text-gray-700",
+  HOLD: "bg-seat-holding border border-seat-holding cursor-not-allowed text-white",
+  SOLD: "bg-seat-sold border border-seat-sold cursor-not-allowed text-white",
   SELECTED:
-    "bg-primary border border-primary text-white shadow-md -translate-y-0.5",
+    "bg-seat-selected border border-seat-selected text-white shadow-md -translate-y-0.5",
 };
 
 function SeatItemImpl({ seat, isSelected, onClick }: SeatItemProps) {
