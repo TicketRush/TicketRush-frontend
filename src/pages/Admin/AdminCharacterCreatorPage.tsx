@@ -5,6 +5,10 @@ import {
   resolveStoredHairStyle,
   type HairStyle,
 } from "@/components/admin/character/characterHair";
+import {
+  resolveStoredEyeStyle,
+  type EyeStyle,
+} from "@/components/admin/character/characterEye";
 
 type SkinTone = "light" | "medium" | "tan" | "dark";
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
@@ -12,6 +16,7 @@ type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 interface CharacterConfig {
   skinTone: SkinTone;
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
   hairColor: string;
   outfitName: string;
   outfitColor: string;
@@ -40,6 +45,19 @@ const HAIR_STYLES: {
   { value: "ponytail", label: "포니테일", icon: "🎀" },
   { value: "twintails", label: "양갈래", icon: "👧" },
   { value: "wave", label: "웨이브", icon: "🌀" },
+];
+
+const EYE_STYLES: {
+  value: EyeStyle;
+  label: string;
+  icon: string;
+}[] = [
+  { value: "default", label: "기본", icon: "👀" },
+  { value: "happy", label: "웃는 눈", icon: "^^" },
+  { value: "wink", label: "윙크", icon: "😉" },
+  { value: "squeeze", label: "찡긋", icon: "><" },
+  { value: "angry", label: "화난 눈", icon: "😠" },
+  { value: "closed", label: "감은 눈", icon: "—" },
 ];
 
 const HAIR_COLORS = [
@@ -129,6 +147,7 @@ const BACKGROUNDS = [
 const DEFAULT_CHARACTER: CharacterConfig = {
   skinTone: "light",
   hairStyle: "ponytail",
+  eyeStyle: "default",
   hairColor: "#151515",
   outfitName: "무지개 블라우스",
   outfitColor: "#60a5fa",
@@ -147,14 +166,16 @@ function loadSavedCharacter(): CharacterConfig {
   try {
     const parsed = JSON.parse(savedCharacter) as Omit<
       CharacterConfig,
-      "hairStyle"
+      "hairStyle" | "eyeStyle"
     > & {
       hairStyle?: unknown;
+      eyeStyle?: unknown;
     };
 
     return {
       ...parsed,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
     };
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -303,6 +324,26 @@ export default function AdminCharacterCreatorPage() {
               </div>
             </CreatorSection>
 
+            <CreatorSection title="눈 모양">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                {EYE_STYLES.map((eyeStyle) => (
+                  <OptionCard
+                    key={eyeStyle.value}
+                    selected={character.eyeStyle === eyeStyle.value}
+                    onClick={() => update("eyeStyle", eyeStyle.value)}
+                  >
+                    <div className="text-2xl font-bold text-slate-800">
+                      {eyeStyle.icon}
+                    </div>
+
+                    <p className="mt-2 text-xs font-bold text-slate-800">
+                      {eyeStyle.label}
+                    </p>
+                  </OptionCard>
+                ))}
+              </div>
+            </CreatorSection>
+
             <CreatorSection title="의상 선택">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {OUTFITS.map((outfit) => (
@@ -421,12 +462,14 @@ export default function AdminCharacterCreatorPage() {
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
                 hairStyle={character.hairStyle}
+                eyeStyle={character.eyeStyle}
               />
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
               <p>피부: {character.skinTone}</p>
               <p>헤어: {character.hairStyle}</p>
+              <p>눈: {character.eyeStyle}</p>
               <p>의상: {character.outfitName}</p>
               <p>액세서리: {character.accessory}</p>
               <p>포즈: {character.pose}</p>
@@ -491,6 +534,7 @@ function OptionCard({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={`rounded-lg border bg-white p-3 text-center transition ${
         selected
           ? "border-slate-900 shadow-sm"
@@ -514,7 +558,8 @@ function ColorButton({
   return (
     <button
       type="button"
-      aria-label={color}
+      aria-label={`${color} 색상 선택`}
+      aria-pressed={selected}
       onClick={onClick}
       className={`h-12 rounded-lg border transition ${
         selected
