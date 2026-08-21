@@ -16,8 +16,14 @@
 //   mockReleaseSeat   → PATCH /api/v1/booking/{bookingId}/cancel
 //   mockConfirmSold   → 백엔드 내부 자동 처리 (POST /payment/confirm 성공 시)
 //   mockSubscribeSeats → GET /api/v1/seat/{performanceId}/seat-status/stream (SSE)
+//
+// - 2026-08-06 (이슈 #177):
+//   - availableCount를 MOCK_CONCERTS.remainingSeats에 맞춰 시드
+//     (ON_SALE 매진 = remainingSeats 0 → availableCount 0 고정)
 
 import { mockDelay, mockError, shouldThrow } from "./_helpers";
+import { MOCK_CONCERTS } from "./concerts";
+import useSeatStore from "@/stores/reservation/seatStore";
 import type {
   SeatWithStatus,
   SeatCounts,
@@ -28,6 +34,7 @@ import type {
 const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 const COLS = 12;
 const HOLD_DURATION_MS = 5 * 60 * 1000;
+const TOTAL_SEATS = ROWS.length * COLS;
 
 /**
  * mockHoldSeat 반환 타입 (백엔드에 실제 API 없음, mock 편의용).
@@ -46,17 +53,24 @@ const seatStateByPerformance: Map<number, Map<number, SeatStatus>> = new Map();
 function ensureSeatState(performanceId: number) {
   if (seatStateByPerformance.has(performanceId)) return;
 
+  const concert = MOCK_CONCERTS.find((c) => c.id === performanceId);
+  const availableTarget = Math.max(
+    0,
+    Math.min(TOTAL_SEATS, concert?.remainingSeats ?? Math.floor(TOTAL_SEATS * 0.6)),
+  );
+
+  // remainingSeats만큼 AVAILABLE, 나머지는 SOLD(일부 HOLD)로 고정 시드
+  // → #177 매진(id=2, remainingSeats=0) 등 시나리오를 재현 가능하게 함
   const map = new Map<number, SeatStatus>();
-  let seatId = 1;
-  ROWS.forEach(() => {
-    for (let col = 1; col <= COLS; col++) {
-      const r = Math.random();
-      let status: SeatStatus = "AVAILABLE";
-      if (r < 0.15) status = "HOLD";
-      else if (r < 0.25) status = "SOLD";
-      map.set(seatId++, status);
+  for (let seatId = 1; seatId <= TOTAL_SEATS; seatId++) {
+    if (seatId <= availableTarget) {
+      map.set(seatId, "AVAILABLE");
+    } else if ((seatId - availableTarget) % 8 === 0) {
+      map.set(seatId, "HOLD");
+    } else {
+      map.set(seatId, "SOLD");
     }
-  });
+  }
   seatStateByPerformance.set(performanceId, map);
 }
 
@@ -195,41 +209,76 @@ function notifyListeners(performanceId: number, event: SeatUpdateEvent) {
 }
 
 /**
+ * mock QA 임시 스위치.
+ * URL에 `?forceHoldSelected=1` 이면 랜덤이 아니라 **현재 선택 좌석**을 HOLD한다.
+ * 예: /concerts/1/seats?forceHoldSelected=1
+ */
+function isForceHoldSelectedEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    new URLSearchParams(window.location.search).get("forceHoldSelected") ===
+    "1"
+  );
+}
+
+function holdSeatForSimulator(
+  performanceId: number,
+  seatId: number,
+  statusMap: Map<number, SeatStatus>,
+) {
+  statusMap.set(seatId, "HOLD");
+  notifyListeners(performanceId, {
+    seatId,
+    status: "HOLD",
+    timestamp: new Date().toISOString(),
+  });
+
+  // 5초 후 다시 해제 (반복 테스트 가능)
+  setTimeout(() => {
+    if (statusMap.get(seatId) === "HOLD") {
+      statusMap.set(seatId, "AVAILABLE");
+      notifyListeners(performanceId, {
+        seatId,
+        status: "AVAILABLE",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, 5000);
+}
+
+/**
  * 다른 사용자의 좌석 활동을 시뮬레이션.
- * 3초마다 10% 확률로 랜덤한 좌석을 HOLD → 5초 후 AVAILABLE.
- * UI에서 SSE 동작을 눈으로 확인하기 위함.
+ * - 기본: 3초마다 10% 확률로 랜덤 좌석 HOLD → 5초 후 AVAILABLE
+ * - `?forceHoldSelected=1`: 선택 좌석이 있으면 약 2초마다 그 좌석을 HOLD (토스트/선택 해제 QA용)
  */
 function startSimulator(performanceId: number) {
   if (intervalByPerformance.has(performanceId)) return;
 
   const interval = setInterval(() => {
-    if (Math.random() >= 0.1) return;
-
     ensureSeatState(performanceId);
     const statusMap = seatStateByPerformance.get(performanceId)!;
+
+    // ── QA 스위치: 선택 좌석 강제 HOLD ──
+    if (isForceHoldSelectedEnabled()) {
+      const selectedId = useSeatStore.getState().selectedSeat?.id;
+      if (
+        selectedId != null &&
+        statusMap.get(selectedId) === "AVAILABLE"
+      ) {
+        holdSeatForSimulator(performanceId, selectedId, statusMap);
+      }
+      return;
+    }
+
+    // ── 기본 랜덤 시뮬레이터 ──
+    if (Math.random() >= 0.1) return;
+
     const seatIds = Array.from(statusMap.keys());
     const randomId = seatIds[Math.floor(Math.random() * seatIds.length)];
     const current = statusMap.get(randomId)!;
 
-    if (current === "AVAILABLE" && Math.random() < 0.5) {
-      statusMap.set(randomId, "HOLD");
-      notifyListeners(performanceId, {
-        seatId: randomId,
-        status: "HOLD",
-        timestamp: new Date().toISOString(),
-      });
-
-      // 5초 후 다시 해제
-      setTimeout(() => {
-        if (statusMap.get(randomId) === "HOLD") {
-          statusMap.set(randomId, "AVAILABLE");
-          notifyListeners(performanceId, {
-            seatId: randomId,
-            status: "AVAILABLE",
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }, 5000);
+    if (current === "AVAILABLE") {
+      holdSeatForSimulator(performanceId, randomId, statusMap);
     }
   }, 3000);
 

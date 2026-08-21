@@ -1,5 +1,23 @@
 // 결제 상태 머신 store
-// 상태 전이: IDLE → REQUESTING → CONFIRMING → SUCCESS / FAILED / EXPIRED
+//
+// 상태 전이:
+//   IDLE
+//     ├─ startRequest()      → REQUESTING (SDK 호출 시작)
+//     ├─ cancel()            → CANCELLED  (예매 진입 전/직후 취소)
+//     └─ expire()            → EXPIRED    (타이머 만료)
+//
+//   REQUESTING
+//     ├─ startConfirming()   → CONFIRMING (SDK 콜백 후 백엔드 confirm 진행)
+//     ├─ cancel()            → CANCELLED  (사용자가 SDK 창에서 닫음)
+//     ├─ fail(msg)           → FAILED     (SDK 오류)
+//     └─ expire()            → EXPIRED    (타이머 만료)
+//
+//   CONFIRMING
+//     ├─ succeed()           → SUCCESS    (confirm 성공)
+//     └─ fail(msg)           → FAILED     (confirm 실패)
+//
+//   SUCCESS / FAILED / EXPIRED / CANCELLED
+//     └─ reset()             → IDLE       (새 예매 시작)
 //
 // ⚠️ Toss 결제창 리다이렉트로 페이지가 완전히 새로 로드되므로, 리다이렉트 복귀 후에도
 // bookingNumber/bookingId/seatId/amount/status를 잃지 않도록 sessionStorage에 persist.
@@ -48,8 +66,11 @@ interface PaymentStoreState {
   /** 결제 성공 */
   succeed: () => void;
 
-  /** 결제 실패 (사용자 취소, SDK 오류, confirm 실패 등) */
+  /** 결제 실패 (SDK 오류, confirm 실패 등 시스템 오류) */
   fail: (message: string) => void;
+
+  /** 사용자가 명시적으로 결제 취소 (SDK 창 닫기, 뒤로가기 등) */
+  cancel: () => void;
 
   /** 타이머 만료 */
   expire: () => void;
@@ -97,6 +118,8 @@ export const usePaymentStore = create<PaymentStoreState>()(
       succeed: () => set({ status: "SUCCESS" }),
 
       fail: (message) => set({ status: "FAILED", errorMessage: message }),
+
+      cancel: () => set({ status: "CANCELLED", errorMessage: null }),
 
       expire: () => set({ status: "EXPIRED" }),
 

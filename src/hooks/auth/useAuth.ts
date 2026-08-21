@@ -2,28 +2,21 @@
 //
 // 변경사항:
 //   - setAuth 호출부에 refreshToken 매개변수 추가 (refresh 토큰 자동 재발급 지원)
-//   - useEmailLogin.onSuccess에서 백엔드 응답의 data.role 우선 사용
-//     (화이트리스트는 backend가 role 안 줄 때만 fallback)
-//   - 실 API 연동 후에는 화이트리스트 로직 제거 가능
+//   - 소셜 로그인 응답에 email/role/joinedAt 없음 반영 (백엔드 OauthLoginResponse)
+//   - 이메일 로그인 응답에 name/joinedAt 없음 반영 (백엔드 LoginResponse)
+//   - 로그인 직후 getMeApi()로 프로필(name/email/createdAt/role) 보강 (#137)
+//   - authStore.role SSOT = /me.role (BE role = MEMBER | ADMIN 통일)
+//   - 로그인 성공 시 저장된 복귀 경로가 있으면 그곳으로 이동, 단 ADMIN은 항상 /admin (#101)
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { socialLoginApi, emailLoginApi, logoutApi } from "@/api/auth";
+import { socialLoginApi, emailLoginApi, logoutApi, getMeApi } from "@/api/auth";
 import useAuthStore from "@/stores/global/authStore";
+import { resolveLandingPath } from "@/utils/auth/loginRedirect";
 import type { UserRole } from "@/types/domain/auth";
 
-// ⚠️ Dev/데모용 — 관리자 계정 화이트리스트 (backend role 없을 때 fallback)
-// 백엔드에서 응답에 role 필드가 확정되면 이 화이트리스트는 제거
-const ADMIN_EMAIL_WHITELIST = ["admin@ticketrush.com"];
-
-function determineRole(email: string, backendRole?: string): UserRole {
-  // 백엔드가 role을 주면 그게 우선
-  if (backendRole === "ADMIN") return "ADMIN";
-  if (backendRole === "MEMBER") return "MEMBER";
-  // 백엔드 role 없을 때 화이트리스트 fallback
-  if (ADMIN_EMAIL_WHITELIST.includes(email.toLowerCase().trim())) {
-    return "ADMIN";
-  }
-  return "MEMBER";
+/** BE role → UserRole. 알 수 없는 값은 MEMBER로 안전하게 처리 */
+function toUserRole(backendRole?: string): UserRole {
+  return backendRole === "ADMIN" ? "ADMIN" : "MEMBER";
 }
 
 export function useSocialLogin() {
@@ -32,18 +25,37 @@ export function useSocialLogin() {
 
   return useMutation({
     mutationFn: socialLoginApi,
-    onSuccess: (data) => {
-      // 소셜 로그인 응답에 role 이미 포함됨
-      const role = determineRole(data.email, data.role);
+    onSuccess: async (data) => {
+      // 소셜 응답 body에 role 없음 → /me 전 임시 MEMBER, 보강 후 me.role 사용
+      let role: UserRole = "MEMBER";
+      // /me 실패 시 role이 확정되지 않으므로 예매 복귀를 타지 않는다.
+      // 관리자인데 MEMBER로 남아 좌석 선택으로 가는 것을 막기 위함이다.
+      let allowRedirect = false;
 
       setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
-        name: data.name,
-        email: data.email,
+        name: data.name ?? "",
+        email: "",
         role,
-        joinedAt: data.joinedAt,
+        joinedAt: new Date().toISOString(),
       });
-      navigate(role === "ADMIN" ? "/admin" : "/");
+
+      try {
+        const me = await getMeApi();
+        role = toUserRole(me.role);
+        allowRedirect = true;
+        setAuth(data.accessToken, data.refreshToken, {
+          userId: data.userId,
+          name: me.name ?? data.name ?? "",
+          email: me.email ?? "",
+          role,
+          joinedAt: me.createdAt ?? new Date().toISOString(),
+        });
+      } catch {
+        // /me 실패해도 로그인 자체는 유지 (role은 임시 MEMBER, 복귀 경로는 쓰지 않음)
+      }
+
+      navigate(resolveLandingPath(role, { allowRedirect }));
     },
   });
 }
@@ -54,19 +66,34 @@ export function useEmailLogin() {
 
   return useMutation({
     mutationFn: emailLoginApi,
-    onSuccess: (data, variables) => {
-      // 백엔드 응답의 data.role 우선, 없으면 화이트리스트 fallback
-      const role = determineRole(variables.email, data.role);
+    onSuccess: async (data, variables) => {
+      // /me 전: 로그인 응답 role. /me 성공 시 me.role로 덮어씀 (SSOT).
+      let role = toUserRole(data.role);
 
       setAuth(data.accessToken, data.refreshToken, {
         userId: data.userId,
-        name: data.name,
+        name: "",
         email: variables.email,
         role,
-        joinedAt: data.joinedAt,
+        joinedAt: new Date().toISOString(),
       });
 
-      navigate(role === "ADMIN" ? "/admin" : "/");
+      try {
+        const me = await getMeApi();
+        role = toUserRole(me.role);
+        setAuth(data.accessToken, data.refreshToken, {
+          userId: data.userId,
+          name: me.name ?? "",
+          email: me.email ?? variables.email,
+          role,
+          joinedAt: me.createdAt ?? new Date().toISOString(),
+        });
+      } catch {
+        // /me 실패해도 로그인 자체는 유지
+      }
+
+      // 이메일 로그인은 응답에 role이 있어 /me가 실패해도 역할 규칙을 적용할 수 있다
+      navigate(resolveLandingPath(role));
     },
   });
 }
@@ -82,7 +109,6 @@ export function useLogout() {
       navigate("/login");
     },
     onError: () => {
-      // 서버 로그아웃 실패해도 클라이언트 세션은 정리
       logout();
       navigate("/login");
     },

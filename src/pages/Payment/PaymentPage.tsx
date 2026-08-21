@@ -172,6 +172,11 @@ export default function PaymentPage() {
     retryPayment();
   }
 
+  function handleBack() {
+    // Confirm으로 복귀 — PENDING/HOLD는 유지 (이탈·만료 시에만 취소)
+    navigate(`/concerts/${id}/payment/confirm`);
+  }
+
   const totalAmount = amount || (currentConcert?.price ?? 0);
   const isWarning = mm < 1;
   const canPay =
@@ -186,8 +191,9 @@ export default function PaymentPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50"
+          onClick={handleBack}
+          disabled={releaseMutation.isPending}
+          className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-60"
         >
           <ArrowLeft size={14} />
           뒤로가기
@@ -199,7 +205,7 @@ export default function PaymentPage() {
         className={`rounded-xl p-4 mb-6 flex items-center justify-between ${
           isWarning
             ? "bg-red-50 border border-red-200"
-            : "bg-yellow-50 border border-yellow-200"
+            : "bg-warning-bg border border-warning-border"
         }`}
       >
         <div className="flex items-start gap-3">
@@ -315,8 +321,9 @@ export default function PaymentPage() {
 
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="w-full py-2.5 rounded-lg bg-gray-100 text-text-secondary text-sm hover:bg-gray-200"
+              onClick={handleBack}
+              disabled={releaseMutation.isPending}
+              className="w-full py-2.5 rounded-lg bg-gray-100 text-text-secondary text-sm hover:bg-gray-200 disabled:opacity-60"
             >
               ← 이전으로
             </button>

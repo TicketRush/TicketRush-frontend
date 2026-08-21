@@ -50,12 +50,27 @@ export interface SeatCounts {
   soldCount: number;
 }
 
-/** SSE 이벤트 페이로드 — 백엔드 확정 대기 (가상 스펙) */
+/**
+ * SSE 이벤트 페이로드 — 백엔드 SeatStatusChangedResponse 대응 (이슈 #123, BE 소스 확인 완료)
+ *
+ * 백엔드 원본 필드(snake_case): performance_id, seat_id, seat_layout_id,
+ * seat_number, seat_status, hold_expired_at.
+ * EventSource는 axios를 거치지 않아 axios-case-converter가 적용되지 않으므로,
+ * subscribeSeatStream 내부에서 snake_case → camelCase로 직접 변환해 이 타입으로 전달한다.
+ *
+ * hold_expired_at은 백엔드 Jackson NON_NULL 설정으로 null일 때 필드 자체가 생략됨
+ * (HOLD가 아닌 상태에서는 대부분 없음).
+ */
 export interface SeatUpdateEvent {
   seatId: number;
   status: SeatStatus;
-  /** ISO datetime */
-  timestamp: string;
+  performanceId?: number;
+  seatLayoutId?: number;
+  seatNumber?: string;
+  /** HOLD 만료 예정 시각 — 백엔드 포맷 "yyyy-MM-dd HH:mm:ss" (ISO 아님) */
+  holdExpiredAt?: string;
+  /** @deprecated 백엔드 페이로드에 없음. Mock 시뮬레이터 호환용으로만 유지. */
+  timestamp?: string;
 }
 
 /**

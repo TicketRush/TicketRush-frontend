@@ -6,11 +6,15 @@ import type { MyBookingsParams } from "@/types/domain/booking";
 const DEFAULT_SIZE = 100;
 
 export function useMyBookings(params: MyBookingsParams = {}) {
-  const { size = DEFAULT_SIZE } = params;
+  const normalized: MyBookingsParams = {
+    page: params.page ?? 0,
+    size: params.size ?? DEFAULT_SIZE,
+    ...(params.status ? { status: params.status } : {}),
+  };
 
   return useQuery({
-    queryKey: queryKeys.bookings.mine({ size }),
-    queryFn: () => fetchMyBookings({ size }),
+    queryKey: queryKeys.bookings.mine(normalized),
+    queryFn: () => fetchMyBookings(normalized),
     staleTime: 30_000,
   });
 }

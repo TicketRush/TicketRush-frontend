@@ -49,6 +49,9 @@ interface BackendBookingSummary {
   seatId: number;
   bookingStatus: BookingStatus;
   confirmedAt: string | null;
+  /** 예매 생성/만료 시각 — BE 응답에 있으면 사용 (없으면 optional) */
+  createdAt?: string | null;
+  expiresAt?: string | null;
 }
 
 /** 백엔드 BookingCountResponse */
@@ -82,26 +85,66 @@ export async function createBookingApi(
 //
 // 예매 상세 조회 (aggregation).
 //
-// ⚠️ 백엔드에 이 API 없음. 다음 순서로 aggregation:
-//   1. GET /api/v1/booking/me 에서 해당 bookingNumber 찾기
+// ⚠️ 백엔드에 단건 조회 API 없음 (후속: FE #168 / BE #560).
+// 현재 우회:
+//   1. GET /api/v1/booking/me 를 status·page 순회하며 bookingNumber 찾기
 //   2. GET /api/v1/performance/{performanceId} 공연 정보 조회
 //   3. GET /api/v1/seat/numbers?seatIds= 좌석 번호 조회
 //
 // 결제 정보(price, paidAt)는 booking 응답에서 파생 불가 → 결제 API 별도 조회 필요.
 // 지금은 concert.price로 fallback. 필요 시 GET /payment 로직 추가.
 
+const BOOKING_ME_PAGE_SIZE = 100;
+const BOOKING_ME_MAX_PAGES = 50;
+/** 단건 조회 우회 시 status 순회 목록 (BE 기본값이 CONFIRMED라 명시 필요) */
+const BOOKING_DETAIL_STATUSES: BookingStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "CANCELED",
+  "REFUNDING",
+  "REFUNDED",
+  "EXPIRED",
+];
+/** 내 예매 목록 전체 조회용 (status 미지정 시 BE 기본 CONFIRMED만 오는 문제 방지) */
+const MY_BOOKING_LIST_STATUSES: BookingStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "CANCELED",
+  "REFUNDING",
+  "REFUNDED",
+  "EXPIRED",
+];
+
+function resolveBookingCreatedAt(s: BackendBookingSummary): string {
+  return s.confirmedAt ?? s.createdAt ?? s.expiresAt ?? "";
+}
+
+/** /booking/me 를 status·page 순회해 bookingNumber에 해당하는 summary를 찾는다. */
+async function findMyBookingSummary(
+  bookingNumber: string,
+): Promise<BackendBookingSummary | undefined> {
+  for (const status of BOOKING_DETAIL_STATUSES) {
+    for (let page = 0; page < BOOKING_ME_MAX_PAGES; page++) {
+      const listRes = await apiClient.get<BackendBookingSummary[]>(
+        "/api/v1/booking/me",
+        { params: { status, page, size: BOOKING_ME_PAGE_SIZE } },
+      );
+      const summaries = listRes.data ?? [];
+      const found = summaries.find((b) => b.bookingNumber === bookingNumber);
+      if (found) return found;
+      if (summaries.length < BOOKING_ME_PAGE_SIZE) break;
+    }
+  }
+  return undefined;
+}
+
 export async function fetchBookingDetail(
   bookingNumber: string,
 ): Promise<BookingDetail> {
   if (USE_MOCK) return mockGetBookingDetail(bookingNumber);
 
-  // 1. 내 예매 목록에서 해당 bookingNumber 찾기 (백엔드가 단건 조회 API 미제공)
-  const listRes = await apiClient.get<BackendBookingSummary[]>(
-    "/api/v1/booking/me",
-    { params: { size: 100 } },
-  );
-  const summaries = listRes.data ?? [];
-  const target = summaries.find((b) => b.bookingNumber === bookingNumber);
+  // 1. 내 예매 목록에서 해당 bookingNumber 찾기 (단건 API 전까지 pagination 우회)
+  const target = await findMyBookingSummary(bookingNumber);
   if (!target) {
     throw new Error("예매 정보를 찾을 수 없습니다.");
   }
@@ -130,7 +173,7 @@ export async function fetchBookingDetail(
     seatNumber,
     price: concert.price,
     paidAt: target.confirmedAt,
-    createdAt: target.confirmedAt ?? new Date().toISOString(),
+    createdAt: resolveBookingCreatedAt(target) || new Date().toISOString(),
     cancelledAt: null,
   };
 }
@@ -143,6 +186,7 @@ export async function fetchBookingDetail(
 //
 // aggregation 순서:
 //   1. GET /api/v1/booking/me → BookingSummary[]
+//      ⚠️ BE는 status 기본값이 CONFIRMED → status 미지정 시 상태별 병렬 조회 후 merge
 //   2. unique performanceId 목록 추출 → GET /performance/{id} 병렬 조회
 //   3. 모든 seatId 목록 → GET /seat/numbers 한 번에 조회
 //   4. 조합하여 BookingListItem[] 반환
@@ -150,33 +194,14 @@ export async function fetchBookingDetail(
 // ⚠️ 성능 우려: 예매가 많으면 performance 조회가 N+1.
 // 현재는 unique로 dedupe만 함. 심하면 백엔드 batch endpoint 요청 고려.
 
-export async function fetchMyBookings(
-  params: MyBookingsParams,
+async function aggregateMyBookingSummaries(
+  summaries: BackendBookingSummary[],
+  size: number,
 ): Promise<MyBookingsResponse> {
-  if (USE_MOCK) return mockGetMyBookings(params);
-
-  const page = params.page ?? 0;
-  const size = params.size ?? 20;
-
-  // 1. 내 예매 목록 조회
-  //    ⚠️ 백엔드가 pageRequest를 object로 받는 방식이면 별도 처리 필요할 수 있음.
-  //    현재는 flat params로 전달 시도.
-  const listRes = await apiClient.get<BackendBookingSummary[]>(
-    "/api/v1/booking/me",
-    {
-      params: {
-        page,
-        size,
-        ...(params.status ? { status: params.status } : {}),
-      },
-    },
-  );
-  const summaries = listRes.data ?? [];
   if (summaries.length === 0) {
     return { items: [], hasNext: false };
   }
 
-  // 2. 공연 정보 aggregation (unique performanceId만)
   const uniquePerformanceIds = Array.from(
     new Set(summaries.map((s) => s.performanceId)),
   );
@@ -191,20 +216,17 @@ export async function fetchMyBookings(
         const concert = await fetchConcertDetail(id);
         concertsMap.set(id, concert);
       } catch (error) {
-        // 공연이 삭제된 경우 등 — 조용히 무시하고 fallback
         console.warn(`Failed to fetch concert ${id}:`, error);
       }
     }),
   );
 
-  // 3. 좌석 번호 aggregation (한 번에 조회)
   const allSeatIds = Array.from(new Set(summaries.map((s) => s.seatId)));
   const seatNumbersArr = await fetchSeatNumbers(allSeatIds);
   const seatNumberMap = new Map(
     seatNumbersArr.map((s) => [s.seatId, s.seatNumber]),
   );
 
-  // 4. 조합
   const items: BookingListItem[] = summaries.map((s) => {
     const concert = concertsMap.get(s.performanceId);
     return {
@@ -218,15 +240,81 @@ export async function fetchMyBookings(
       performanceImageMainUrl: concert?.imageMainUrl ?? "",
       seatNumber: seatNumberMap.get(s.seatId) ?? "?",
       price: concert?.price ?? 0,
-      createdAt: s.confirmedAt ?? "",
+      createdAt: resolveBookingCreatedAt(s),
     };
   });
 
   return {
     items,
-    // 백엔드 응답 size와 요청 size 같으면 다음 페이지 존재 가능
-    hasNext: summaries.length === size,
+    hasNext: summaries.length >= size,
   };
+}
+
+async function fetchMyBookingSummariesPage(
+  status: BookingStatus,
+  page: number,
+  size: number,
+): Promise<BackendBookingSummary[]> {
+  const listRes = await apiClient.get<BackendBookingSummary[]>(
+    "/api/v1/booking/me",
+    { params: { status, page, size } },
+  );
+  return listRes.data ?? [];
+}
+
+export async function fetchMyBookings(
+  params: MyBookingsParams,
+): Promise<MyBookingsResponse> {
+  if (USE_MOCK) return mockGetMyBookings(params);
+
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+
+  // status 지정 시 해당 상태만 조회
+  if (params.status) {
+    const summaries = await fetchMyBookingSummariesPage(
+      params.status,
+      page,
+      size,
+    );
+    return aggregateMyBookingSummaries(summaries, size);
+  }
+
+  // status 미지정: BE 기본 CONFIRMED만 오는 것을 막고 전 상태 병렬 조회 후 merge.
+  // BE는 status당 pagination만 지원하므로, 요청 페이지를 채울 만큼 각 상태에서
+  // 앞쪽 항목을 가져온 뒤 **전체 목록 기준**으로 정렬·slice·hasNext를 계산한다.
+  const neededCount = (page + 1) * size;
+  const perStatusFetchSize = Math.min(
+    BOOKING_ME_PAGE_SIZE * BOOKING_ME_MAX_PAGES,
+    neededCount + 1,
+  );
+  const pages = await Promise.all(
+    MY_BOOKING_LIST_STATUSES.map((status) =>
+      fetchMyBookingSummariesPage(status, 0, perStatusFetchSize),
+    ),
+  );
+  const merged = new Map<number, BackendBookingSummary>();
+  for (const batch of pages) {
+    for (const s of batch) {
+      merged.set(s.bookingId, s);
+    }
+  }
+  const summaries = Array.from(merged.values()).sort((a, b) => {
+    const ta = resolveBookingCreatedAt(a);
+    const tb = resolveBookingCreatedAt(b);
+    return tb.localeCompare(ta);
+  });
+
+  const start = page * size;
+  const pageSummaries = summaries.slice(start, start + size);
+  const mayHaveMoreBeyondFetch = pages.some(
+    (batch) => batch.length >= perStatusFetchSize,
+  );
+  const hasNext =
+    start + size < summaries.length || mayHaveMoreBeyondFetch;
+
+  const aggregated = await aggregateMyBookingSummaries(pageSummaries, size);
+  return { ...aggregated, hasNext };
 }
 
 // -------------------------------------------------------

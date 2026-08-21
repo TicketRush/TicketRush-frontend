@@ -20,9 +20,9 @@ jobs:
           node-version: "20"
           cache: "npm" # npm 캐시를 사용하여 설치 속도 향상
 
-      # 라이브러리 설치
+      # 라이브러리 설치 (배포와 동일하게 lockfile 정합성 검증)
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # 타입 체크
       - name: Type check
@@ -31,6 +31,10 @@ jobs:
       # 린트 검사 (코드 스타일 및 문법 체크)
       - name: Lint check
         run: npm run lint
+
+      # 단위 테스트
+      - name: Unit test
+        run: npm test
 
       # 빌드 테스트 (실제 배포용 파일 생성 확인)
       - name: Build project

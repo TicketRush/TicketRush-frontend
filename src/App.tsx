@@ -33,6 +33,7 @@ import AdminBookingsPage from "@/pages/Admin/AdminBookingsPage";
 import AdminRefundsPage from "@/pages/Admin/AdminRefundsPage";
 import AdminSeatMonitoringPage from "@/pages/Admin/AdminSeatMonitoringPage";
 import AdminConcertFormPage from "@/pages/Admin/AdminConcertFormPage";
+import AdminCharacterCreatorPage from "@/pages/Admin/AdminCharacterCreatorPage";
 import DevNavPage from "@/pages/Dev/DevNavPage";
 
 import OAuthCallbackPage from "./pages/Auth/OAuthCallbackPage";
@@ -107,6 +108,10 @@ function App() {
             관리자 영역 — AdminRoute + AdminLayout
           ──────────────────────────────────────── */}
           <Route element={<AdminRoute />}>
+            <Route
+              path="/admin/character-creator"
+              element={<AdminCharacterCreatorPage />}
+              />
             <Route element={<AdminLayout />}>
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/bookings" element={<AdminBookingsPage />} />
@@ -138,6 +143,7 @@ function App() {
           closeOnClick
           pauseOnHover
           draggable
+          style={{ zIndex: 9999 }}
         />
       </BrowserRouter>
     </ErrorBoundary>

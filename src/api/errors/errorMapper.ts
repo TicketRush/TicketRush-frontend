@@ -167,3 +167,20 @@ export function isValidationError(error: unknown): boolean {
 export function isNetworkError(error: unknown): boolean {
   return error instanceof ApiError && error.code === "NETWORK_ERROR";
 }
+
+/**
+ * PENDING 취소(DELETE booking) 실패를 무시해도 안전한지.
+ * 이미 없거나 만료/취소된 예매는 새 PENDING 생성 전에 통과시키고,
+ * 그 외(네트워크·5xx 등)는 호출측에서 새 예매 생성을 중단해야 한다.
+ */
+export function isIgnorablePendingCancelError(error: unknown): boolean {
+  const apiError = ApiError.fromUnknown(error);
+  if (apiError.httpStatus === 404) return true;
+
+  return (
+    apiError.code === ERROR_CODES.BOOKING_NOT_FOUND ||
+    apiError.code === ERROR_CODES.BOOKING_EXPIRED ||
+    // mock alias (실 API 코드표에는 없음)
+    apiError.code === "BOOKING_ALREADY_CANCELED"
+  );
+}

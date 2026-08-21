@@ -28,6 +28,7 @@ import type {
   ConcertSummary,
   Genre,
 } from "@/types/domain/concert";
+import type { CursorInfo } from "./types/pagination";
 import { MOCK_CONCERTS, getMockConcertDetail } from "./mocks/concerts";
 import { mockDelay, mockError } from "./mocks/_helpers";
 import apiClient from "./instance";
@@ -66,19 +67,12 @@ interface PerformanceDetailResponse {
   totalSeats: number;
   address: string;
   performanceStatus: ConcertStatus;
+  /** 예매 오픈 시각 (UPCOMING 안내) */
+  bookingOpenAt?: string | null;
   imageMainUrl: string;
   image3dUrl?: string;
   imageGalleryUrls: string[];
   facilities: string[]; // 백엔드는 문자열 배열
-}
-
-/** 백엔드 PageInfo */
-interface BackendPageInfo {
-  pageIndex: number;
-  size: number;
-  hasNext: boolean;
-  totalElements?: number;
-  totalPages?: number;
 }
 
 // -------------------------------------------------------
@@ -124,7 +118,7 @@ function mapListItem(item: PerformanceListResponse): ConcertSummary {
     price: item.price,
     imageMainUrl: item.imageMainUrl,
     status: item.performanceStatus,
-    // totalSeats, remainingSeats는 목록 응답에 없음
+    // totalSeats, remainingSeats, bookingOpenAt은 목록 응답에 없음
   };
 }
 
@@ -150,6 +144,7 @@ function mapDetail(item: PerformanceDetailResponse): ConcertDetail {
       label: f,
     })),
     status: item.performanceStatus,
+    bookingOpenAt: item.bookingOpenAt ?? null,
     // notices는 백엔드에 없음 → 프론트 페이지에서 fallback 상수 사용
   };
 }
@@ -228,17 +223,37 @@ export async function fetchConcerts(
     return buildMockConcertListResponse(params);
   }
 
-  // ⚠️ 프론트 cursor → 백엔드 page 매핑
-  // cursor를 page index로 취급 (첫 요청 cursor=0, size=8 → page=0, size=8)
+  // ⚠️ 버그 수정 (2026-07-21): 백엔드는 page 기반이 아니라 cursor 기반 페이지네이션.
+  // 실제 요청/응답 (swagger·네트워크 캡처로 확인):
+  //   GET /api/v1/performance?size=8&cursor=0
+  //   → pagination_info: { has_next, next_cursor?, size } (CursorInfo, PageInfo 아님)
+  // 기존 코드는 cursor를 page index로 환산해 page/size를 보내고 응답을 PageInfo로
+  // 가정 + nextCursor를 (pageIndex+1)*size로 직접 계산했는데, 백엔드가 실제로
+  // cursor/size를 그대로 받고 CursorInfo를 내려주기 때문에 두 가정 모두 스펙과
+  // 어긋남. cursor/size를 그대로 전달하고 응답의 nextCursor를 그대로 사용하도록 수정.
+  //
+  // ⚠️ 추가 수정 (2026-07-21, 백엔드 소스 직접 확인):
+  // PerformanceController.getPerformances는 커서 파라미터를
+  // @ModelAttribute CursorPageRequest(cursorId, size)로 바인딩한다. 즉 실제
+  // 파라미터명은 "cursor"가 아니라 "cursorId"다("cursor"는 Spring이 바인딩하지
+  // 못해 매번 무시되고 항상 첫 페이지만 반환됨 — 무한 스크롤이 진행되지 않는 버그).
+  // 또한 minPrice/maxPrice/cursorId처럼 여러 단어로 된 파라미터명은
+  // axios-case-converter가 snake_case로 바꿔버리면 바인딩이 깨지므로
+  // instance.ts에 ignoreParams: true를 함께 적용함 (쿼리 파라미터는 변환하지 않음).
+  //
+  // 참고: PerformanceController는 sort 파라미터를 전혀 받지 않는다
+  // (Javadoc: "최신 등록순(performanceId 내림차순) 고정 정렬"). 아래 sort는
+  // 현재 백엔드에 아무 효과가 없으며, 추가 파라미터라 에러 없이 조용히 무시된다.
   const size = params.size ?? 8;
-  const cursorValue = params.cursor ?? 0;
-  const pageIndex = Math.floor(cursorValue / size);
+  const cursor = params.cursor ?? 0;
 
   // sort 매핑 — 프론트 enum → 백엔드 문자열 형식 ("property,DIRECTION")
+  // ⚠️ 현재 백엔드는 이 파라미터를 지원하지 않음 (위 주석 참고) — 정렬 UI는
+  // sort 지원 이슈가 해결되기 전까지 실제로는 동작하지 않음.
   const backendSort = mapSort(params.sort);
 
   const backendParams: Record<string, unknown> = {
-    page: pageIndex,
+    cursorId: cursor,
     size,
   };
   if (params.genre) backendParams.genre = params.genre;
@@ -247,27 +262,23 @@ export async function fetchConcerts(
   if (params.maxPrice !== undefined) backendParams.maxPrice = params.maxPrice;
   if (backendSort) backendParams.sort = backendSort;
 
-  // 백엔드 응답: { result: PerformanceListResponse[], paginationInfo: PageInfo }
-  // instance.ts interceptor가 result → data.data로 unwrap하고 paginationInfo → data.pagination로 분리
+  // 백엔드 응답: { result: PerformanceListResponse[], paginationInfo: CursorInfo }
+  // instance.ts interceptor가 result → res.data로 unwrap하고 paginationInfo → res.pagination로 분리
   const res = await apiClient.get<PerformanceListResponse[]>(
     "/api/v1/performance",
     { params: backendParams },
   );
 
   const items = (res.data ?? []).map(mapListItem);
-  const backendPageInfo = res.pagination as unknown as
-    | BackendPageInfo
-    | undefined;
-
-  const hasNext = backendPageInfo?.hasNext ?? false;
-  const nextCursor = (pageIndex + 1) * size;
+  const paginationInfo = res.pagination as CursorInfo | undefined;
 
   return {
     items,
     pagination: {
-      hasNext,
-      nextCursor,
-      size,
+      hasNext: paginationInfo?.hasNext ?? false,
+      // has_next=false일 때 next_cursor는 @JsonInclude(NON_NULL)로 응답에서 빠짐
+      nextCursor: paginationInfo?.nextCursor ?? cursor + size,
+      size: paginationInfo?.size ?? size,
     },
   };
 }
