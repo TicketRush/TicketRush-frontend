@@ -340,13 +340,22 @@ export async function mockGetRefundingStuckBookings(
 
 export async function mockRetryRefund(bookingNumber: string): Promise<void> {
   await mockDelay(500);
-  const idx = MOCK_REFUND_FAILED.findIndex(
+  const failedIdx = MOCK_REFUND_FAILED.findIndex(
     (b) => b.bookingNumber === bookingNumber,
   );
-  if (idx === -1) {
-    await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
+  if (failedIdx !== -1) {
+    // mock: 재시도 성공 시 해당 목록에서 제거
+    MOCK_REFUND_FAILED.splice(failedIdx, 1);
     return;
   }
-  // mock: 재시도 성공 시 목록에서 제거
-  MOCK_REFUND_FAILED.splice(idx, 1);
+
+  const stuckIdx = MOCK_REFUNDING_STUCK.findIndex(
+    (b) => b.bookingNumber === bookingNumber,
+  );
+  if (stuckIdx !== -1) {
+    MOCK_REFUNDING_STUCK.splice(stuckIdx, 1);
+    return;
+  }
+
+  await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
 }
