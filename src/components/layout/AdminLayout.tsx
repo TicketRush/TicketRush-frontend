@@ -87,8 +87,8 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      {/* 메인 영역 */}
-      <main className="flex-1 min-w-0 overflow-auto">
+      {/* 메인 영역 — min-h-0: flex 아이템이 콘텐츠 높이로 늘어나 overflow가 막히지 않게 함 */}
+      <main className="flex-1 min-w-0 min-h-0 overflow-auto">
         <Outlet />
       </main>
     </div>
