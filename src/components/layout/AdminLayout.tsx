@@ -1,4 +1,5 @@
 // components/layout/AdminLayout.tsx
+import { useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -26,13 +27,16 @@ export default function AdminLayout() {
   const isActive = (to: string, exact?: boolean) =>
     exact ? location.pathname === to : location.pathname.startsWith(to);
 
+  useEffect(() => {
+    document.body.classList.add("admin-layout");
+    return () => document.body.classList.remove("admin-layout");
+  }, []);
+
   return (
-    // body의 transform: scale(0.7) 때문에 sticky는 화면에 고정되지 않는다.
-    // 레이아웃 높이를 viewport로 잠그고, 스크롤은 메인 영역만 담당한다.
-    <div className="h-screen overflow-hidden flex bg-admin-bg text-admin-text">
-      {/* 사이드바 */}
+    <div className="min-h-screen flex bg-admin-bg text-admin-text">
+      {/* 사이드바 — self-start로 stretch를 막아 sticky가 화면 높이를 유지 */}
       <aside
-        className="w-64 shrink-0 h-full overflow-y-auto
+        className="w-64 shrink-0 sticky top-0 self-start h-screen overflow-y-auto
           bg-admin-card border-r border-admin-border flex flex-col"
       >
         {/* 로고 */}
@@ -87,8 +91,7 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      {/* 메인 영역 — min-h-0: flex 아이템이 콘텐츠 높이로 늘어나 overflow가 막히지 않게 함 */}
-      <main className="flex-1 min-w-0 min-h-0 overflow-auto">
+      <main className="flex-1 min-w-0">
         <Outlet />
       </main>
     </div>
