@@ -84,21 +84,22 @@ export default function ConcertListPage() {
       {/* 목록이 비거나 로딩 중이어도 배너는 같은 위치에 둔다 */}
       <BannerSlider />
 
-      {isLoading ? (
-        <ConcertGrid>
-          {Array.from({ length: BANNER_AFTER }).map((_, i) => (
-            <ConcertCardSkeleton key={`b-${i}`} />
-          ))}
-        </ConcertGrid>
-      ) : (
-        afterBanner.length > 0 && (
+      {!isError &&
+        (isLoading ? (
           <ConcertGrid>
-            {afterBanner.map((c) => (
-              <ConcertCard key={c.id} concert={c} />
+            {Array.from({ length: BANNER_AFTER }).map((_, i) => (
+              <ConcertCardSkeleton key={`b-${i}`} />
             ))}
           </ConcertGrid>
-        )
-      )}
+        ) : (
+          afterBanner.length > 0 && (
+            <ConcertGrid>
+              {afterBanner.map((c) => (
+                <ConcertCard key={c.id} concert={c} />
+              ))}
+            </ConcertGrid>
+          )
+        ))}
 
       {/* 무한 스크롤 trigger */}
       <div ref={sentinelRef} className="h-1" />

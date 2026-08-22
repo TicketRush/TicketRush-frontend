@@ -53,9 +53,22 @@ export default function ConcertDetailPage() {
   if (!concertId || isNaN(concertId))
     return <Navigate to="/concerts" replace />;
 
+  const listBackButton = (
+    <Button
+      variant="outline"
+      size="sm"
+      className="mb-4"
+      icon={<ArrowLeft size={14} />}
+      onClick={() => navigate("/concerts")}
+    >
+      공연 목록으로
+    </Button>
+  );
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {listBackButton}
         <div className="bg-white border border-border rounded-xl p-12 text-center text-text-secondary">
           공연 정보 불러오는 중...
         </div>
@@ -66,6 +79,7 @@ export default function ConcertDetailPage() {
   if (isError || !data) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {listBackButton}
         <div className="bg-white border border-border rounded-xl p-12 text-center text-error">
           공연 정보를 불러올 수 없습니다.
         </div>
@@ -117,16 +131,7 @@ export default function ConcertDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-      {/* 상단 — 뒤로가기 */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="mb-4"
-        icon={<ArrowLeft size={14} />}
-        onClick={() => navigate(-1)}
-      >
-        공연 목록으로
-      </Button>
+      {listBackButton}
 
       {/* 7:3 grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6">
