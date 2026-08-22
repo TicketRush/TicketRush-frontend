@@ -202,7 +202,7 @@ export default function SignupPage() {
       {/* 뒤로가기 */}
       <div className="absolute top-6 left-6">
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           icon={<img src={backbtnIcon} alt="" className="w-4 h-4" />}
           onClick={() => navigate(-1)}

@@ -25,6 +25,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import Button from "@/components/common/Button/Button";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
@@ -306,15 +307,15 @@ export default function SeatSelectionPage() {
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between bg-white border border-border rounded-xl px-6 py-4">
-        <button
-          type="button"
-          onClick={handleBack}
+        <Button
+          variant="outline"
+          size="sm"
+          icon={<X size={14} />}
           disabled={isConfirmPending}
-          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-gray-100 disabled:opacity-60"
+          onClick={handleBack}
         >
-          <X size={14} />
           뒤로가기
-        </button>
+        </Button>
         <div className="text-center">
           <h1 className="text-base font-bold text-text">좌석 선택</h1>
           <p className="text-xs text-text-secondary mt-0.5">
