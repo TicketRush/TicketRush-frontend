@@ -27,10 +27,12 @@ export default function AdminLayout() {
     exact ? location.pathname === to : location.pathname.startsWith(to);
 
   return (
-    <div className="min-h-screen flex bg-admin-bg text-admin-text">
+    // body의 transform: scale(0.7) 때문에 sticky는 화면에 고정되지 않는다.
+    // 레이아웃 높이를 viewport로 잠그고, 스크롤은 메인 영역만 담당한다.
+    <div className="h-screen overflow-hidden flex bg-admin-bg text-admin-text">
       {/* 사이드바 */}
       <aside
-        className="w-64 shrink-0 sticky top-0 h-screen overflow-y-auto
+        className="w-64 shrink-0 h-full overflow-y-auto
           bg-admin-card border-r border-admin-border flex flex-col"
       >
         {/* 로고 */}
