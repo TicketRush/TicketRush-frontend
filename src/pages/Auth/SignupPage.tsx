@@ -12,7 +12,7 @@
 //     * getOauthUrlApi(provider) → window.location.href 리다이렉트
 //     * 실패 시 toast, pendingProvider로 로딩·중복 클릭 방지
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -27,6 +27,7 @@ import {
 } from "@/api/auth";
 import { ApiError } from "@/api/errors/errorMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
+import { saveLoginRedirect } from "@/utils/auth/loginRedirect";
 import backbtnIcon from "@/assets/icons/arrow-back.svg";
 import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
@@ -39,6 +40,7 @@ type SocialProvider = "kakao" | "naver" | "google";
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // 이메일 인증 상태
   const [verificationSent, setVerificationSent] = useState(false);
@@ -71,6 +73,12 @@ export default function SignupPage() {
   const email = watch("email");
   const verificationCode = watch("verificationCode");
   const isEmailVerified = watch("isEmailVerified");
+
+  // 예매 흐름에서 밀려온 경우 복귀 경로를 보관한다. 가입 후 /login으로 넘어가도
+  // sessionStorage에 남아 있어 로그인 성공 시 그대로 복귀한다 (#101)
+  useEffect(() => {
+    saveLoginRedirect((location.state as { from?: unknown } | null)?.from);
+  }, [location.state]);
 
   // 재발송 카운트다운 (1초 단위 감소)
   useEffect(() => {
@@ -129,7 +137,8 @@ export default function SignupPage() {
       }),
     onSuccess: () => {
       toast.success("회원가입이 완료되었습니다.");
-      navigate("/login");
+      // 예매 흐름에서 저장한 복귀 경로를 로그인 페이지가 지우지 않게 한다
+      navigate("/login", { state: { preserveRedirect: true } });
     },
     onError: (error: unknown) => {
       const apiError = ApiError.fromUnknown(error);
@@ -394,7 +403,11 @@ export default function SignupPage() {
         {/* 푸터 */}
         <p className="font-pretendard text-sm text-text-secondary text-center mt-6">
           이미 계정이 있으신가요?{" "}
-          <Link to="/login" className="text-primary font-semibold underline">
+          <Link
+            to="/login"
+            state={{ preserveRedirect: true }}
+            className="text-primary font-semibold underline"
+          >
             로그인
           </Link>
         </p>

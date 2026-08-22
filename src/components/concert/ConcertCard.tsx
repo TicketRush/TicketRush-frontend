@@ -128,7 +128,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
 
   return (
     <article
-      className="group rounded-xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
+      className="group rounded-xl overflow-hidden bg-white shadow-card hover:shadow-md transition-shadow duration-200 cursor-pointer"
       onClick={handleClick}
       role="link"
       tabIndex={0}
@@ -139,7 +139,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
         }
       }}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
+      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-b from-poster-fallback to-poster-fallback-end">
         <img
           src={concert.imageMainUrl || samplePoster}
           alt={`${concert.title} 포스터`}

@@ -18,6 +18,7 @@ import SeatSelectionPage from "./pages/Booking/SeatSelectionPage";
 import ReservationConfirmPage from "./pages/Booking/ReservationConfirmPage";
 
 import PaymentPage from "./pages/Payment/PaymentPage";
+import PaymentSuccessPage from "./pages/Payment/PaymentSuccessPage";
 import PaymentCompletePage from "./pages/Payment/PaymentCompletePage";
 import PaymentFailedPage from "./pages/Payment/PaymentFailedPage";
 import ReservationExpiredPage from "./pages/Payment/ReservationExpiredPage";
@@ -73,6 +74,10 @@ function App() {
                 element={<ReservationConfirmPage />}
               />
               <Route path="/concerts/:id/payment" element={<PaymentPage />} />
+              <Route
+                path="/concerts/:id/payment/success"
+                element={<PaymentSuccessPage />}
+              />
               <Route
                 path="/concerts/:id/payment/expired"
                 element={<ReservationExpiredPage />}
@@ -138,6 +143,7 @@ function App() {
           closeOnClick
           pauseOnHover
           draggable
+          style={{ zIndex: 9999 }}
         />
       </BrowserRouter>
     </ErrorBoundary>
