@@ -23,6 +23,9 @@ import type {
   MyBookingsParams,
   MyBookingsResponse,
   MyBookingCountResponse,
+  AdminRefundBookingItem,
+  AdminRefundBookingListParams,
+  AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
 import {
   mockCreateBooking,
@@ -30,6 +33,9 @@ import {
   mockGetMyBookings,
   mockGetMyBookingCount,
   mockCancelBooking,
+  mockGetRefundFailedBookings,
+  mockGetRefundingStuckBookings,
+  mockRetryRefund,
 } from "./mocks/bookings";
 import { fetchConcertDetail } from "./concerts";
 import { fetchSeatNumbers } from "./seats";
@@ -341,4 +347,146 @@ export async function cancelBookingApi(bookingNumber: string): Promise<void> {
   if (USE_MOCK) return mockCancelBooking(bookingNumber);
 
   await apiClient.delete(`/api/v1/booking/${bookingNumber}`);
+}
+
+// -------------------------------------------------------
+// 관리자: 환불 모니터링 (booking-service admin, 2026-07-18 실측으로 확인된 실 API)
+// -------------------------------------------------------
+
+/** 백엔드 BookingSummaryResponse (관리자 환불 조회용, userId/refundFailedAt/updatedAt 포함) */
+interface BackendAdminRefundBooking {
+  bookingId: number;
+  bookingNumber: string;
+  userId: number;
+  performanceId: number;
+  seatId: number;
+  bookingStatus: BookingStatus;
+  confirmedAt: string | null;
+  refundFailedAt: string | null;
+  updatedAt: string;
+}
+
+/**
+ * hasNext 결정:
+ *   1. interceptor가 분리한 paginationInfo.hasNext 우선
+ *   2. 없으면 items.length === requestedSize fallback
+ *      (마지막 페이지 항목 수가 size와 같으면 false positive 가능)
+ */
+function resolveAdminRefundHasNext(
+  paginationHasNext: boolean | undefined,
+  itemCount: number,
+  requestedSize: number,
+): boolean {
+  if (typeof paginationHasNext === "boolean") return paginationHasNext;
+  return itemCount === requestedSize;
+}
+
+async function toAdminRefundListResponse(
+  raw: BackendAdminRefundBooking[],
+  requestedSize: number,
+  paginationHasNext?: boolean,
+): Promise<AdminRefundBookingListResponse> {
+  const items: AdminRefundBookingItem[] = raw.map((b) => ({
+    bookingId: b.bookingId,
+    bookingNumber: b.bookingNumber,
+    userId: b.userId,
+    performanceId: b.performanceId,
+    seatId: b.seatId,
+    status: b.bookingStatus,
+    confirmedAt: b.confirmedAt,
+    refundFailedAt: b.refundFailedAt,
+    updatedAt: b.updatedAt,
+  }));
+
+  if (items.length === 0) {
+    return { items: [], hasNext: false };
+  }
+
+  const uniquePerformanceIds = Array.from(
+    new Set(items.map((i) => i.performanceId)),
+  );
+  const concertsMap = new Map<
+    number,
+    Awaited<ReturnType<typeof fetchConcertDetail>>
+  >();
+  await Promise.all(
+    uniquePerformanceIds.map(async (id) => {
+      try {
+        concertsMap.set(id, await fetchConcertDetail(id));
+      } catch (error) {
+        console.warn(`Failed to fetch concert ${id}:`, error);
+      }
+    }),
+  );
+
+  const seatIds = Array.from(new Set(items.map((i) => i.seatId)));
+  let seatNumberMap = new Map<number, string>();
+  try {
+    const seatNumbersArr = await fetchSeatNumbers(seatIds);
+    seatNumberMap = new Map(
+      seatNumbersArr.map((s) => [s.seatId, s.seatNumber]),
+    );
+  } catch (error) {
+    console.warn("Failed to fetch seat numbers for refund list:", error);
+  }
+
+  const richItems = items.map((i) => ({
+    ...i,
+    performanceTitle: concertsMap.get(i.performanceId)?.title ?? "삭제된 공연",
+    seatNumber: seatNumberMap.get(i.seatId) ?? "?",
+  }));
+
+  return {
+    items: richItems,
+    hasNext: resolveAdminRefundHasNext(
+      paginationHasNext,
+      items.length,
+      requestedSize,
+    ),
+  };
+}
+
+/** 백엔드: GET /api/v1/booking/admin/bookings/refund-failed (환불 처리 자체가 실패한 건) */
+export async function getRefundFailedBookingsApi(
+  params: AdminRefundBookingListParams = {},
+): Promise<AdminRefundBookingListResponse> {
+  if (USE_MOCK) return mockGetRefundFailedBookings(params);
+
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const res = await apiClient.get<BackendAdminRefundBooking[]>(
+    "/api/v1/booking/admin/bookings/refund-failed",
+    { params: { page, size } },
+  );
+  return toAdminRefundListResponse(
+    res.data ?? [],
+    size,
+    res.pagination?.hasNext,
+  );
+}
+
+/** 백엔드: GET /api/v1/booking/admin/bookings/refunding-stuck (REFUNDING 상태로 멈춰있는 건) */
+export async function getRefundingStuckBookingsApi(
+  params: AdminRefundBookingListParams = {},
+): Promise<AdminRefundBookingListResponse> {
+  if (USE_MOCK) return mockGetRefundingStuckBookings(params);
+
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const res = await apiClient.get<BackendAdminRefundBooking[]>(
+    "/api/v1/booking/admin/bookings/refunding-stuck",
+    { params: { page, size } },
+  );
+  return toAdminRefundListResponse(
+    res.data ?? [],
+    size,
+    res.pagination?.hasNext,
+  );
+}
+
+/** 백엔드: POST /api/v1/booking/admin/{bookingNumber}/refund-retry */
+export async function retryRefundApi(bookingNumber: string): Promise<void> {
+  if (USE_MOCK) return mockRetryRefund(bookingNumber);
+
+  await apiClient.post(`/api/v1/booking/admin/${bookingNumber}/refund-retry`);
 }
