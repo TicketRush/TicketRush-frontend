@@ -27,6 +27,11 @@ import {
   resolveStoredEyeStyle,
   type EyeStyle,
 } from "@/components/admin/character/characterEye";
+import {
+  MOUTH_STYLE_LABELS,
+  resolveStoredMouthStyle,
+  type MouthStyle,
+} from "@/components/admin/character/characterMouth";
 
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
@@ -68,6 +73,7 @@ interface CharacterDraft {
   skinTone: CharacterSkinTone;
   hairStyle: HairStyle;
   eyeStyle: EyeStyle;
+  mouthStyle: MouthStyle;
   hairColor: string;
   outfitName: string;
   outfitColor: string;
@@ -93,16 +99,18 @@ function loadSavedCharacter(): CharacterDraft | null {
   try {
     const parsed = JSON.parse(savedCharacter) as Omit<
       CharacterDraft,
-      "hairStyle" | "eyeStyle"
+      "hairStyle" | "eyeStyle" | "mouthStyle"
     > & {
       hairStyle?: unknown;
       eyeStyle?: unknown;
+      mouthStyle?: unknown;
     };
 
     return {
       ...parsed,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
+      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
     };
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -863,6 +871,7 @@ function CharacterCreatorLinkBox({
           outfitColor={character.outfitColor}
           hairStyle={character.hairStyle}
           eyeStyle={character.eyeStyle}
+          mouthStyle={character.mouthStyle}
         />
       </div>
 
@@ -874,6 +883,10 @@ function CharacterCreatorLinkBox({
         <p className="mt-1 text-xs text-admin-text-secondary">
           피부: {character.skinTone} / 헤어: {character.hairStyle} / 눈:{" "}
           {character.eyeStyle}
+        </p>
+
+        <p className="mt-1 text-xs text-admin-text-secondary">
+          입: {MOUTH_STYLE_LABELS[character.mouthStyle]}
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">

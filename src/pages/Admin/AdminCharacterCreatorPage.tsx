@@ -9,6 +9,11 @@ import {
   resolveStoredEyeStyle,
   type EyeStyle,
 } from "@/components/admin/character/characterEye";
+import {
+  MOUTH_STYLE_LABELS,
+  resolveStoredMouthStyle,
+  type MouthStyle,
+} from "@/components/admin/character/characterMouth";
 
 type SkinTone = "light" | "medium" | "tan" | "dark";
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
@@ -17,6 +22,7 @@ interface CharacterConfig {
   skinTone: SkinTone;
   hairStyle: HairStyle;
   eyeStyle: EyeStyle;
+  mouthStyle: MouthStyle;
   hairColor: string;
   outfitName: string;
   outfitColor: string;
@@ -58,6 +64,43 @@ const EYE_STYLES: {
   { value: "squeeze", label: "찡긋", icon: "><" },
   { value: "angry", label: "화난 눈", icon: "😠" },
   { value: "closed", label: "감은 눈", icon: "—" },
+];
+
+const MOUTH_OPTIONS: {
+  value: MouthStyle;
+  label: string;
+  icon: string;
+}[] = [
+  {
+    value: "DEFAULT",
+    label: MOUTH_STYLE_LABELS.DEFAULT,
+    icon: "—",
+  },
+  {
+    value: "SMILE",
+    label: MOUTH_STYLE_LABELS.SMILE,
+    icon: "⌣",
+  },
+  {
+    value: "OPEN_SMILE",
+    label: MOUTH_STYLE_LABELS.OPEN_SMILE,
+    icon: "◡",
+  },
+  {
+    value: "PUCKER",
+    label: MOUTH_STYLE_LABELS.PUCKER,
+    icon: "3",
+  },
+  {
+    value: "CAT",
+    label: MOUTH_STYLE_LABELS.CAT,
+    icon: "ㅅ",
+  },
+  {
+    value: "ROUND",
+    label: MOUTH_STYLE_LABELS.ROUND,
+    icon: "○",
+  },
 ];
 
 const HAIR_COLORS = [
@@ -148,6 +191,7 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   skinTone: "light",
   hairStyle: "ponytail",
   eyeStyle: "default",
+  mouthStyle: "DEFAULT",
   hairColor: "#151515",
   outfitName: "무지개 블라우스",
   outfitColor: "#60a5fa",
@@ -166,16 +210,18 @@ function loadSavedCharacter(): CharacterConfig {
   try {
     const parsed = JSON.parse(savedCharacter) as Omit<
       CharacterConfig,
-      "hairStyle" | "eyeStyle"
+      "hairStyle" | "eyeStyle" | "mouthStyle"
     > & {
       hairStyle?: unknown;
       eyeStyle?: unknown;
+      mouthStyle?: unknown;
     };
 
     return {
       ...parsed,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
+      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
     };
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -324,23 +370,52 @@ export default function AdminCharacterCreatorPage() {
               </div>
             </CreatorSection>
 
-            <CreatorSection title="눈 모양">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-                {EYE_STYLES.map((eyeStyle) => (
-                  <OptionCard
-                    key={eyeStyle.value}
-                    selected={character.eyeStyle === eyeStyle.value}
-                    onClick={() => update("eyeStyle", eyeStyle.value)}
-                  >
-                    <div className="text-2xl font-bold text-slate-800">
-                      {eyeStyle.icon}
-                    </div>
+            <CreatorSection title="얼굴 꾸미기">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">눈 모양</h3>
 
-                    <p className="mt-2 text-xs font-bold text-slate-800">
-                      {eyeStyle.label}
-                    </p>
-                  </OptionCard>
-                ))}
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                  {EYE_STYLES.map((eyeStyle) => (
+                    <OptionCard
+                      key={eyeStyle.value}
+                      selected={character.eyeStyle === eyeStyle.value}
+                      onClick={() => update("eyeStyle", eyeStyle.value)}
+                    >
+                      <div className="text-2xl font-bold text-slate-800">
+                        {eyeStyle.icon}
+                      </div>
+
+                      <p className="mt-2 text-xs font-bold text-slate-800">
+                        {eyeStyle.label}
+                      </p>
+                    </OptionCard>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-slate-200 pt-5">
+                <h3 className="text-sm font-bold text-slate-800">입 모양</h3>
+
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                  {MOUTH_OPTIONS.map((mouth) => (
+                    <OptionCard
+                      key={mouth.value}
+                      selected={character.mouthStyle === mouth.value}
+                      onClick={() => update("mouthStyle", mouth.value)}
+                    >
+                      <div
+                        className="text-2xl font-bold text-slate-800"
+                        aria-hidden="true"
+                      >
+                        {mouth.icon}
+                      </div>
+
+                      <p className="mt-2 text-xs font-bold text-slate-800">
+                        {mouth.label}
+                      </p>
+                    </OptionCard>
+                  ))}
+                </div>
               </div>
             </CreatorSection>
 
@@ -463,6 +538,7 @@ export default function AdminCharacterCreatorPage() {
                 outfitColor={character.outfitColor}
                 hairStyle={character.hairStyle}
                 eyeStyle={character.eyeStyle}
+                mouthStyle={character.mouthStyle}
               />
             </div>
 
@@ -470,6 +546,7 @@ export default function AdminCharacterCreatorPage() {
               <p>피부: {character.skinTone}</p>
               <p>헤어: {character.hairStyle}</p>
               <p>눈: {character.eyeStyle}</p>
+              <p>입: {MOUTH_STYLE_LABELS[character.mouthStyle]}</p>
               <p>의상: {character.outfitName}</p>
               <p>액세서리: {character.accessory}</p>
               <p>포즈: {character.pose}</p>
