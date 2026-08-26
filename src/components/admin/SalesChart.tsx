@@ -8,13 +8,13 @@ interface SalesChartProps {
 }
 
 const GENRE_LABELS: Record<string, string> = {
-  CONCERT: "Concert",
-  MUSICAL: "Musical",
-  CLASSIC: "Classical",
-  JAZZ: "Jazz",
-  FESTIVAL: "Festival",
-  FANMEETING: "Fan Meeting",
-  BALLET: "Ballet",
+  CONCERT: "콘서트",
+  MUSICAL: "뮤지컬",
+  CLASSIC: "클래식",
+  JAZZ: "재즈",
+  FESTIVAL: "페스티벌",
+  FANMEETING: "팬미팅",
+  BALLET: "발레",
 };
 
 export default function SalesChart({ data }: SalesChartProps) {

@@ -40,7 +40,7 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
             <Pie
               data={data}
               dataKey="revenue"
-              nameKey="genre"
+              nameKey="label"
               cx="50%"
               cy="50%"
               outerRadius={100}
@@ -91,7 +91,7 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
                       style={{ backgroundColor: color }}
                     />
                     <span className="font-semibold text-gray-900">
-                      {entry.genre}
+                      {entry.label}
                     </span>
                   </div>
                   <span className="text-gray-500">

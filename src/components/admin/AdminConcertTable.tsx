@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-table";
 import { Edit, Trash2 } from "lucide-react";
 import type { AdminConcertItem } from "@/types/domain/admin";
+import type { ConcertStatus, Genre } from "@/types/domain/concert";
 
 interface AdminConcertTableProps {
   data: AdminConcertItem[];
@@ -14,12 +15,42 @@ interface AdminConcertTableProps {
   onDelete: (id: number) => void;
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  ON_SALE: { label: "판매중", color: "bg-green-100 text-green-700" },
-  SOLD_OUT: { label: "매진", color: "bg-red-100 text-red-700" },
-  ENDED: { label: "종료", color: "bg-gray-100 text-gray-600" },
-  UPCOMING: { label: "예정", color: "bg-blue-100 text-blue-700" },
+const GENRE_LABELS: Record<Genre, string> = {
+  MUSICAL: "뮤지컬",
+  CONCERT: "콘서트",
+  CLASSIC: "클래식",
+  JAZZ: "재즈",
+  FESTIVAL: "페스티벌",
+  FANMEETING: "팬미팅",
+  BALLET: "발레",
 };
+
+const STATUS_STYLES: Record<string, string> = {
+  판매중: "bg-green-100 text-green-700",
+  매진: "bg-red-100 text-red-700",
+  예정: "bg-blue-100 text-blue-700",
+  종료: "bg-gray-100 text-gray-600",
+  취소: "bg-red-100 text-red-700",
+};
+
+/** Figma: 초록 판매중 / 빨강 매진. 매진은 enum이 아니라 잔여 0. */
+function statusBadge(row: AdminConcertItem): { label: string; color: string } {
+  if (row.status === "CANCELED") {
+    return { label: "취소", color: STATUS_STYLES.취소 };
+  }
+  const soldOut = row.totalSeats > 0 && row.soldSeats >= row.totalSeats;
+  if (soldOut) {
+    return { label: "매진", color: STATUS_STYLES.매진 };
+  }
+  const byStatus: Record<ConcertStatus, string> = {
+    UPCOMING: "예정",
+    ON_SALE: "판매중",
+    CLOSED: "종료",
+    CANCELED: "취소",
+  };
+  const label = byStatus[row.status] ?? "판매중";
+  return { label, color: STATUS_STYLES[label] ?? STATUS_STYLES.판매중 };
+}
 
 export default function AdminConcertTable({
   data,
@@ -43,7 +74,12 @@ export default function AdminConcertTable({
         <span className="font-bold text-sm">{getValue() as string}</span>
       ),
     },
-    { accessorKey: "genre", header: "장르" },
+    {
+      accessorKey: "genre",
+      header: "장르",
+      cell: ({ getValue }) =>
+        GENRE_LABELS[getValue() as Genre] ?? (getValue() as string),
+    },
     { accessorKey: "date", header: "날짜" },
     {
       id: "sales",
@@ -76,8 +112,8 @@ export default function AdminConcertTable({
     {
       accessorKey: "status",
       header: "상태",
-      cell: ({ getValue }) => {
-        const s = STATUS_LABELS[getValue() as string] ?? STATUS_LABELS.ON_SALE;
+      cell: ({ row }) => {
+        const s = statusBadge(row.original);
         return (
           <span
             className={`px-2 py-1 rounded text-xs font-semibold ${s.color}`}
@@ -116,6 +152,14 @@ export default function AdminConcertTable({
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  if (data.length === 0) {
+    return (
+      <div className="py-12 text-center text-sm text-gray-500">
+        등록된 공연이 없습니다.
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">

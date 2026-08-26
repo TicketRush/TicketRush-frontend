@@ -21,6 +21,13 @@ import AdminConcertTable from "@/components/admin/AdminConcertTable";
 import AdminCalendar from "@/components/admin/AdminCalendar";
 import { useAdminDashboard, useDeleteConcert } from "@/hooks/admin/useAdmin";
 
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useAdminDashboard();
@@ -37,8 +44,8 @@ export default function AdminDashboardPage() {
 
   const filteredRevenue = useMemo(() => {
     if (!data) return [];
-    const startStr = selectedRange.start.toISOString().split("T")[0];
-    const endStr = selectedRange.end.toISOString().split("T")[0];
+    const startStr = toLocalDateKey(selectedRange.start);
+    const endStr = toLocalDateKey(selectedRange.end);
     return data.dailyRevenue.filter(
       (d) => d.date >= startStr && d.date <= endStr,
     );
