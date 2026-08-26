@@ -26,6 +26,9 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
 const CONCERT_OUTFIT_NAME = "마이크 콘서트";
 const CONCERT_OUTFIT_URL = "/models/outfits/concert_outfit.glb";
 
+const MUSICAL_OUTFIT_NAME = "뮤지컬 공연";
+const MUSICAL_OUTFIT_URL = "/models/outfits/musical_outfit.glb";
+
 function getPartType(objectName: string) {
   const name = objectName.toLowerCase();
 
@@ -53,7 +56,10 @@ function CharacterBody({
 
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
+
     const isConcertOutfit = outfitName === CONCERT_OUTFIT_NAME;
+    const isMusicalOutfit = outfitName === MUSICAL_OUTFIT_NAME;
+    const isCustomOutfit = isConcertOutfit || isMusicalOutfit;
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
@@ -70,7 +76,7 @@ function CharacterBody({
       }
 
       if (partType === "clothes") {
-        if (isConcertOutfit) {
+        if (isCustomOutfit) {
           object.visible = false;
           return;
         }
@@ -125,6 +131,16 @@ function ConcertOutfitModel() {
   return <primitive object={scene} />;
 }
 
+function MusicalOutfitModel() {
+  const gltf = useGLTF(MUSICAL_OUTFIT_URL);
+
+  const scene = useMemo(() => {
+    return gltf.scene.clone(true);
+  }, [gltf.scene]);
+
+  return <primitive object={scene} />;
+}
+
 function CharacterModel({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
@@ -134,6 +150,7 @@ function CharacterModel({
   hairStyle,
 }: CharacterModelViewerProps) {
   const isConcertOutfit = outfitName === CONCERT_OUTFIT_NAME;
+  const isMusicalOutfit = outfitName === MUSICAL_OUTFIT_NAME;
 
   return (
     <Center>
@@ -149,9 +166,14 @@ function CharacterModel({
           outfitName={outfitName}
         />
 
-        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+        <HairModel
+          hairStyle={hairStyle}
+          hairColor={hairColor}
+        />
 
         {isConcertOutfit && <ConcertOutfitModel />}
+
+        {isMusicalOutfit && <MusicalOutfitModel />}
       </group>
     </Center>
   );
@@ -195,9 +217,12 @@ export default function CharacterModelViewer({
 }
 
 useGLTF.preload("/models/chibi-base.glb");
+
 useGLTF.preload("/models/hair/hair_short.glb");
 useGLTF.preload("/models/hair/hair_long.glb");
 useGLTF.preload("/models/hair/hair_ponytail.glb");
 useGLTF.preload("/models/hair/hair_twintails.glb");
 useGLTF.preload("/models/hair/hair_wave.glb");
+
 useGLTF.preload(CONCERT_OUTFIT_URL);
+useGLTF.preload(MUSICAL_OUTFIT_URL);
