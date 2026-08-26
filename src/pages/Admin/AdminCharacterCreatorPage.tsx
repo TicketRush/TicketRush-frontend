@@ -79,6 +79,11 @@ const OUTFITS = [
     icon: "🩰",
   },
   {
+    name: "뮤지컬 공연",
+    description: "뮤지컬 무대 의상",
+    icon: "🎭",
+  },
+  {
     name: "연극 / 극장",
     description: "무대 의상",
     icon: "🎩",
