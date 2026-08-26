@@ -1,4 +1,5 @@
 // components/layout/AdminLayout.tsx
+import { useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -26,10 +27,18 @@ export default function AdminLayout() {
   const isActive = (to: string, exact?: boolean) =>
     exact ? location.pathname === to : location.pathname.startsWith(to);
 
+  useEffect(() => {
+    document.body.classList.add("admin-layout");
+    return () => document.body.classList.remove("admin-layout");
+  }, []);
+
   return (
     <div className="min-h-screen flex bg-admin-bg text-admin-text">
-      {/* 사이드바 */}
-      <aside className="w-64 bg-admin-card border-r border-admin-border flex flex-col">
+      {/* 사이드바 — self-start로 stretch를 막아 sticky가 화면 높이를 유지 */}
+      <aside
+        className="w-64 shrink-0 sticky top-0 self-start h-screen overflow-y-auto
+          bg-admin-card border-r border-admin-border flex flex-col"
+      >
         {/* 로고 */}
         <div className="px-6 py-5 border-b border-admin-border">
           <p className="font-pretendard text-xs text-admin-text-secondary tracking-wider">
@@ -82,8 +91,7 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      {/* 메인 영역 */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-w-0">
         <Outlet />
       </main>
     </div>
