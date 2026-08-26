@@ -70,12 +70,15 @@ export async function mockGetAdminDashboard() {
     averageOccupancyRate: totalSeats > 0 ? totalSold / totalSeats : 0,
   };
 
-  // 일별 매출 — 최근 7일 mock
+  // 일별 매출 — 최근 7일 mock (로컬 날짜. UTC toISOString이면 KST에서 하루 밀림)
   const dailyRevenue: DailyRevenue[] = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
     return {
-      date: d.toISOString().split("T")[0],
+      date: `${y}-${m}-${day}`,
       revenue: Math.floor(10000 + Math.random() * 20000),
       ticketsSold: Math.floor(15 + Math.random() * 30),
     };

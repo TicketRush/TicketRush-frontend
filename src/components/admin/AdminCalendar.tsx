@@ -32,8 +32,22 @@ export default function AdminCalendar({
     );
   }
   function isInRange(date: Date) {
-    const t = date.getTime();
-    return t >= selectedRange.start.getTime() && t <= selectedRange.end.getTime();
+    const t = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    ).getTime();
+    const start = new Date(
+      selectedRange.start.getFullYear(),
+      selectedRange.start.getMonth(),
+      selectedRange.start.getDate(),
+    ).getTime();
+    const end = new Date(
+      selectedRange.end.getFullYear(),
+      selectedRange.end.getMonth(),
+      selectedRange.end.getDate(),
+    ).getTime();
+    return t >= start && t <= end;
   }
   function isRangeEdge(date: Date) {
     return (

@@ -21,6 +21,10 @@ import AdminConcertTable from "@/components/admin/AdminConcertTable";
 import AdminCalendar from "@/components/admin/AdminCalendar";
 import { useAdminDashboard, useDeleteConcert } from "@/hooks/admin/useAdmin";
 
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 function toLocalDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -38,8 +42,10 @@ export default function AdminDashboardPage() {
     start: Date;
     end: Date;
   }>(() => {
-    const today = new Date();
-    return { start: today, end: today };
+    const today = startOfDay(new Date());
+    const start = startOfDay(new Date());
+    start.setDate(start.getDate() - 6);
+    return { start, end: today };
   });
 
   const filteredRevenue = useMemo(() => {
