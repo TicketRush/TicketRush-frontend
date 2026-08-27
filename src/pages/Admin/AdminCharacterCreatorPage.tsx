@@ -291,9 +291,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setBackgroundHexInput(character.background);
-    setBackgroundHexError(
-      "예: #E9DDFF처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setBackgroundHexError("");
   }
 
   function handleReset() {
