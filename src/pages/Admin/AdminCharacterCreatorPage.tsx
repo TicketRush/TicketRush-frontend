@@ -183,6 +183,12 @@ export default function AdminCharacterCreatorPage() {
   useEffect(() => {
     document.body.classList.add("admin-layout");
 
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+
     return () => {
       document.body.classList.remove("admin-layout");
     };
