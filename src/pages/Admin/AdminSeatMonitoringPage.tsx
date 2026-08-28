@@ -84,7 +84,7 @@ export default function AdminSeatMonitoringPage() {
           <button
             type="button"
             onClick={() => navigate("/admin")}
-            className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
           >
             <ArrowLeft size={16} /> 대시보드
           </button>
@@ -189,7 +189,7 @@ export default function AdminSeatMonitoringPage() {
         <button
           type="button"
           onClick={() => navigate("/admin")}
-          className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+          className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
         >
           <ArrowLeft size={16} /> 대시보드
         </button>

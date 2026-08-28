@@ -47,47 +47,35 @@ export default function RevenueChart({ data }: RevenueChartProps) {
   }));
 
   return (
-    <div className="bg-admin-card border border-admin-border rounded-xl p-6">
-      <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+    <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-6">
+      <span className="text-[10px] font-bold tracking-wider bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block mb-2">
         REVENUE ANALYTICS
       </span>
-      <h3 className="text-base font-bold text-admin-text mb-4">
+      <h3 className="text-base font-bold text-gray-900 mb-4">
         기간별 매출 추이
       </h3>
       <ResponsiveContainer width="100%" height={280}>
         <LineChart
           data={chartData}
-          margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+          margin={{ top: 5, right: 16, left: 0, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#252B3D" />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
-          {/* 좌측 Y축 — 매출 */}
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#6B7280" }} />
           <YAxis
             yAxisId="left"
-            tick={{ fontSize: 11, fill: "#9CA3AF" }}
+            tick={{ fontSize: 11, fill: "#6B7280" }}
             tickFormatter={(v) => `${v}K`}
-            label={{
-              value: "매출 (천원)",
-              angle: -90,
-              position: "insideLeft",
-              style: { fontSize: 11, fill: "#9CA3AF" },
-            }}
           />
-          {/* 우측 Y축 — 티켓 판매 */}
           <YAxis
             yAxisId="right"
             orientation="right"
             tick={{ fontSize: 11, fill: "#6C5CE7" }}
-            label={{
-              value: "티켓 판매",
-              angle: 90,
-              position: "insideRight",
-              style: { fontSize: 11, fill: "#6C5CE7" },
-            }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend
-            wrapperStyle={{ fontSize: 11, color: "#9CA3AF" }}
+            align="left"
+            verticalAlign="bottom"
+            wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
             iconType="line"
             formatter={(v) => (v === "revenue" ? "매출 (천원)" : "티켓 판매")}
           />

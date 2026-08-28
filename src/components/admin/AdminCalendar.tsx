@@ -32,8 +32,22 @@ export default function AdminCalendar({
     );
   }
   function isInRange(date: Date) {
-    const t = date.getTime();
-    return t >= selectedRange.start.getTime() && t <= selectedRange.end.getTime();
+    const t = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    ).getTime();
+    const start = new Date(
+      selectedRange.start.getFullYear(),
+      selectedRange.start.getMonth(),
+      selectedRange.start.getDate(),
+    ).getTime();
+    const end = new Date(
+      selectedRange.end.getFullYear(),
+      selectedRange.end.getMonth(),
+      selectedRange.end.getDate(),
+    ).getTime();
+    return t >= start && t <= end;
   }
   function isRangeEdge(date: Date) {
     return (
@@ -88,7 +102,7 @@ export default function AdminCalendar({
   const canGoYearNext = yearPageStart + YEAR_RANGE_SIZE < 2200;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 relative">
+    <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-4 relative">
       <p className="text-sm font-bold mb-3 text-gray-900">기간 설정</p>
 
       {/* 월/연도 헤더 */}

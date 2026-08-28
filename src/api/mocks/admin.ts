@@ -70,12 +70,15 @@ export async function mockGetAdminDashboard() {
     averageOccupancyRate: totalSeats > 0 ? totalSold / totalSeats : 0,
   };
 
-  // 일별 매출 — 최근 7일 mock
+  // 일별 매출 — 최근 7일 mock (로컬 날짜. UTC toISOString이면 KST에서 하루 밀림)
   const dailyRevenue: DailyRevenue[] = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
     return {
-      date: d.toISOString().split("T")[0],
+      date: `${y}-${m}-${day}`,
       revenue: Math.floor(10000 + Math.random() * 20000),
       ticketsSold: Math.floor(15 + Math.random() * 30),
     };
@@ -114,7 +117,7 @@ export async function mockGetAdminDashboard() {
     .sort((a, b) => b.revenue - a.revenue);
 
   // 공연별 판매 현황
-  // ⚠️ ConcertStatus에 SOLD_OUT 없음 → remainingSeats === 0으로 매진 판단
+  // 매진은 ConcertStatus enum이 아니라 잔여 0 (표와 동일: soldSeats >= totalSeats)
   const concertSales: ConcertSalesStatus[] = MOCK_CONCERTS.map((c) => {
     const sold = getSold(c);
     const total = getTotalSeats(c);
@@ -127,7 +130,7 @@ export async function mockGetAdminDashboard() {
       totalSeats: total,
       occupancyRate: total > 0 ? sold / total : 0,
       revenue: sold * c.price,
-      isSoldOut: (c.remainingSeats ?? 0) === 0,
+      isSoldOut: total > 0 && sold >= total,
     };
   });
 
