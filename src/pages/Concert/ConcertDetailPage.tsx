@@ -19,7 +19,7 @@
 //   - 포스터/갤러리 없을 때 samplePoster 대신 poster-fallback 그라데이션
 //   - 갤러리 비면 섹션 숨김, venue===address면 주소 박스 숨김
 //   - InfoBox 원형 아이콘, 섹션/주소/편의시설 border-2 + shadow-card
-//   - 소개 비면 섹션 숨김. 모바일은 제목 다음 예매 박스, 제목은 모든 폭에서 sticky
+//   - 소개 비면 섹션 숨김. 모바일은 제목 다음 예매 박스, 제목 sticky는 lg만
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import type { SyntheticEvent } from "react";
 import {
@@ -166,11 +166,11 @@ export default function ConcertDetailPage() {
       </div>
 
       {/*
-        모바일 순서: 제목 → 예매 박스 → 본문.
+        모바일 순서: 제목 → 예매 박스 → 본문. 제목 sticky는 lg만 (좁은 화면에서 카드가 뷰포트를 먹지 않게).
         데스크톱: 제목+본문 | 사이드바(row-span). 사이드바는 그리드 직접 자식이어야 sticky.
       */}
       <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6 items-start">
-        <div className="order-1 sticky top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card lg:col-start-1 lg:row-start-1">
+        <div className="order-1 lg:sticky lg:top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card lg:col-start-1 lg:row-start-1">
           <h1 className="text-3xl font-bold text-text">{data.title}</h1>
           <p className="text-text-secondary mt-1">{data.performer}</p>
           <div className="mt-3">
