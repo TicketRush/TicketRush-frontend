@@ -25,6 +25,7 @@
 // - 2026-08-27 (이슈 #98):
 //   - sticky top-16 (헤더 아래), 예매 정보/유의사항 shadow-card + border-2
 //   - 관람 시간·상태 안내 박스 border-2 (CTA/좌석 로직 유지)
+//   - 모바일 order-2로 제목 바로 아래, 데스크톱은 우측 row-span sticky
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
@@ -177,7 +178,7 @@ export default function BookingSidebar({
       : AlertTriangle;
 
   return (
-    <div className="lg:sticky lg:top-16 space-y-3">
+    <div className="order-2 space-y-3 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-16">
       <div className="bg-white border-2 border-border rounded-xl p-5 space-y-4 shadow-card">
         <h3 className="font-bold">예매 정보</h3>
 

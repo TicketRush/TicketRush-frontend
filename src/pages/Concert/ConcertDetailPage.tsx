@@ -19,6 +19,7 @@
 //   - 포스터/갤러리 없을 때 samplePoster 대신 poster-fallback 그라데이션
 //   - 갤러리 비면 섹션 숨김, venue===address면 주소 박스 숨김
 //   - InfoBox 원형 아이콘, 섹션/주소/편의시설 border-2 + shadow-card
+//   - 소개 비면 섹션 숨김. 모바일은 제목 다음 예매 박스, 제목은 모든 폭에서 sticky
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import type { SyntheticEvent } from "react";
 import {
@@ -123,6 +124,7 @@ export default function ConcertDetailPage() {
     data.address && data.address !== venueDisplay,
   );
   const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
+  const description = data.description?.trim() ?? "";
 
   function handleBooking() {
     setConcert({
@@ -163,17 +165,20 @@ export default function ConcertDetailPage() {
         ) : null}
       </div>
 
-      {/* items-start + 사이드바를 그리드 직접 자식으로 둬야 sticky가 동작한다 */}
+      {/*
+        모바일 순서: 제목 → 예매 박스 → 본문.
+        데스크톱: 제목+본문 | 사이드바(row-span). 사이드바는 그리드 직접 자식이어야 sticky.
+      */}
       <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6 items-start">
-        <div className="space-y-4 min-w-0">
-          <div className="lg:sticky lg:top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card">
-            <h1 className="text-3xl font-bold text-text">{data.title}</h1>
-            <p className="text-text-secondary mt-1">{data.performer}</p>
-            <div className="mt-3">
-              <GenreBadge genre={data.genre} />
-            </div>
+        <div className="order-1 sticky top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card lg:col-start-1 lg:row-start-1">
+          <h1 className="text-3xl font-bold text-text">{data.title}</h1>
+          <p className="text-text-secondary mt-1">{data.performer}</p>
+          <div className="mt-3">
+            <GenreBadge genre={data.genre} />
           </div>
+        </div>
 
+        <div className="order-3 space-y-4 min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <InfoBox
               icon={<Calendar size={20} className="text-primary" />}
@@ -207,11 +212,13 @@ export default function ConcertDetailPage() {
             </div>
           )}
 
-          <Section title="공연 소개">
-            <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-              {data.description}
-            </p>
-          </Section>
+          {description && (
+            <Section title="공연 소개">
+              <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
+                {data.description}
+              </p>
+            </Section>
+          )}
 
           {data.facilities && data.facilities.length > 0 && (
             <Section title="편의시설 및 서비스">
