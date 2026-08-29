@@ -40,8 +40,7 @@ import {
 import { fetchConcertDetail } from "./concerts";
 import { fetchSeatNumbers } from "./seats";
 import apiClient from "./instance";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+import { USE_MOCK } from "./useMock";
 
 // -------------------------------------------------------
 // 백엔드 응답 타입 (원본 스펙)
