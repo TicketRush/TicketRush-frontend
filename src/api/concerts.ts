@@ -32,8 +32,7 @@ import type { CursorInfo } from "./types/pagination";
 import { MOCK_CONCERTS, getMockConcertDetail } from "./mocks/concerts";
 import { mockDelay, mockError } from "./mocks/_helpers";
 import apiClient from "./instance";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+import { USE_MOCK } from "./useMock";
 
 // -------------------------------------------------------
 // 백엔드 응답 타입 (원본 스펙)
