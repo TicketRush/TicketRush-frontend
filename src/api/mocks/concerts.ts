@@ -33,8 +33,9 @@
  */
 import type { ConcertSummary, ConcertDetail } from "@/types/domain/concert";
 import { mockDelay } from "./_helpers";
+import samplePoster from "@/assets/images/sample-poster.svg";
 
-const POSTER = "/placeholder-poster.png";
+const POSTER = samplePoster;
 
 export const MOCK_CONCERTS: ConcertSummary[] = [
   {

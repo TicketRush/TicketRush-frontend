@@ -19,7 +19,7 @@ interface AdminBookingTableProps {
 
 const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
   CONFIRMED: { label: "완료", bg: "#00C950" },
-  CANCELLED: { label: "취소", bg: "#FB2C36" },
+  CANCELED: { label: "취소", bg: "#FB2C36" },
   PENDING: { label: "대기", bg: "#FBBF24" },
   EXPIRED: { label: "만료", bg: "#9CA3AF" },
 };

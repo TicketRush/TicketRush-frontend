@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
+import {
+  resolveStoredHairStyle,
+  type HairStyle,
+} from "@/components/admin/character/characterHair";
 import {
   DEFAULT_SKIN_COLOR,
   DEFAULT_SKIN_TONE,
@@ -11,7 +15,6 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 
-type HairStyle = "short" | "long" | "bun" | "ponytail" | "wave" | "rainbow";
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterConfig {
@@ -35,13 +38,16 @@ interface BackgroundPreset {
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_RETURN_TO = "/admin/concerts/new";
 
-const HAIR_STYLES: { value: HairStyle; label: string; icon: string }[] = [
-  { value: "short", label: "숏컷", icon: "👱" },
-  { value: "long", label: "단발", icon: "👩" },
-  { value: "bun", label: "양갈래", icon: "👧" },
+const HAIR_STYLES: {
+  value: HairStyle;
+  label: string;
+  icon: string;
+}[] = [
+  { value: "short", label: "단발", icon: "👱" },
+  { value: "long", label: "장발", icon: "👩" },
   { value: "ponytail", label: "포니테일", icon: "🎀" },
+  { value: "twintails", label: "양갈래", icon: "👧" },
   { value: "wave", label: "웨이브", icon: "🌀" },
-  { value: "rainbow", label: "무지개", icon: "🌈" },
 ];
 
 const DEFAULT_HAIR_COLOR = "#151515";
@@ -57,12 +63,36 @@ const HAIR_COLORS = [
 ];
 
 const OUTFITS = [
-  { name: "무지개 블라우스", description: "가벼운 공연 의상", icon: "👗" },
-  { name: "마이크 콘서트", description: "K-POP 콘서트 대표룩", icon: "🎤" },
-  { name: "클래식 공연", description: "포멀한 공연 의상", icon: "🎻" },
-  { name: "DJ / 페스티벌", description: "EDM 페스티벌룩", icon: "🎸" },
-  { name: "발레 / 무용 공연", description: "무용 공연 의상", icon: "🩰" },
-  { name: "연극 / 극장", description: "무대 의상", icon: "🎩" },
+  {
+    name: "무지개 블라우스",
+    description: "가벼운 공연 의상",
+    icon: "👗",
+  },
+  {
+    name: "마이크 콘서트",
+    description: "K-POP 콘서트 대표룩",
+    icon: "🎤",
+  },
+  {
+    name: "클래식 공연",
+    description: "포멀한 공연 의상",
+    icon: "🎻",
+  },
+  {
+    name: "DJ / 페스티벌",
+    description: "EDM 페스티벌룩",
+    icon: "🎸",
+  },
+  {
+    name: "발레 / 무용 공연",
+    description: "무용 공연 의상",
+    icon: "🩰",
+  },
+  {
+    name: "연극 / 극장",
+    description: "무대 의상",
+    icon: "🎩",
+  },
 ];
 
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
@@ -139,9 +169,15 @@ function loadSavedCharacter(): CharacterConfig {
   }
 
   try {
-    const parsed = JSON.parse(savedCharacter) as Partial<CharacterConfig> & {
+    const parsed = JSON.parse(savedCharacter) as Partial<
+      Omit<
+        CharacterConfig,
+        "skinTone" | "skinColor" | "hairStyle" | "hairColor"
+      >
+    > & {
       skinTone?: unknown;
       skinColor?: unknown;
+      hairStyle?: unknown;
       hairColor?: unknown;
       outfitColor?: unknown;
     };
@@ -165,6 +201,7 @@ function loadSavedCharacter(): CharacterConfig {
       ...DEFAULT_CHARACTER,
       ...parsed,
       ...resolvedSkin,
+      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
     } as CharacterConfig;
@@ -191,6 +228,14 @@ function resolveAdminReturnTo(returnTo: string | null): string {
 export default function AdminCharacterCreatorPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    document.body.classList.add("admin-layout");
+
+    return () => {
+      document.body.classList.remove("admin-layout");
+    };
+  }, []);
 
   const [character, setCharacter] = useState<CharacterConfig>(() =>
     loadSavedCharacter(),
@@ -308,9 +353,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setSkinHexInput(character.skinColor);
-    setSkinHexError(
-      "예: #F7C6A8처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setSkinHexError("");
   }
 
   function applyHairColor(value: string) {
@@ -364,9 +407,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setHairHexInput(character.hairColor);
-    setHairHexError(
-      "예: #151515처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setHairHexError("");
   }
 
   function applyOutfitColor(value: string) {
@@ -446,8 +487,7 @@ export default function AdminCharacterCreatorPage() {
     const normalized = normalizeHexColor(upperValue);
 
     if (normalized) {
-      update("background", normalized);
-      setBackgroundHexError("");
+      applyBackgroundColor(normalized);
       return;
     }
 
@@ -477,9 +517,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setBackgroundHexInput(character.background);
-    setBackgroundHexError(
-      "예: #E9DDFF처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setBackgroundHexError("");
   }
 
   function handleReset() {
@@ -700,7 +738,7 @@ export default function AdminCharacterCreatorPage() {
             </CreatorSection>
 
             <CreatorSection title="헤어스타일">
-              <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                 {HAIR_STYLES.map((hairStyle) => (
                   <OptionCard
                     key={hairStyle.value}
@@ -1269,9 +1307,13 @@ function ColorButton({
       aria-pressed={selected}
       onClick={onClick}
       className={`h-12 rounded-lg border transition ${
-        selected ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200"
+        selected
+          ? "border-slate-900 ring-2 ring-slate-900"
+          : "border-slate-200"
       }`}
-      style={{ backgroundColor: color }}
+      style={{
+        backgroundColor: color,
+      }}
     />
   );
 }
