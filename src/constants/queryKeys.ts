@@ -16,8 +16,7 @@ export const queryKeys = {
   },
   concerts: {
     all: ["concerts"] as const,
-    list: (params?: ConcertListParams) =>
-      ["concerts", "list", params] as const,
+    list: (params?: ConcertListParams) => ["concerts", "list", params] as const,
     detail: (id: number) => ["concerts", "detail", id] as const,
   },
   seats: {
@@ -31,15 +30,18 @@ export const queryKeys = {
   },
   bookings: {
     all: ["bookings"] as const,
-    mine: (params?: MyBookingsParams) =>
-      ["bookings", "mine", params] as const,
+    mine: (params?: MyBookingsParams) => ["bookings", "mine", params] as const,
     detail: (bookingNumber: string) =>
       ["bookings", "detail", bookingNumber] as const,
   },
   payments: {
     all: ["payments"] as const,
-    status: (paymentKey: string) =>
-      ["payments", "status", paymentKey] as const,
+    status: (paymentKey: string) => ["payments", "status", paymentKey] as const,
+  },
+  tickets: {
+    all: ["tickets"] as const,
+    // 입장권 QR payload — bookingId 기준
+    qr: (bookingId: number) => ["tickets", "qr", bookingId] as const,
   },
 } as const;
 

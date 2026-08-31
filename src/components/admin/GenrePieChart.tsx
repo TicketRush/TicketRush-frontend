@@ -25,11 +25,11 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
   }
 
   return (
-    <div className="bg-admin-card border border-admin-border rounded-xl p-6">
-      <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+    <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-6">
+      <span className="text-[10px] font-bold tracking-wider bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block mb-2">
         GENRE ANALYTICS
       </span>
-      <h3 className="text-base font-bold text-admin-text mb-4">
+      <h3 className="text-base font-bold text-gray-900 mb-4">
         장르별 매출 분포
       </h3>
 
@@ -40,7 +40,7 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
             <Pie
               data={data}
               dataKey="revenue"
-              nameKey="genre"
+              nameKey="label"
               cx="50%"
               cy="50%"
               outerRadius={100}
@@ -82,8 +82,7 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
             return (
               <div
                 key={entry.genre}
-                className="border-2 rounded-lg p-3"
-                style={{ borderColor: color }}
+                className="border-2 border-admin-card-border rounded-lg p-3"
               >
                 <div className="flex items-center justify-between text-xs mb-2">
                   <div className="flex items-center gap-2">
@@ -91,16 +90,16 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
                       className="w-3 h-3 rounded"
                       style={{ backgroundColor: color }}
                     />
-                    <span className="font-semibold text-admin-text">
-                      {entry.genre}
+                    <span className="font-semibold text-gray-900">
+                      {entry.label}
                     </span>
                   </div>
-                  <span className="text-admin-text-secondary">
+                  <span className="text-gray-500">
                     {entry.percentage.toFixed(0)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-admin-border overflow-hidden">
+                  <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -109,7 +108,7 @@ export default function GenrePieChart({ data }: GenrePieChartProps) {
                       }}
                     />
                   </div>
-                  <span className="text-xs text-admin-text-secondary min-w-[70px] text-right">
+                  <span className="text-xs text-gray-500 min-w-[70px] text-right">
                     ₩{entry.revenue.toLocaleString()}
                   </span>
                 </div>

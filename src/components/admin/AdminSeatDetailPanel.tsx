@@ -65,7 +65,7 @@ export default function AdminSeatDetailPanel({
     <Panel title="좌석 상세 정보">
       <div className="text-center py-8">
         <p className="text-base font-bold mb-1">{detail.seatNumber}</p>
-        <p className="text-sm text-seat-available">예약 가능</p>
+        <p className="text-sm text-admin-seat-available">예약 가능</p>
       </div>
     </Panel>
   );
@@ -93,7 +93,7 @@ function HoldDetail({
   return (
     <Panel title="좌석 상세 정보">
       <div className="text-center mb-4">
-        <div className="inline-block bg-seat-holding text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
+        <div className="inline-block bg-admin-seat-holding text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
           {detail.seatNumber}
         </div>
         <p className="text-xs text-admin-text-secondary">
@@ -121,8 +121,7 @@ function HoldDetail({
       <button
         type="button"
         onClick={() => onRelease(detail.seatId)}
-        className="w-full py-3 rounded font-bold text-white"
-        style={{ backgroundColor: "#942D12" }}
+        className="w-full py-3 rounded font-bold text-white bg-admin-refund"
       >
         예약 해제
       </button>
@@ -143,7 +142,7 @@ function SoldDetail({
   return (
     <Panel title="좌석 상세 정보">
       <div className="text-center mb-4">
-        <div className="inline-block bg-seat-sold text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
+        <div className="inline-block bg-admin-seat-sold text-gray-800 px-4 py-2 rounded font-bold text-lg mb-2">
           {detail.seatNumber}
         </div>
         <p className="text-xs text-admin-text-secondary">판매 완료</p>
@@ -166,16 +165,14 @@ function SoldDetail({
         <button
           type="button"
           onClick={() => onRefund(detail.seatId)}
-          className="w-full py-3 rounded font-bold text-white"
-          style={{ backgroundColor: "#942D12" }}
+          className="w-full py-3 rounded font-bold text-white bg-admin-refund"
         >
           환불 처리
         </button>
         <button
           type="button"
           onClick={() => onShowReserver(detail.seatId)}
-          className="w-full py-3 rounded font-bold text-white"
-          style={{ backgroundColor: "#414B59" }}
+          className="w-full py-3 rounded font-bold text-white bg-admin-resend"
         >
           예매자 정보 보기
         </button>

@@ -109,7 +109,7 @@ const NOTICE_STYLES: Record<
   { box: string; icon: string; text: string }
 > = {
   default: {
-    box: "bg-yellow-50 border-yellow-200",
+    box: "bg-warning-bg border-warning-border",
     icon: "text-yellow-700",
     text: "text-yellow-800",
   },

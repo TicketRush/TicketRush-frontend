@@ -128,7 +128,7 @@ export function useReservationLifecycle() {
 
   // ───────────────────────────────────────────────────────────────────────
   // 4) 예매 취소 (사용자가 명시적으로 뒤로가기/취소)
-  //    seat + timer 초기화 + 이동. (결제 진입 전이므로 paymentStore는 건드리지 않음)
+  //    seat + timer + payment 초기화 + 이동
   // ───────────────────────────────────────────────────────────────────────
   const handleCancelReservation = useCallback(
     async (options: CancelOptions = {}) => {
@@ -143,11 +143,12 @@ export function useReservationLifecycle() {
       }
 
       resetSeatAndTimer();
+      resetPayment();
 
-      if (message) toast.info(message ?? DEFAULT_CANCEL_MSG);
+      toast.info(message ?? DEFAULT_CANCEL_MSG);
       onNavigate?.();
     },
-    [resetSeatAndTimer],
+    [resetSeatAndTimer, resetPayment],
   );
 
   return {

@@ -20,6 +20,10 @@ import type { ConcertFormData } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
+  resolveStoredHairStyle,
+  type HairStyle,
+} from "@/components/admin/character/characterHair";
+import {
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
@@ -57,19 +61,12 @@ interface Props {
   mode: "create" | "edit";
 }
 
-type CharacterHairStyle =
-  | "short"
-  | "long"
-  | "bun"
-  | "ponytail"
-  | "wave"
-  | "rainbow";
 type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterDraft {
   skinTone: SkinToneSelection;
   skinColor: string;
-  hairStyle: CharacterHairStyle;
+  hairStyle: HairStyle;
   hairColor: string;
   outfitName: string;
   outfitColor: string;
@@ -86,13 +83,14 @@ function loadSavedCharacter(): CharacterDraft | null {
   }
 
   try {
-    const parsed = JSON.parse(savedCharacter) as Omit<
-      CharacterDraft,
-      "skinTone" | "skinColor"
+    const parsed = JSON.parse(savedCharacter) as Partial<
+      Omit<CharacterDraft, "skinTone" | "skinColor" | "hairStyle">
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
+      hairStyle?: unknown;
     };
+
     const resolvedSkin = resolveStoredSkinTone(
       parsed.skinTone,
       parsed.skinColor,
@@ -101,6 +99,7 @@ function loadSavedCharacter(): CharacterDraft | null {
     return {
       ...parsed,
       ...resolvedSkin,
+      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -209,6 +208,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   function handleMainImageFiles(files: File[]) {
     const file = files[0];
+
     if (!file) return;
 
     setMainImage(file);
@@ -267,9 +267,11 @@ export default function AdminConcertFormPage({ mode }: Props) {
     if (!form.genre) return "장르를 선택해주세요.";
     if (!form.date) return "공연 날짜를 선택해주세요.";
     if (!form.time) return "공연 시간을 선택해주세요.";
+
     if (!form.durationMinutes || form.durationMinutes <= 0) {
       return "공연 러닝타임을 입력해주세요.";
     }
+
     if (!form.venue.trim()) return "공연장명을 입력해주세요.";
     if (!form.address.trim()) return "상세 주소를 입력해주세요.";
     if (!form.price || form.price <= 0) return "티켓 가격을 입력해주세요.";
@@ -335,9 +337,11 @@ export default function AdminConcertFormPage({ mode }: Props) {
           <span className="rounded bg-admin-border px-2 py-1 text-[10px] font-bold tracking-wider">
             CONCERT FORM
           </span>
+
           <h1 className="mt-3 text-3xl font-bold">
             {mode === "create" ? "공연 등록" : "공연 수정"}
           </h1>
+
           <p className="mt-2 text-sm text-admin-text-secondary">
             새로운 공연 정보를 입력하세요.
           </p>
@@ -574,6 +578,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
                       <span className="line-clamp-2">
                         {galleryImages[index].name}
                       </span>
+
                       <button
                         type="button"
                         onClick={() => removeGalleryImage(index)}
@@ -599,6 +604,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
             className="flex h-12 items-center justify-center gap-2 rounded-lg bg-primary px-6 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Save size={16} />
+
             {isPending
               ? "저장 중..."
               : mode === "create"
@@ -620,7 +626,13 @@ export default function AdminConcertFormPage({ mode }: Props) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-xl border border-admin-border bg-admin-card p-6 shadow-sm">
       <h2 className="mb-4 text-base font-bold">{title}</h2>
@@ -644,6 +656,7 @@ function Field({
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
       </p>
+
       {children}
     </div>
   );
@@ -690,6 +703,7 @@ function UploadBox({
 }) {
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
+
     onFilesSelected(files);
     event.target.value = "";
   }
@@ -803,6 +817,7 @@ function EditableTimeInput({
     />
   );
 }
+
 function CharacterCreatorLinkBox({
   character,
   onClick,
@@ -853,8 +868,8 @@ function CharacterCreatorLinkBox({
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) / 헤어: {character.hairStyle} / 포즈:{" "}
-          {character.pose}
+          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
+          헤어: {character.hairStyle} / 포즈: {character.pose}
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">

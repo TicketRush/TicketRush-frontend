@@ -84,14 +84,14 @@ export default function AdminSeatMonitoringPage() {
           <button
             type="button"
             onClick={() => navigate("/admin")}
-            className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
           >
             <ArrowLeft size={16} /> 대시보드
           </button>
         </div>
 
         {/* 공연 목록 테이블 */}
-        <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
+        <div className="bg-admin-surface border-2 border-admin-surface-border rounded-xl p-6">
           <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
             EVENT LISTS
           </span>
@@ -189,7 +189,7 @@ export default function AdminSeatMonitoringPage() {
         <button
           type="button"
           onClick={() => navigate("/admin")}
-          className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+          className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
         >
           <ArrowLeft size={16} /> 대시보드
         </button>
@@ -235,7 +235,11 @@ export default function AdminSeatMonitoringPage() {
         />
         <StatCard
           icon={
-            <Square size={24} fill="#B9F8CF" stroke="#B9F8CF" strokeWidth={0} />
+            <Square
+              size={24}
+              className="fill-admin-seat-available text-admin-seat-available"
+              strokeWidth={0}
+            />
           }
           badge="AVAILABLE"
           badgeColor="green"
@@ -244,7 +248,11 @@ export default function AdminSeatMonitoringPage() {
         />
         <StatCard
           icon={
-            <Square size={24} fill="#99A1AF" stroke="#99A1AF" strokeWidth={0} />
+            <Square
+              size={24}
+              className="fill-admin-seat-sold text-admin-seat-sold"
+              strokeWidth={0}
+            />
           }
           badge="SOLD"
           badgeColor="blue"
@@ -283,9 +291,12 @@ export default function AdminSeatMonitoringPage() {
               {/* 범례 */}
               <div className="flex justify-center gap-8 mt-6 pt-4 border-t border-admin-border">
                 <p className="text-xs text-admin-text-secondary">범례</p>
-                <LegendRow color="#B9F8CF" label="예매 가능" />
-                <LegendRow color="#99A1AF" label="판매 완료" />
-                <LegendRow color="#FFF085" label="진행중 (타이머)" />
+                <LegendRow swatch="bg-admin-seat-available" label="예매 가능" />
+                <LegendRow swatch="bg-admin-seat-sold" label="판매 완료" />
+                <LegendRow
+                  swatch="bg-admin-seat-holding"
+                  label="진행중 (타이머)"
+                />
               </div>
             </>
           ) : (
@@ -309,10 +320,10 @@ export default function AdminSeatMonitoringPage() {
   );
 }
 
-function LegendRow({ color, label }: { color: string; label: string }) {
+function LegendRow({ swatch, label }: { swatch: string; label: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
+      <span className={`w-4 h-4 rounded ${swatch}`} />
       <span className="text-admin-text-secondary">{label}</span>
     </div>
   );

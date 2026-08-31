@@ -4,9 +4,8 @@
 // USE_MOCK = true 유지. 백엔드 완성 시 순차 교체.
 
 import { mockGetBanners } from "./mocks/banners";
+import { USE_MOCK } from "./useMock";
 // import apiClient from "./instance";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 export async function fetchBanners() {
   if (USE_MOCK) return mockGetBanners();
