@@ -58,7 +58,11 @@ const HAIR_COLORS = [
 
 const OUTFITS = [
   { name: "무지개 블라우스", description: "가벼운 공연 의상", icon: "👗" },
-  { name: "마이크 콘서트", description: "K-POP 콘서트 대표룩", icon: "🎤" },
+  {
+    name: "마이크 콘서트",
+    description: "K-POP 콘서트 대표룩",
+    icon: "🎤",
+  },
   { name: "클래식 공연", description: "포멀한 공연 의상", icon: "🎻" },
   { name: "DJ / 페스티벌", description: "EDM 페스티벌룩", icon: "🎸" },
   { name: "발레 / 무용 공연", description: "무용 공연 의상", icon: "🩰" },
@@ -289,9 +293,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setSkinHexInput(character.skinColor);
-    setSkinHexError(
-      "예: #F7C6A8처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setSkinHexError("");
   }
 
   function applyHairColor(value: string) {
@@ -345,9 +347,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setHairHexInput(character.hairColor);
-    setHairHexError(
-      "예: #151515처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setHairHexError("");
   }
 
   function applyBackgroundColor(value: string) {
@@ -402,9 +402,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setBackgroundHexInput(character.background);
-    setBackgroundHexError(
-      "예: #E9DDFF처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setBackgroundHexError("");
   }
 
   function handleReset() {
@@ -1076,7 +1074,9 @@ function ColorButton({
       aria-pressed={selected}
       onClick={onClick}
       className={`h-12 rounded-lg border transition ${
-        selected ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200"
+        selected
+          ? "border-slate-900 ring-2 ring-slate-900"
+          : "border-slate-200"
       }`}
       style={{ backgroundColor: color }}
     />
