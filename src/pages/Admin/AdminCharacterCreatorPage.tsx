@@ -50,8 +50,10 @@ const HAIR_STYLES: {
   { value: "wave", label: "웨이브", icon: "🌀" },
 ];
 
+const DEFAULT_HAIR_COLOR = "#151515";
+
 const HAIR_COLORS = [
-  "#151515",
+  DEFAULT_HAIR_COLOR,
   "#4b3a2b",
   "#bfc5c7",
   "#f07ac4",
@@ -145,7 +147,7 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   skinTone: DEFAULT_SKIN_TONE,
   skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
-  hairColor: "#151515",
+  hairColor: DEFAULT_HAIR_COLOR,
   outfitName: "무지개 블라우스",
   outfitColor: "#60a5fa",
   accessory: "none",
@@ -166,11 +168,15 @@ function loadSavedCharacter(): CharacterConfig {
 
   try {
     const parsed = JSON.parse(savedCharacter) as Partial<
-      Omit<CharacterConfig, "skinTone" | "skinColor" | "hairStyle">
+      Omit<
+        CharacterConfig,
+        "skinTone" | "skinColor" | "hairStyle" | "hairColor"
+      >
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      hairColor?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -178,11 +184,17 @@ function loadSavedCharacter(): CharacterConfig {
       parsed.skinColor,
     );
 
+    const resolvedHairColor =
+      typeof parsed.hairColor === "string"
+        ? normalizeHexColor(parsed.hairColor)
+        : null;
+
     return {
       ...DEFAULT_CHARACTER,
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
     } as CharacterConfig;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -225,12 +237,22 @@ export default function AdminCharacterCreatorPage() {
   );
   const [skinHexError, setSkinHexError] = useState("");
 
+  const [hairHexInput, setHairHexInput] = useState(
+    () => character.hairColor,
+  );
+  const [hairHexError, setHairHexError] = useState("");
+
   const [backgroundHexInput, setBackgroundHexInput] = useState(
     () => character.background,
   );
   const [backgroundHexError, setBackgroundHexError] = useState("");
 
   const isCustomSkinTone = character.skinTone === "custom";
+
+  const selectedHairColorPreset = HAIR_COLORS.find((color) =>
+    isSameHexColor(color, character.hairColor),
+  );
+  const isCustomHairColor = !selectedHairColorPreset;
 
   const selectedBackgroundPreset = BACKGROUNDS.find((background) =>
     isSameHexColor(background.color, character.background),
@@ -315,6 +337,60 @@ export default function AdminCharacterCreatorPage() {
     setSkinHexError("");
   }
 
+  function applyHairColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("hairColor", normalized);
+    setHairHexInput(normalized);
+    setHairHexError("");
+
+    return true;
+  }
+
+  function handleHairHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setHairHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyHairColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setHairHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setHairHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setHairHexError("");
+  }
+
+  function handleHairHexBlur() {
+    const normalized = normalizeHexColor(hairHexInput);
+
+    if (normalized) {
+      applyHairColor(normalized);
+      return;
+    }
+
+    setHairHexInput(character.hairColor);
+    setHairHexError("");
+  }
+
   function applyBackgroundColor(value: string) {
     const normalized = normalizeHexColor(value);
 
@@ -373,6 +449,8 @@ export default function AdminCharacterCreatorPage() {
     setCharacter(DEFAULT_CHARACTER);
     setSkinHexInput(DEFAULT_CHARACTER.skinColor);
     setSkinHexError("");
+    setHairHexInput(DEFAULT_CHARACTER.hairColor);
+    setHairHexError("");
     setBackgroundHexInput(DEFAULT_CHARACTER.background);
     setBackgroundHexError("");
   }
@@ -381,6 +459,13 @@ export default function AdminCharacterCreatorPage() {
     if (!normalizeHexColor(skinHexInput)) {
       setSkinHexError(
         "피부색을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (!normalizeHexColor(hairHexInput)) {
+      setHairHexError(
+        "헤어 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
       );
       return;
     }
@@ -590,10 +675,114 @@ export default function AdminCharacterCreatorPage() {
                   <ColorButton
                     key={color}
                     color={color}
-                    selected={character.hairColor === color}
-                    onClick={() => update("hairColor", color)}
+                    selected={isSameHexColor(character.hairColor, color)}
+                    onClick={() => applyHairColor(color)}
                   />
                 ))}
+              </div>
+
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      사용자 지정 헤어 컬러
+                    </h3>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
+                    </p>
+                  </div>
+
+                  {isCustomHairColor && (
+                    <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+                      CUSTOM 선택됨
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+                  <div>
+                    <label
+                      htmlFor="custom-hair-color-picker"
+                      className="mb-2 block text-xs font-bold text-slate-700"
+                    >
+                      컬러 피커
+                    </label>
+
+                    <input
+                      id="custom-hair-color-picker"
+                      type="color"
+                      value={character.hairColor}
+                      onChange={(event) =>
+                        applyHairColor(event.target.value)
+                      }
+                      className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                      aria-label="사용자 지정 헤어 컬러 선택"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="custom-hair-hex"
+                      className="mb-2 block text-xs font-bold text-slate-700"
+                    >
+                      HEX 색상 코드
+                    </label>
+
+                    <input
+                      id="custom-hair-hex"
+                      type="text"
+                      value={hairHexInput}
+                      onChange={(event) =>
+                        handleHairHexChange(event.target.value)
+                      }
+                      onBlur={handleHairHexBlur}
+                      placeholder="#151515"
+                      maxLength={7}
+                      spellCheck={false}
+                      aria-invalid={Boolean(hairHexError)}
+                      aria-describedby="custom-hair-hex-help custom-hair-hex-error"
+                      className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                        hairHexError
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-slate-300 focus:border-primary"
+                      }`}
+                    />
+
+                    <p
+                      id="custom-hair-hex-help"
+                      className="mt-1 text-[11px] text-slate-500"
+                    >
+                      # 없이 6자리만 입력해도 자동으로 적용됩니다.
+                    </p>
+
+                    {hairHexError && (
+                      <p
+                        id="custom-hair-hex-error"
+                        className="mt-1 text-xs font-medium text-red-600"
+                      >
+                        {hairHexError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-bold text-slate-700">
+                      현재 적용 색상
+                    </p>
+
+                    <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+                      <span
+                        className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                        style={{ backgroundColor: character.hairColor }}
+                      />
+
+                      <code className="text-xs font-bold text-slate-700">
+                        {character.hairColor.toUpperCase()}
+                      </code>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CreatorSection>
 
@@ -828,6 +1017,7 @@ export default function AdminCharacterCreatorPage() {
               <p>피부: {character.skinTone}</p>
               <p>피부색: {character.skinColor.toUpperCase()}</p>
               <p>헤어: {character.hairStyle}</p>
+              <p>헤어 컬러: {character.hairColor.toUpperCase()}</p>
               <p>의상: {character.outfitName}</p>
               <p>액세서리: {character.accessory}</p>
               <p>포즈: {character.pose}</p>

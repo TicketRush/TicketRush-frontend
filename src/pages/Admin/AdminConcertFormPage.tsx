@@ -24,6 +24,7 @@ import {
   type HairStyle,
 } from "@/components/admin/character/characterHair";
 import {
+  normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
@@ -56,6 +57,7 @@ const INITIAL_FORM: ConcertFormData = {
 
 const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const DEFAULT_HAIR_COLOR = "#151515";
 
 interface Props {
   mode: "create" | "edit";
@@ -84,11 +86,15 @@ function loadSavedCharacter(): CharacterDraft | null {
 
   try {
     const parsed = JSON.parse(savedCharacter) as Partial<
-      Omit<CharacterDraft, "skinTone" | "skinColor" | "hairStyle">
+      Omit<
+        CharacterDraft,
+        "skinTone" | "skinColor" | "hairStyle" | "hairColor"
+      >
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      hairColor?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -96,10 +102,16 @@ function loadSavedCharacter(): CharacterDraft | null {
       parsed.skinColor,
     );
 
+    const resolvedHairColor =
+      typeof parsed.hairColor === "string"
+        ? normalizeHexColor(parsed.hairColor)
+        : null;
+
     return {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
