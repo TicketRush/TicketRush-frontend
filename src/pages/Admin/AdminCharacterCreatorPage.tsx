@@ -5,12 +5,21 @@ import {
   resolveStoredHairStyle,
   type HairStyle,
 } from "@/components/admin/character/characterHair";
+import {
+  DEFAULT_SKIN_COLOR,
+  DEFAULT_SKIN_TONE,
+  SKIN_TONE_PRESETS,
+  findSkinTonePresetByColor,
+  normalizeHexColor,
+  resolveStoredSkinTone,
+  type SkinToneSelection,
+} from "@/components/admin/character/characterSkin";
 
-type SkinTone = "light" | "medium" | "tan" | "dark";
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterConfig {
-  skinTone: SkinTone;
+  skinTone: SkinToneSelection;
+  skinColor: string;
   hairStyle: HairStyle;
   hairColor: string;
   outfitName: string;
@@ -28,14 +37,6 @@ interface BackgroundPreset {
 
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_RETURN_TO = "/admin/concerts/new";
-const HEX_COLOR_PATTERN = /^#?[0-9A-Fa-f]{6}$/;
-
-const SKIN_TONES: { value: SkinTone; label: string; color: string }[] = [
-  { value: "light", label: "Light", color: "#f7c6a8" },
-  { value: "medium", label: "Medium", color: "#d9a78c" },
-  { value: "tan", label: "Tan", color: "#bf7f54" },
-  { value: "dark", label: "Dark", color: "#8b5a2b" },
-];
 
 const HAIR_STYLES: {
   value: HairStyle;
@@ -141,7 +142,8 @@ const BACKGROUNDS: BackgroundPreset[] = [
 ];
 
 const DEFAULT_CHARACTER: CharacterConfig = {
-  skinTone: "light",
+  skinTone: DEFAULT_SKIN_TONE,
+  skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
   hairColor: "#151515",
   outfitName: "무지개 블라우스",
@@ -150,17 +152,6 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   pose: "standing",
   background: "#E9DDFF",
 };
-
-function normalizeHexColor(value: string): string | null {
-  const trimmed = value.trim();
-
-  if (!HEX_COLOR_PATTERN.test(trimmed)) {
-    return null;
-  }
-
-  const normalized = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
-  return normalized.toUpperCase();
-}
 
 function isSameHexColor(first: string, second: string) {
   return first.toUpperCase() === second.toUpperCase();
@@ -174,17 +165,25 @@ function loadSavedCharacter(): CharacterConfig {
   }
 
   try {
-    const parsed = JSON.parse(savedCharacter) as Omit<
-      CharacterConfig,
-      "hairStyle"
+    const parsed = JSON.parse(savedCharacter) as Partial<
+      Omit<CharacterConfig, "skinTone" | "skinColor" | "hairStyle">
     > & {
+      skinTone?: unknown;
+      skinColor?: unknown;
       hairStyle?: unknown;
     };
 
+    const resolvedSkin = resolveStoredSkinTone(
+      parsed.skinTone,
+      parsed.skinColor,
+    );
+
     return {
+      ...DEFAULT_CHARACTER,
       ...parsed,
+      ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
-    };
+    } as CharacterConfig;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     return DEFAULT_CHARACTER;
@@ -221,15 +220,17 @@ export default function AdminCharacterCreatorPage() {
     loadSavedCharacter(),
   );
 
+  const [skinHexInput, setSkinHexInput] = useState(
+    () => character.skinColor,
+  );
+  const [skinHexError, setSkinHexError] = useState("");
+
   const [backgroundHexInput, setBackgroundHexInput] = useState(
     () => character.background,
   );
-
   const [backgroundHexError, setBackgroundHexError] = useState("");
 
-  const selectedSkinTone = SKIN_TONES.find(
-    (skinTone) => skinTone.value === character.skinTone,
-  );
+  const isCustomSkinTone = character.skinTone === "custom";
 
   const selectedBackgroundPreset = BACKGROUNDS.find((background) =>
     isSameHexColor(background.color, character.background),
@@ -245,6 +246,73 @@ export default function AdminCharacterCreatorPage() {
       ...prev,
       [key]: value,
     }));
+  }
+
+  function applySkinPreset(
+    skinTone: Exclude<SkinToneSelection, "custom">,
+    skinColor: string,
+  ) {
+    update("skinTone", skinTone);
+    update("skinColor", skinColor);
+    setSkinHexInput(skinColor);
+    setSkinHexError("");
+  }
+
+  function applyCustomSkinColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    const matchedPreset = findSkinTonePresetByColor(normalized);
+
+    update("skinTone", matchedPreset ?? "custom");
+    update("skinColor", normalized);
+    setSkinHexInput(normalized);
+    setSkinHexError("");
+
+    return true;
+  }
+
+  function handleSkinHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setSkinHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyCustomSkinColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setSkinHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setSkinHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setSkinHexError("");
+  }
+
+  function handleSkinHexBlur() {
+    const normalized = normalizeHexColor(skinHexInput);
+
+    if (normalized) {
+      applyCustomSkinColor(normalized);
+      return;
+    }
+
+    setSkinHexInput(character.skinColor);
+    setSkinHexError("");
   }
 
   function applyBackgroundColor(value: string) {
@@ -268,8 +336,7 @@ export default function AdminCharacterCreatorPage() {
     const normalized = normalizeHexColor(upperValue);
 
     if (normalized) {
-      update("background", normalized);
-      setBackgroundHexError("");
+      applyBackgroundColor(normalized);
       return;
     }
 
@@ -304,11 +371,20 @@ export default function AdminCharacterCreatorPage() {
 
   function handleReset() {
     setCharacter(DEFAULT_CHARACTER);
+    setSkinHexInput(DEFAULT_CHARACTER.skinColor);
+    setSkinHexError("");
     setBackgroundHexInput(DEFAULT_CHARACTER.background);
     setBackgroundHexError("");
   }
 
   function handleApply() {
+    if (!normalizeHexColor(skinHexInput)) {
+      setSkinHexError(
+        "피부색을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
     if (!normalizeHexColor(backgroundHexInput)) {
       setBackgroundHexError(
         "배경색을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
@@ -361,18 +437,19 @@ export default function AdminCharacterCreatorPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
             <CreatorSection title="피부색 선택">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {SKIN_TONES.map((skinTone) => (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                {SKIN_TONE_PRESETS.map((skinTone) => (
                   <OptionCard
                     key={skinTone.value}
                     selected={character.skinTone === skinTone.value}
-                    onClick={() => update("skinTone", skinTone.value)}
+                    onClick={() =>
+                      applySkinPreset(skinTone.value, skinTone.color)
+                    }
+                    ariaLabel={`${skinTone.label} 피부색 선택`}
                   >
                     <div
-                      className="mx-auto h-10 w-32 rounded-full"
-                      style={{
-                        backgroundColor: skinTone.color,
-                      }}
+                      className="mx-auto h-10 w-full max-w-32 rounded-full"
+                      style={{ backgroundColor: skinTone.color }}
                     />
 
                     <p className="mt-2 text-xs font-bold text-slate-800">
@@ -380,6 +457,110 @@ export default function AdminCharacterCreatorPage() {
                     </p>
                   </OptionCard>
                 ))}
+              </div>
+
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      사용자 지정 피부색
+                    </h3>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
+                    </p>
+                  </div>
+
+                  {isCustomSkinTone && (
+                    <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+                      CUSTOM 선택됨
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+                  <div>
+                    <label
+                      htmlFor="custom-skin-color-picker"
+                      className="mb-2 block text-xs font-bold text-slate-700"
+                    >
+                      컬러 피커
+                    </label>
+
+                    <input
+                      id="custom-skin-color-picker"
+                      type="color"
+                      value={character.skinColor}
+                      onChange={(event) =>
+                        applyCustomSkinColor(event.target.value)
+                      }
+                      className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                      aria-label="사용자 지정 피부색 선택"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="custom-skin-hex"
+                      className="mb-2 block text-xs font-bold text-slate-700"
+                    >
+                      HEX 색상 코드
+                    </label>
+
+                    <input
+                      id="custom-skin-hex"
+                      type="text"
+                      value={skinHexInput}
+                      onChange={(event) =>
+                        handleSkinHexChange(event.target.value)
+                      }
+                      onBlur={handleSkinHexBlur}
+                      placeholder="#F7C6A8"
+                      maxLength={7}
+                      spellCheck={false}
+                      aria-invalid={Boolean(skinHexError)}
+                      aria-describedby="custom-skin-hex-help custom-skin-hex-error"
+                      className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                        skinHexError
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-slate-300 focus:border-primary"
+                      }`}
+                    />
+
+                    <p
+                      id="custom-skin-hex-help"
+                      className="mt-1 text-[11px] text-slate-500"
+                    >
+                      # 없이 6자리만 입력해도 자동으로 적용됩니다.
+                    </p>
+
+                    {skinHexError && (
+                      <p
+                        id="custom-skin-hex-error"
+                        className="mt-1 text-xs font-medium text-red-600"
+                      >
+                        {skinHexError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-bold text-slate-700">
+                      현재 적용 색상
+                    </p>
+
+                    <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+                      <span
+                        className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                        style={{ backgroundColor: character.skinColor }}
+                      />
+
+                      <code className="text-xs font-bold text-slate-700">
+                        {character.skinColor.toUpperCase()}
+                      </code>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CreatorSection>
 
@@ -636,7 +817,7 @@ export default function AdminCharacterCreatorPage() {
             >
               <CharacterModelViewer
                 modelUrl="/models/chibi-base.glb"
-                skinColor={selectedSkinTone?.color ?? "#f7c6a8"}
+                skinColor={character.skinColor}
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
                 hairStyle={character.hairStyle}
@@ -645,6 +826,7 @@ export default function AdminCharacterCreatorPage() {
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
               <p>피부: {character.skinTone}</p>
+              <p>피부색: {character.skinColor.toUpperCase()}</p>
               <p>헤어: {character.hairStyle}</p>
               <p>의상: {character.outfitName}</p>
               <p>액세서리: {character.accessory}</p>
