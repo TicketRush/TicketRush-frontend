@@ -23,8 +23,9 @@ import type {
   AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
 import { MOCK_CONCERTS } from "./concerts";
+import samplePoster from "@/assets/images/sample-poster.svg";
 
-const POSTER = "/placeholder-poster.png";
+const POSTER = samplePoster;
 
 // ── 메모리 저장소 (앱 새로고침 시 초기 데이터로 리셋) ────
 const bookingStore: BookingDetail[] = [

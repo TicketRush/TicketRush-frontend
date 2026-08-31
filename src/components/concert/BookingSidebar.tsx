@@ -22,6 +22,10 @@
 // - 2026-08-07 (#178 보완2):
 //   - ON_SALE 매진/로딩/실패 시 5분 타이머 안내 대신 상태 맞춤 문구
 //   - bookingOpenAt 포맷을 Asia/Seoul 기준으로 통일
+// - 2026-08-27 (이슈 #98):
+//   - sticky top-16 (헤더 아래), 예매 정보/유의사항 shadow-card + border-2
+//   - 관람 시간·상태 안내 박스 border-2 (CTA/좌석 로직 유지)
+//   - 모바일 order-2로 제목 바로 아래, 데스크톱은 우측 row-span sticky
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
@@ -109,22 +113,22 @@ const NOTICE_STYLES: Record<
   { box: string; icon: string; text: string }
 > = {
   default: {
-    box: "bg-warning-bg border-warning-border",
+    box: "bg-warning-bg border-2 border-warning-border",
     icon: "text-yellow-700",
     text: "text-yellow-800",
   },
   muted: {
-    box: "bg-gray-100 border-gray-200",
+    box: "bg-gray-100 border-2 border-gray-200",
     icon: "text-gray-600",
     text: "text-gray-700",
   },
   danger: {
-    box: "bg-red-50 border-red-200",
+    box: "bg-red-50 border-2 border-red-200",
     icon: "text-red-600",
     text: "text-red-800",
   },
   success: {
-    box: "bg-green-50 border-green-200",
+    box: "bg-green-50 border-2 border-green-200",
     icon: "text-green-700",
     text: "text-green-800",
   },
@@ -174,8 +178,8 @@ export default function BookingSidebar({
       : AlertTriangle;
 
   return (
-    <div className="lg:sticky lg:top-4 space-y-3">
-      <div className="bg-white border border-border rounded-xl p-5 space-y-4">
+    <div className="order-2 space-y-3 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-16">
+      <div className="bg-white border-2 border-border rounded-xl p-5 space-y-4 shadow-card">
         <h3 className="font-bold">예매 정보</h3>
 
         <div>
@@ -228,7 +232,7 @@ export default function BookingSidebar({
           </p>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+        <div className="border-2 border-border rounded-lg p-3 bg-white flex items-center justify-between">
           <span className="text-xs text-text-secondary">관람 시간</span>
           <span className="text-sm font-semibold">{duration}분</span>
         </div>
@@ -249,7 +253,7 @@ export default function BookingSidebar({
 
         {statusNotice && (
           <div
-            className={`border rounded-lg p-3 flex items-start gap-2 ${noticeStyle.box}`}
+            className={`rounded-lg p-3 flex items-start gap-2 ${noticeStyle.box}`}
           >
             <NoticeIcon
               size={14}
@@ -269,7 +273,7 @@ export default function BookingSidebar({
         )}
       </div>
 
-      <div className="bg-white border border-border rounded-xl p-4">
+      <div className="bg-white border-2 border-border rounded-xl p-4 shadow-card">
         <ul className="text-xs text-text-secondary space-y-1.5">
           {notices.map((n, i) => (
             <li key={i} className="flex items-start gap-1.5">

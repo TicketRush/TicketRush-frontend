@@ -14,7 +14,14 @@
 // - 2026-08-06 (이슈 #177):
 //   - ON_SALE일 때만 seat-counts 조회
 //   - 잔여 미확정 시 "-" (Sidebar), 예매는 기존처럼 차단
+// - 2026-08-27 (이슈 #98):
+//   - 포스터와 제목 분리: 포스터는 스크롤, 제목 카드만 sticky (lg:top-16)
+//   - 포스터/갤러리 없을 때 samplePoster 대신 poster-fallback 그라데이션
+//   - 갤러리 비면 섹션 숨김, venue===address면 주소 박스 숨김
+//   - InfoBox 원형 아이콘, 섹션/주소/편의시설 border-2 + shadow-card
+//   - 소개 비면 섹션 숨김. 모바일은 제목 다음 예매 박스, 제목 sticky는 lg만
 import { useNavigate, useParams, Navigate } from "react-router-dom";
+import type { SyntheticEvent } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -33,7 +40,13 @@ import {
   canBookConcert,
   shouldFetchSeatCounts,
 } from "@/utils/concert/canBookConcert";
-import samplePoster from "@/assets/images/sample-poster.svg";
+
+const POSTER_FALLBACK =
+  "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
+
+function hideBrokenImage(e: SyntheticEvent<HTMLImageElement>) {
+  e.currentTarget.style.display = "none";
+}
 
 export default function ConcertDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -69,7 +82,7 @@ export default function ConcertDetailPage() {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
         {listBackButton}
-        <div className="bg-white border border-border rounded-xl p-12 text-center text-text-secondary">
+        <div className="bg-white border-2 border-border rounded-xl p-12 text-center text-text-secondary">
           공연 정보 불러오는 중...
         </div>
       </div>
@@ -80,7 +93,7 @@ export default function ConcertDetailPage() {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
         {listBackButton}
-        <div className="bg-white border border-border rounded-xl p-12 text-center text-error">
+        <div className="bg-white border-2 border-border rounded-xl p-12 text-center text-error">
           공연 정보를 불러올 수 없습니다.
         </div>
       </div>
@@ -105,8 +118,13 @@ export default function ConcertDetailPage() {
     remaining,
   });
 
-  // venue fallback
-  const venueDisplay = data.venue ?? data.address ?? "";
+  // 빈 문자열 venue는 없는 것과 같다. 실 API는 venue/address가 둘 다 도로명.
+  const venueDisplay = data.venue || data.address || "";
+  const showAddressBox = Boolean(
+    data.address && data.address !== venueDisplay,
+  );
+  const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
+  const description = data.description?.trim() ?? "";
 
   function handleBooking() {
     setConcert({
@@ -133,56 +151,59 @@ export default function ConcertDetailPage() {
     <div className="max-w-7xl mx-auto px-6 py-8">
       {listBackButton}
 
-      {/* 7:3 grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6">
-        {/* ── 좌측: 콘텐츠 ──────────────────── */}
-        <div className="space-y-4">
-          {/* 포스터 (4:3) */}
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
-            <img
-              src={data.imageMainUrl || samplePoster}
-              alt={`${data.title} 포스터`}
-              className="w-full aspect-[4/3] object-cover bg-gray-100"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = samplePoster;
-              }}
-            />
-            <div className="p-6">
-              <h1 className="text-3xl font-bold text-text">{data.title}</h1>
-              <p className="text-text-secondary mt-1">{data.performer}</p>
-              <div className="mt-3">
-                <GenreBadge genre={data.genre} />
-              </div>
-            </div>
-          </div>
+      {/* 포스터는 sticky 대상이 아님. 깨진 이미지도 그라데이션 자리를 유지한다. */}
+      <div
+        className={`mb-6 aspect-[4/3] rounded-xl overflow-hidden shadow-card ${POSTER_FALLBACK}`}
+      >
+        {data.imageMainUrl ? (
+          <img
+            src={data.imageMainUrl}
+            alt={`${data.title} 포스터`}
+            className="w-full h-full object-cover"
+            onError={hideBrokenImage}
+          />
+        ) : null}
+      </div>
 
-          {/* 공연 정보 — 2x2 박스 */}
+      {/*
+        모바일 순서: 제목 → 예매 박스 → 본문. 제목 sticky는 lg만 (좁은 화면에서 카드가 뷰포트를 먹지 않게).
+        데스크톱: 제목+본문 | 사이드바(row-span). 사이드바는 그리드 직접 자식이어야 sticky.
+      */}
+      <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6 items-start">
+        <div className="order-1 lg:sticky lg:top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card lg:col-start-1 lg:row-start-1">
+          <h1 className="text-3xl font-bold text-text">{data.title}</h1>
+          <p className="text-text-secondary mt-1">{data.performer}</p>
+          <div className="mt-3">
+            <GenreBadge genre={data.genre} />
+          </div>
+        </div>
+
+        <div className="order-3 space-y-4 min-w-0 lg:order-none lg:col-start-1 lg:row-start-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <InfoBox
-              icon={<Calendar size={16} className="text-primary" />}
+              icon={<Calendar size={20} className="text-primary" />}
               label="공연일"
               value={data.showDate}
             />
             <InfoBox
-              icon={<Clock size={16} className="text-primary" />}
+              icon={<Clock size={20} className="text-primary" />}
               label="시간"
               value={`${data.showTime} (${data.durationMinutes}분)`}
             />
             <InfoBox
-              icon={<MapPin size={16} className="text-primary" />}
+              icon={<MapPin size={20} className="text-primary" />}
               label="장소"
               value={venueDisplay}
             />
             <InfoBox
-              icon={<DollarSign size={16} className="text-primary" />}
+              icon={<DollarSign size={20} className="text-primary" />}
               label="가격"
               value={`₩${data.price.toLocaleString()}`}
             />
           </div>
 
-          {/* 공연장 주소 — 별도 박스 */}
-          {data.address && (
-            <div className="bg-white border border-border rounded-xl p-4 flex items-start gap-3">
+          {showAddressBox && (
+            <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 flex items-start gap-3">
               <MapPin size={16} className="text-primary mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs text-text-secondary">공연장 주소</p>
@@ -191,21 +212,21 @@ export default function ConcertDetailPage() {
             </div>
           )}
 
-          {/* 공연 소개 */}
-          <Section title="공연 소개">
-            <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-              {data.description}
-            </p>
-          </Section>
+          {description && (
+            <Section title="공연 소개">
+              <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
+                {data.description}
+              </p>
+            </Section>
+          )}
 
-          {/* 편의시설 및 서비스 */}
           {data.facilities && data.facilities.length > 0 && (
             <Section title="편의시설 및 서비스">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {data.facilities.map((f, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm"
+                    className="flex items-center gap-2 px-3 py-2 border-2 border-border rounded-lg text-sm"
                   >
                     <CheckCircle2 size={16} className="text-primary shrink-0" />
                     <span>{f.label}</span>
@@ -215,47 +236,44 @@ export default function ConcertDetailPage() {
             </Section>
           )}
 
-          {/* 공연장 갤러리 */}
-          <Section title="공연장 갤러리">
-            <div className="grid grid-cols-3 gap-3">
-              {(data.imageGalleryUrls && data.imageGalleryUrls.length > 0
-                ? data.imageGalleryUrls
-                : [samplePoster, samplePoster, samplePoster]
-              ).map((src, i) => (
-                <img
-                  key={i}
-                  src={src}
-                  alt={`${data.title} 갤러리 ${i + 1}`}
-                  className="w-full aspect-square object-cover rounded-lg bg-gray-100"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = samplePoster;
-                  }}
-                />
-              ))}
-            </div>
-          </Section>
+          {galleryUrls.length > 0 && (
+            <Section title="공연장 갤러리">
+              <div className="grid grid-cols-3 gap-3">
+                {galleryUrls.map((src, i) => (
+                  <div
+                    key={`${src}-${i}`}
+                    className={`aspect-square rounded-lg overflow-hidden ${POSTER_FALLBACK}`}
+                  >
+                    <img
+                      src={src}
+                      alt={`${data.title} 갤러리 ${i + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={hideBrokenImage}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
         </div>
 
-        {/* ── 우측: sticky 예매 사이드바 ──────────────────── */}
-        <div>
-          <BookingSidebar
-            remaining={remaining}
-            total={total}
-            price={data.price}
-            duration={data.durationMinutes}
-            isOnSale={isOnSale}
-            status={data.status}
-            bookingOpenAt={data.bookingOpenAt}
-            seatsLoading={shouldFetchSeats && seatCountsLoading}
-            seatsError={shouldFetchSeats && seatCountsError}
-            notices={
-              data.notices && data.notices.length > 0
-                ? data.notices
-                : DEFAULT_NOTICES
-            }
-            onBooking={handleBooking}
-          />
-        </div>
+        <BookingSidebar
+          remaining={remaining}
+          total={total}
+          price={data.price}
+          duration={data.durationMinutes}
+          isOnSale={isOnSale}
+          status={data.status}
+          bookingOpenAt={data.bookingOpenAt}
+          seatsLoading={shouldFetchSeats && seatCountsLoading}
+          seatsError={shouldFetchSeats && seatCountsError}
+          notices={
+            data.notices && data.notices.length > 0
+              ? data.notices
+              : DEFAULT_NOTICES
+          }
+          onBooking={handleBooking}
+        />
       </div>
     </div>
   );
@@ -278,8 +296,8 @@ function InfoBox({
   value: string;
 }) {
   return (
-    <div className="bg-white border border-border rounded-xl p-4 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+    <div className="bg-white border-2 border-border rounded-xl p-4 flex items-center gap-3">
+      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="min-w-0">
@@ -298,7 +316,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-border rounded-xl p-6">
+    <div className="bg-white border-2 border-border rounded-xl p-6 shadow-card">
       <h2 className="font-bold mb-3">{title}</h2>
       {children}
     </div>
