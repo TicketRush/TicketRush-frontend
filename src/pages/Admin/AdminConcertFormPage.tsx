@@ -20,6 +20,10 @@ import type { ConcertFormData } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
+  resolveStoredHairStyle,
+  type HairStyle,
+} from "@/components/admin/character/characterHair";
+import {
   normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
@@ -59,20 +63,12 @@ interface Props {
   mode: "create" | "edit";
 }
 
-type CharacterHairStyle =
-  | "short"
-  | "long"
-  | "bun"
-  | "ponytail"
-  | "wave"
-  | "rainbow";
-
 type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterDraft {
   skinTone: SkinToneSelection;
   skinColor: string;
-  hairStyle: CharacterHairStyle;
+  hairStyle: HairStyle;
   hairColor: string;
   outfitName: string;
   outfitColor: string;
@@ -89,12 +85,15 @@ function loadSavedCharacter(): CharacterDraft | null {
   }
 
   try {
-    const parsed = JSON.parse(savedCharacter) as Omit<
-      CharacterDraft,
-      "skinTone" | "skinColor" | "hairColor"
+    const parsed = JSON.parse(savedCharacter) as Partial<
+      Omit<
+        CharacterDraft,
+        "skinTone" | "skinColor" | "hairStyle" | "hairColor"
+      >
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
+      hairStyle?: unknown;
       hairColor?: unknown;
     };
 
@@ -111,6 +110,7 @@ function loadSavedCharacter(): CharacterDraft | null {
     return {
       ...parsed,
       ...resolvedSkin,
+      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
     } as CharacterDraft;
   } catch {

@@ -1,8 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useConcerts } from "@/hooks/queries/useConcerts";
 import ConcertCard from "@/components/concert/ConcertCard";
 import ConcertCardSkeleton from "@/components/concert/ConcertCardSkeleton";
 import BannerSlider from "@/components/concert/BannerSlider";
+
+function ConcertGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {children}
+    </div>
+  );
+}
 
 export default function ConcertListPage() {
   const {
@@ -34,6 +42,13 @@ export default function ConcertListPage() {
 
   const concerts = data?.pages.flatMap((p) => p.items) ?? [];
 
+  // Figma는 배너가 목록 맨 아래가 아니라 첫 줄과 둘째 줄 사이에 끼는 구성이다.
+  // 배너를 그리드 안에 넣으면 col-span-full이 줄을 넘기면서 빈 칸이 생기므로
+  // 그리드를 둘로 나눠 사이에 배치한다.
+  const BANNER_AFTER = 4;
+  const beforeBanner = concerts.slice(0, BANNER_AFTER);
+  const afterBanner = concerts.slice(BANNER_AFTER);
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
       {/* 제목 */}
@@ -44,29 +59,47 @@ export default function ConcertListPage() {
         </p>
       </div>
 
-      {/* 카드 그리드 */}
       {isError ? (
         <div className="bg-white border border-border rounded-xl p-12 text-center text-error">
           공연 목록을 불러올 수 없습니다.
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {isLoading
-            ? Array.from({ length: 8 }).map((_, i) => (
-                <ConcertCardSkeleton key={i} />
-              ))
-            : concerts.map((c) => <ConcertCard key={c.id} concert={c} />)}
-        </div>
-      )}
-
-      {!isLoading && concerts.length === 0 && !isError && (
+      ) : isLoading ? (
+        <ConcertGrid>
+          {Array.from({ length: BANNER_AFTER }).map((_, i) => (
+            <ConcertCardSkeleton key={`a-${i}`} />
+          ))}
+        </ConcertGrid>
+      ) : concerts.length === 0 ? (
         <div className="text-center text-text-secondary py-12">
           등록된 공연이 없습니다.
         </div>
+      ) : (
+        <ConcertGrid>
+          {beforeBanner.map((c) => (
+            <ConcertCard key={c.id} concert={c} />
+          ))}
+        </ConcertGrid>
       )}
 
-      {/* 배너 슬라이더 */}
+      {/* 목록이 비거나 로딩 중이어도 배너는 같은 위치에 둔다 */}
       <BannerSlider />
+
+      {!isError &&
+        (isLoading ? (
+          <ConcertGrid>
+            {Array.from({ length: BANNER_AFTER }).map((_, i) => (
+              <ConcertCardSkeleton key={`b-${i}`} />
+            ))}
+          </ConcertGrid>
+        ) : (
+          afterBanner.length > 0 && (
+            <ConcertGrid>
+              {afterBanner.map((c) => (
+                <ConcertCard key={c.id} concert={c} />
+              ))}
+            </ConcertGrid>
+          )
+        ))}
 
       {/* 무한 스크롤 trigger */}
       <div ref={sentinelRef} className="h-1" />

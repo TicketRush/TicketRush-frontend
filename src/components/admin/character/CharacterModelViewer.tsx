@@ -2,24 +2,31 @@ import { Suspense, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { Center, OrbitControls, useGLTF } from "@react-three/drei";
+import type { HairStyle } from "@/components/admin/character/characterHair";
+
+export type { HairStyle } from "@/components/admin/character/characterHair";
 
 interface CharacterModelViewerProps {
   modelUrl?: string;
   skinColor: string;
   hairColor: string;
   outfitColor: string;
-  hairStyle: string;
+  hairStyle: HairStyle;
 }
+
+const HAIR_MODEL_URLS: Record<HairStyle, string> = {
+  short: "/models/hair/hair_short.glb",
+  long: "/models/hair/hair_long.glb",
+  ponytail: "/models/hair/hair_ponytail.glb",
+  twintails: "/models/hair/hair_twintails.glb",
+  wave: "/models/hair/hair_wave.glb",
+};
 
 function getPartType(objectName: string) {
   const name = objectName.toLowerCase();
 
   if (name.startsWith("body_")) {
     return "body";
-  }
-
-  if (name.startsWith("hair_")) {
-    return "hair";
   }
 
   if (name.startsWith("clothes_")) {
@@ -29,23 +36,14 @@ function getPartType(objectName: string) {
   return "other";
 }
 
-function shouldShowHair(objectName: string, selectedHairStyle: string) {
-  const name = objectName.toLowerCase();
-
-  if (!name.startsWith("hair_")) {
-    return true;
-  }
-
-  return name.startsWith(`hair_${selectedHairStyle}`);
-}
-
-function CharacterModel({
+function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
-  hairColor,
   outfitColor,
-  hairStyle,
-}: CharacterModelViewerProps) {
+}: Pick<
+  CharacterModelViewerProps,
+  "modelUrl" | "skinColor" | "outfitColor"
+>) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
@@ -56,24 +54,12 @@ function CharacterModel({
         return;
       }
 
-      const objectName = object.name.toLowerCase();
-      const partType = getPartType(objectName);
-
-      if (partType === "hair") {
-        object.visible = shouldShowHair(objectName, hairStyle);
-      }
+      const partType = getPartType(object.name);
 
       if (partType === "body") {
         object.material = new THREE.MeshStandardMaterial({
           color: skinColor,
           roughness: 0.8,
-        });
-      }
-
-      if (partType === "hair") {
-        object.material = new THREE.MeshStandardMaterial({
-          color: hairColor,
-          roughness: 0.85,
         });
       }
 
@@ -86,18 +72,62 @@ function CharacterModel({
     });
 
     return clonedScene;
-  }, [gltf.scene, skinColor, hairColor, outfitColor, hairStyle]);
+  }, [gltf.scene, skinColor, outfitColor]);
 
+  return <primitive object={scene} />;
+}
+
+function HairModel({
+  hairStyle,
+  hairColor,
+}: Pick<CharacterModelViewerProps, "hairStyle" | "hairColor">) {
+  const hairModelUrl = HAIR_MODEL_URLS[hairStyle];
+  const gltf = useGLTF(hairModelUrl);
+
+  const scene = useMemo(() => {
+    const clonedScene = gltf.scene.clone(true);
+
+    clonedScene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      object.material = new THREE.MeshStandardMaterial({
+        color: hairColor,
+        roughness: 0.85,
+      });
+    });
+
+    return clonedScene;
+  }, [gltf.scene, hairColor]);
+
+  return <primitive object={scene} />;
+}
+
+function CharacterModel({
+  modelUrl = "/models/chibi-base.glb",
+  skinColor,
+  hairColor,
+  outfitColor,
+  hairStyle,
+}: CharacterModelViewerProps) {
   return (
     <Center>
-        <primitive
-        object={scene}
+      <group
         scale={0.8}
         position={[0, -0.4, 0]}
         rotation={[0, 0, 0]}
+      >
+        <CharacterBody
+          modelUrl={modelUrl}
+          skinColor={skinColor}
+          outfitColor={outfitColor}
         />
+
+        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+      </group>
     </Center>
-    );
+  );
 }
 
 export default function CharacterModelViewer({
@@ -136,3 +166,8 @@ export default function CharacterModelViewer({
 }
 
 useGLTF.preload("/models/chibi-base.glb");
+useGLTF.preload("/models/hair/hair_short.glb");
+useGLTF.preload("/models/hair/hair_long.glb");
+useGLTF.preload("/models/hair/hair_ponytail.glb");
+useGLTF.preload("/models/hair/hair_twintails.glb");
+useGLTF.preload("/models/hair/hair_wave.glb");

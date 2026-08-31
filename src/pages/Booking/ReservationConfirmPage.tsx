@@ -3,9 +3,14 @@
 // 백엔드 스펙 반영 변경:
 //   - selectedSeat.seatNumber → seatNumber
 //   - totalAmount 계산: selectedSeat 제거, currentConcert만 사용
+//
+// ⚠️ 이슈 #124 후속: 좌석 HOLD는 예매(PENDING) 생성으로 대체됨.
+//   "좌석 다시 선택" 시 및 타이머 만료 시 useReservationLifecycle로 예매를
+//   취소(cancelBookingApi)해 서버 좌석 HOLD도 함께 해제.
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Clock, ArrowLeft, AlertCircle } from "lucide-react";
+import Button from "@/components/common/Button/Button";
 import { CircularTimer } from "@/components/common/CircularTimer/CircularTimer";
 import {
   useTimerDisplay,
@@ -13,18 +18,37 @@ import {
 } from "@/stores/reservation/timerStore";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
+import { usePaymentStore } from "@/stores/reservation/paymentStore";
+import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
+import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 
 export default function ReservationConfirmPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const performanceId = id ? Number(id) : undefined;
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const currentConcert = useConcertStore((s) => s.currentConcert);
+  const bookingNumber = usePaymentStore((s) => s.bookingNumber);
   const { remainingMs } = useTimerDisplay();
 
-  // 만료 시 expired 페이지로
+  const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);
+  const { handleTimeout, handleCancelReservation } = useReservationLifecycle();
+
+  function releaseSeat() {
+    if (!bookingNumber) return Promise.resolve();
+    return releaseSeatMutation.mutateAsync({
+      bookingNumber,
+      seatId: selectedSeat?.id,
+    });
+  }
+
+  // 만료 시 예매 취소 + expired 페이지로
   useTimerExpiry(() => {
-    navigate(`/concerts/${id}/payment/expired`, { replace: true });
+    handleTimeout({
+      onReleaseSeat: releaseSeat,
+      onNavigate: () => navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+    });
   });
 
   // 좌석 없으면 좌석 페이지로
@@ -36,20 +60,36 @@ export default function ReservationConfirmPage() {
 
   if (!selectedSeat) return null;
 
+  function handleReselect() {
+    handleCancelReservation({
+      onReleaseSeat: releaseSeat,
+      onNavigate: () => navigate(`/concerts/${id}/seats`),
+    });
+  }
+
+  function handleBack() {
+    handleCancelReservation({
+      onReleaseSeat: releaseSeat,
+      onNavigate: () => navigate(`/concerts/${id}/seats`),
+    });
+  }
+
   const remainingSeconds = Math.ceil(remainingMs / 1000);
   // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
   const totalAmount = currentConcert?.price ?? 0;
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 mb-6"
+      <Button
+        variant="outline"
+        size="sm"
+        className="mb-6"
+        icon={<ArrowLeft size={14} />}
+        disabled={releaseSeatMutation.isPending}
+        onClick={handleBack}
       >
-        <ArrowLeft size={14} />
         뒤로가기
-      </button>
+      </Button>
 
       <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3">
@@ -93,15 +133,16 @@ export default function ReservationConfirmPage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(`/concerts/${id}/seats`)}
-            className="w-full mt-2 py-3 rounded-lg bg-white border border-border text-text-secondary hover:bg-gray-50"
+            onClick={handleReselect}
+            disabled={releaseSeatMutation.isPending}
+            className="w-full mt-2 py-3 rounded-lg bg-white border border-border text-text-secondary hover:bg-gray-50 disabled:opacity-60"
           >
             좌석 다시 선택
           </button>
         </div>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex gap-3">
+      <div className="bg-warning-bg border border-warning-border rounded-xl p-4 flex gap-3">
         <AlertCircle size={20} className="text-yellow-600 shrink-0 mt-0.5" />
         <div>
           <p className="font-semibold text-sm text-yellow-900 mb-1">
