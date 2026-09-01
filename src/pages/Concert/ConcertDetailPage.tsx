@@ -20,6 +20,9 @@
 //   - 갤러리 비면 섹션 숨김, venue===address면 주소 박스 숨김
 //   - InfoBox 원형 아이콘, 섹션/주소/편의시설 border-2 + shadow-card
 //   - 소개 비면 섹션 숨김. 모바일은 제목 다음 예매 박스, 제목 sticky는 lg만
+// - 2026-08-31 (이슈 #203):
+//   - 상세 게이지는 목록 infinite query 캐시 lookup. 상세 totalSeats(등록값) 미사용
+//   - 예매 CTA는 기존처럼 seat-counts availableCount (#181)
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import type { SyntheticEvent } from "react";
 import {
@@ -31,6 +34,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
+import { useConcertListItem } from "@/hooks/queries/useConcertListItem";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
 import Button from "@/components/common/Button/Button";
 import GenreBadge from "@/components/concert/GenreBadge";
@@ -40,6 +44,7 @@ import {
   canBookConcert,
   shouldFetchSeatCounts,
 } from "@/utils/concert/canBookConcert";
+import { hasSeatCounts } from "@/utils/concert/hasSeatCounts";
 
 const POSTER_FALLBACK =
   "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
@@ -55,6 +60,7 @@ export default function ConcertDetailPage() {
 
   const concertId = id ? Number(id) : undefined;
   const { data, isLoading, isError } = useConcertDetail(concertId);
+  const listItem = useConcertListItem(concertId);
   // ON_SALE일 때만 seat-counts 조회 (#177). 그 외 상태는 "-" 표시
   const shouldFetchSeats = !!data && shouldFetchSeatCounts(data.status);
   const {
@@ -105,17 +111,18 @@ export default function ConcertDetailPage() {
     !!seatCounts &&
     !seatCountsLoading &&
     !seatCountsError;
-  // 표시/예매 판단은 seat-counts 확정 후에만 사용 (미확인 시 null → "-")
-  const total = seatsReady
-    ? seatCounts.totalCount
-    : (data.totalSeats ?? 0);
   const remaining = seatsReady ? seatCounts.availableCount : null;
+  const listRemaining =
+    listItem && hasSeatCounts(listItem) ? listItem.remainingSeats : null;
+  const listTotal =
+    listItem && hasSeatCounts(listItem) ? listItem.totalSeats : 0;
 
-  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0 (#181 공통)
+  // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0 (#181)
   const isOnSale = canBookConcert({
     status: data.status,
     seatsReady,
     remaining,
+    surface: "detail",
   });
 
   // 빈 문자열 venue는 없는 것과 같다. 실 API는 venue/address가 둘 다 도로명.
@@ -140,8 +147,12 @@ export default function ConcertDetailPage() {
       imageMainUrl: data!.imageMainUrl,
       address: data!.address,
       durationMinutes: data!.durationMinutes,
-      totalSeats: total,
-      remainingSeats: remaining ?? 0,
+      ...(seatsReady
+        ? {
+            totalSeats: seatCounts.totalCount,
+            remainingSeats: remaining ?? undefined,
+          }
+        : {}),
       status: data!.status,
     });
     navigate(`/concerts/${data!.id}/seats`);
@@ -258,8 +269,9 @@ export default function ConcertDetailPage() {
         </div>
 
         <BookingSidebar
+          listRemaining={listRemaining}
+          listTotal={listTotal}
           remaining={remaining}
-          total={total}
           price={data.price}
           duration={data.durationMinutes}
           isOnSale={isOnSale}
