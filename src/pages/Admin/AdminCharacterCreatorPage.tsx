@@ -461,9 +461,7 @@ export default function AdminCharacterCreatorPage() {
     }
 
     setOutfitHexInput(character.outfitColor);
-    setOutfitHexError(
-      "예: #60A5FA처럼 6자리 HEX 색상 코드를 입력해주세요.",
-    );
+    setOutfitHexError("");
   }
 
   function applyBackgroundColor(value: string) {
