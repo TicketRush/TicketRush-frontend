@@ -39,7 +39,7 @@ export function findConcertInListCache(
 }
 
 /**
- * 상세 게이지용. 목록을 안 거치고 들어오면 undefined → 게이지 `-`.
+ * 상세 게이지용. 없으면 상세에서 seat-counts로 폴백한다 (#203).
  */
 export function useConcertListItem(concertId: number | undefined) {
   const queryClient = useQueryClient();

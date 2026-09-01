@@ -21,8 +21,8 @@
 //   - InfoBox 원형 아이콘, 섹션/주소/편의시설 border-2 + shadow-card
 //   - 소개 비면 섹션 숨김. 모바일은 제목 다음 예매 박스, 제목 sticky는 lg만
 // - 2026-08-31 (이슈 #203):
-//   - 상세 게이지는 목록 infinite query 캐시 lookup. 상세 totalSeats(등록값) 미사용
-//   - 예매 CTA는 기존처럼 seat-counts availableCount (#181)
+//   - 상세 게이지는 목록 캐시 우선, 없으면 seat-counts(totalCount - soldCount)
+//   - 상세 totalSeats(등록값) 미사용. 예매 CTA는 availableCount (#181)
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import type { SyntheticEvent } from "react";
 import {
@@ -44,7 +44,7 @@ import {
   canBookConcert,
   shouldFetchSeatCounts,
 } from "@/utils/concert/canBookConcert";
-import { hasSeatCounts } from "@/utils/concert/hasSeatCounts";
+import { getDetailGaugeSeats } from "@/utils/concert/getDetailGaugeSeats";
 
 const POSTER_FALLBACK =
   "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
@@ -112,10 +112,11 @@ export default function ConcertDetailPage() {
     !seatCountsLoading &&
     !seatCountsError;
   const remaining = seatsReady ? seatCounts.availableCount : null;
-  const listRemaining =
-    listItem && hasSeatCounts(listItem) ? listItem.remainingSeats : null;
-  const listTotal =
-    listItem && hasSeatCounts(listItem) ? listItem.totalSeats : 0;
+  const { remaining: gaugeRemaining, total: gaugeTotal } = getDetailGaugeSeats(
+    listItem,
+    seatCounts,
+    seatsReady,
+  );
 
   // 예매 가능: ON_SALE + seat-counts 성공 + availableCount > 0 (#181)
   const isOnSale = canBookConcert({
@@ -269,8 +270,8 @@ export default function ConcertDetailPage() {
         </div>
 
         <BookingSidebar
-          listRemaining={listRemaining}
-          listTotal={listTotal}
+          gaugeRemaining={gaugeRemaining}
+          gaugeTotal={gaugeTotal}
           remaining={remaining}
           price={data.price}
           duration={data.durationMinutes}

@@ -27,16 +27,16 @@
 //   - 관람 시간·상태 안내 박스 border-2 (CTA/좌석 로직 유지)
 //   - 모바일 order-2로 제목 바로 아래, 데스크톱은 우측 row-span sticky
 // - 2026-08-31 (이슈 #203):
-//   - 게이지는 목록 캐시(listRemaining/listTotal). CTA는 seat-counts remaining
+//   - 게이지는 목록 캐시 우선, 없으면 seat-counts. CTA는 availableCount
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 
 interface BookingSidebarProps {
-  /** 목록 캐시 잔여. null이면 게이지 `-` (#203) */
-  listRemaining: number | null;
-  listTotal: number;
+  /** 상세 게이지 잔여. null이면 `-` (#203) */
+  gaugeRemaining: number | null;
+  gaugeTotal: number;
   /** seat-counts availableCount. CTA·안내 문구용 (#181) */
   remaining: number | null;
   price: number;
@@ -139,8 +139,8 @@ const NOTICE_STYLES: Record<
 };
 
 export default function BookingSidebar({
-  listRemaining,
-  listTotal,
+  gaugeRemaining,
+  gaugeTotal,
   remaining,
   price,
   duration,
@@ -152,17 +152,17 @@ export default function BookingSidebar({
   notices,
   onBooking,
 }: BookingSidebarProps) {
-  const listSeatsConfirmed = listRemaining !== null;
+  const gaugeConfirmed = gaugeRemaining !== null;
   const percent =
-    listSeatsConfirmed && listTotal > 0
-      ? (listRemaining / listTotal) * 100
+    gaugeConfirmed && gaugeTotal > 0
+      ? (gaugeRemaining / gaugeTotal) * 100
       : 0;
   const isEndingSoon =
-    listSeatsConfirmed &&
-    listRemaining > 0 &&
+    gaugeConfirmed &&
+    gaugeRemaining > 0 &&
     percent > 0 &&
     percent <= 20;
-  const showGauge = listSeatsConfirmed && listTotal > 0;
+  const showGauge = gaugeConfirmed && gaugeTotal > 0;
 
   const buttonLabel = getBookingCtaLabel({
     status,
@@ -195,17 +195,17 @@ export default function BookingSidebar({
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-xs text-text-secondary">잔여 좌석</span>
             <div className="flex items-baseline gap-0.5">
-              {!listSeatsConfirmed ? (
+              {!gaugeConfirmed ? (
                 <span className="text-3xl font-bold text-text-secondary">
                   -
                 </span>
               ) : (
                 <>
                   <span className="text-3xl font-bold text-text">
-                    {listRemaining}
+                    {gaugeRemaining}
                   </span>
                   <span className="text-xs text-text-secondary">
-                    /{listTotal}
+                    /{gaugeTotal}
                   </span>
                 </>
               )}

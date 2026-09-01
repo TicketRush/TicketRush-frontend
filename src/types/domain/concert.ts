@@ -64,6 +64,7 @@ export interface ConcertSummary {
    * 목록: seat-service 실측 `total_seats` (키 생략 가능).
    * 상세: 공연 등록 입력값. 이름이 같아도 같은 값이 아니다 (#203).
    * 목록 게이지 분모는 이 목록 필드만 쓰고, 상세 등록값을 폴백하지 않는다.
+   * 상세 게이지는 목록 캐시 → 없으면 seat-counts(totalCount - soldCount).
    */
   totalSeats?: number;
   /**
