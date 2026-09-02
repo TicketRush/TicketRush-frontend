@@ -21,12 +21,16 @@ import {
   _findMockBooking,
   _updateMockBookingStatus,
 } from "./bookings";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
 import type {
+  AdminConcertItem,
+  AdminConcertListParams,
+  AdminConcertListResponse,
+  AdminDashboardData,
+  AdminDashboardParams,
   AdminDashboardStats,
   DailyRevenue,
   GenreRevenue,
-  ConcertSalesStatus,
-  AdminConcertItem,
   AdminBookingStats,
   AdminBookingItem,
   AdminBookingListParams,
@@ -36,6 +40,13 @@ import type {
   ConcertFormData,
 } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
+import {
+  DEFAULT_DASHBOARD_PERIOD_DAYS,
+  inclusiveDayCount,
+  MAX_DASHBOARD_PERIOD_DAYS,
+  parseLocalDateKey,
+  toLocalDateKey,
+} from "@/utils/admin/dashboardPeriod";
 
 /**
  * MOCK_CONCERTS 항목에서 totalSeats / 판매 좌석 수 파생.
@@ -49,12 +60,72 @@ function getSold(c: (typeof MOCK_CONCERTS)[number]): number {
   return getTotalSeats(c) - (c.remainingSeats ?? 0);
 }
 
+const GENRE_LABELS: Record<Genre, string> = {
+  CONCERT: "콘서트",
+  MUSICAL: "뮤지컬",
+  CLASSIC: "클래식",
+  JAZZ: "재즈",
+  FESTIVAL: "페스티벌",
+  FANMEETING: "팬미팅",
+  BALLET: "발레",
+};
+
+function buildAdminConcertItems(): AdminConcertItem[] {
+  return MOCK_CONCERTS.map((c) => {
+    const sold = getSold(c);
+    const total = getTotalSeats(c);
+    return {
+      id: c.id,
+      title: c.title,
+      genre: c.genre,
+      date: c.showDate,
+      soldSeats: sold,
+      totalSeats: total,
+      occupancyRate: total > 0 ? sold / total : 0,
+      revenue: sold * c.price,
+      soldOut: total > 0 && sold >= total,
+      status: c.status,
+    };
+  });
+}
+
+function defaultDashboardParams(): AdminDashboardParams {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (DEFAULT_DASHBOARD_PERIOD_DAYS - 1));
+  return { from: toLocalDateKey(from), to: toLocalDateKey(to) };
+}
+
 // ── 대시보드 ───────────────────────────────────────────
-export async function mockGetAdminDashboard() {
+export async function mockGetAdminDashboard(
+  params: AdminDashboardParams = defaultDashboardParams(),
+): Promise<AdminDashboardData> {
   await mockDelay(500);
 
+  const from = parseLocalDateKey(params.from);
+  const to = parseLocalDateKey(params.to);
+  if (from.getTime() > to.getTime()) {
+    await mockError(
+      ERROR_CODES.PERFORMANCE_INVALID_DASHBOARD_PERIOD,
+      "조회 시작일은 종료일보다 늦을 수 없습니다.",
+    );
+  }
+  if (inclusiveDayCount(from, to) > MAX_DASHBOARD_PERIOD_DAYS) {
+    await mockError(
+      ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG,
+      "조회 기간은 최대 92일까지 지정할 수 있습니다.",
+    );
+  }
+
   const totalSold = MOCK_CONCERTS.reduce((sum, c) => sum + getSold(c), 0);
-  const totalSeats = MOCK_CONCERTS.reduce(
+  const occupancyTargets = MOCK_CONCERTS.filter(
+    (c) => c.status === "ON_SALE" || c.status === "CLOSED",
+  );
+  const occupancySold = occupancyTargets.reduce(
+    (sum, c) => sum + getSold(c),
+    0,
+  );
+  const occupancyTotal = occupancyTargets.reduce(
     (sum, c) => sum + getTotalSeats(c),
     0,
   );
@@ -67,34 +138,24 @@ export async function mockGetAdminDashboard() {
     totalConcerts: MOCK_CONCERTS.length,
     soldTickets: totalSold,
     totalRevenue,
-    averageOccupancyRate: totalSeats > 0 ? totalSold / totalSeats : 0,
+    averageOccupancyRate:
+      occupancyTotal > 0 ? occupancySold / occupancyTotal : 0,
   };
 
-  // 일별 매출 — 최근 7일 mock (로컬 날짜. UTC toISOString이면 KST에서 하루 밀림)
-  const dailyRevenue: DailyRevenue[] = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return {
-      date: `${y}-${m}-${day}`,
-      revenue: Math.floor(10000 + Math.random() * 20000),
-      ticketsSold: Math.floor(15 + Math.random() * 30),
-    };
-  });
+  const dayCount = inclusiveDayCount(from, to);
+  const dailyRevenue: DailyRevenue[] = Array.from({ length: dayCount }).map(
+    (_, i) => {
+      const d = new Date(from);
+      d.setDate(from.getDate() + i);
+      return {
+        date: toLocalDateKey(d),
+        revenue: Math.floor(10_000 + ((i * 1_973) % 20_000)),
+        ticketsSold: 15 + (i % 30),
+      };
+    },
+  );
 
-  // 장르별 매출 — 전체 공연 합산
   const genreMap = new Map<Genre, { revenue: number; label: string }>();
-  const GENRE_LABELS: Record<Genre, string> = {
-    CONCERT: "콘서트",
-    MUSICAL: "뮤지컬",
-    CLASSIC: "클래식",
-    JAZZ: "재즈",
-    FESTIVAL: "페스티벌",
-    FANMEETING: "팬미팅",
-    BALLET: "발레",
-  };
   MOCK_CONCERTS.forEach((c) => {
     const revenue = getSold(c) * c.price;
     const prev = genreMap.get(c.genre);
@@ -116,42 +177,31 @@ export async function mockGetAdminDashboard() {
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  // 공연별 판매 현황
-  // 매진은 ConcertStatus enum이 아니라 잔여 0 (표와 동일: soldSeats >= totalSeats)
-  const concertSales: ConcertSalesStatus[] = MOCK_CONCERTS.map((c) => {
-    const sold = getSold(c);
-    const total = getTotalSeats(c);
-    return {
-      concertId: c.id,
-      title: c.title,
-      genre: c.genre,
-      date: c.showDate,
-      soldSeats: sold,
-      totalSeats: total,
-      occupancyRate: total > 0 ? sold / total : 0,
-      revenue: sold * c.price,
-      isSoldOut: total > 0 && sold >= total,
-    };
-  });
+  return { stats, dailyRevenue, genreRevenue };
+}
 
-  // 전체 공연 목록 (관리자 테이블용)
-  const concertList: AdminConcertItem[] = MOCK_CONCERTS.map((c) => {
-    const sold = getSold(c);
-    const total = getTotalSeats(c);
-    return {
-      id: c.id,
-      title: c.title,
-      genre: c.genre,
-      date: c.showDate,
-      soldSeats: sold,
-      totalSeats: total,
-      occupancyRate: total > 0 ? sold / total : 0,
-      revenue: sold * c.price,
-      status: c.status,
-    };
-  });
+export async function mockGetAdminConcerts(
+  params: AdminConcertListParams = {},
+): Promise<AdminConcertListResponse> {
+  await mockDelay(400);
 
-  return { stats, dailyRevenue, genreRevenue, concertSales, concertList };
+  const items = buildAdminConcertItems();
+  const size = Math.min(params.size ?? 10, 50);
+  const pageIndex = params.page ?? 0;
+  const totalElements = items.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / size));
+  const start = pageIndex * size;
+
+  return {
+    items: items.slice(start, start + size),
+    pagination: {
+      pageIndex,
+      size,
+      totalElements,
+      totalPages,
+      hasNext: start + size < totalElements,
+    },
+  };
 }
 
 // ── 예매 내역 관리 ────────────────────────────────────
