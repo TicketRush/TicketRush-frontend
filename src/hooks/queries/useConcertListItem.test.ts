@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { queryKeys } from "@/constants/queryKeys";
 import type {
+  ConcertListParams,
   ConcertListResponse,
   ConcertSummary,
 } from "@/types/domain/concert";
@@ -40,7 +41,7 @@ function page(
 function seedListCache(
   queryClient: QueryClient,
   pages: ConcertListResponse[],
-  params: { size: number } = { size: 8 },
+  params: ConcertListParams = { size: 8 },
 ) {
   const data: InfiniteData<ConcertListResponse> = {
     pages,
@@ -76,5 +77,25 @@ describe("findConcertInListCache", () => {
     queryClient.setQueryData(queryKeys.concerts.list({ size: 8 }), {});
 
     expect(findConcertInListCache(queryClient, 1)).toBeUndefined();
+  });
+
+  it("동일 id면 좌석 수가 있는 캐시를 우선한다", () => {
+    const queryClient = new QueryClient();
+
+    seedListCache(queryClient, [page([summary(1)], false, 8)], { size: 8 });
+    seedListCache(
+      queryClient,
+      [page([summary(1, { totalSeats: 120, remainingSeats: 23 })], false, 8)],
+      { size: 8, genre: "CONCERT" },
+    );
+
+    expect(findConcertInListCache(queryClient, 1)?.remainingSeats).toBe(23);
+  });
+
+  it("좌석 수가 있는 캐시가 없으면 처음 찾은 항목을 반환한다", () => {
+    const queryClient = new QueryClient();
+    seedListCache(queryClient, [page([summary(1)], false, 8)], { size: 8 });
+
+    expect(findConcertInListCache(queryClient, 1)).toEqual(summary(1));
   });
 });

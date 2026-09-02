@@ -9,6 +9,7 @@ import type {
   ConcertListResponse,
   ConcertSummary,
 } from "@/types/domain/concert";
+import { hasSeatCounts } from "@/utils/concert/hasSeatCounts";
 
 function isListQueryKey(key: readonly unknown[]) {
   const prefix = queryKeys.concerts.listPrefix;
@@ -18,6 +19,7 @@ function isListQueryKey(key: readonly unknown[]) {
 /**
  * infinite list 캐시의 모든 페이지에서 같은 id를 찾는다 (#203).
  * 첫 페이지만 보면 스크롤로 연 공연이 `-`로 남는다.
+ * 필터별 list 캐시가 여러 개이면 좌석 수가 있는 항목을 우선한다.
  */
 export function findConcertInListCache(
   queryClient: QueryClient,
@@ -29,13 +31,19 @@ export function findConcertInListCache(
     queryKey: queryKeys.concerts.listPrefix,
   });
 
+  let fallback: ConcertSummary | undefined;
+
   for (const [, data] of entries) {
     const found = data?.pages
       ?.flatMap((page) => page.items ?? [])
       .find((item) => item.id === concertId);
-    if (found) return found;
+
+    if (!found) continue;
+    if (hasSeatCounts(found)) return found;
+    fallback ??= found;
   }
-  return undefined;
+
+  return fallback;
 }
 
 /**
