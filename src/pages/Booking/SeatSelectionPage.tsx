@@ -180,6 +180,15 @@ export default function SeatSelectionPage() {
     setConcert,
   ]);
 
+  // 브라우저 뒤로가기·F5로 좌석에 남은 PENDING은 이탈로 보고 즉시 취소 (#167).
+  // 의존성 비움: 「좌석 확인」직후 bookingNumber가 생긴 뒤 이 effect가 다시 돌면
+  // 방금 만든 PENDING을 취소하게 된다.
+  useEffect(() => {
+    if (!usePaymentStore.getState().bookingNumber) return;
+    void cancelPendingReservation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stats = {
     total: seatCounts?.totalCount ?? 0,
     available: seatCounts?.availableCount ?? 0,
@@ -245,15 +254,6 @@ export default function SeatSelectionPage() {
       throw ApiError.fromUnknown(error);
     }
   }
-
-  // 브라우저 뒤로가기·F5로 좌석에 남은 PENDING은 이탈로 보고 즉시 취소 (#167).
-  // 의존성 비움: 「좌석 확인」직후 bookingNumber가 생긴 뒤 이 effect가 다시 돌면
-  // 방금 만든 PENDING을 취소하게 된다.
-  useEffect(() => {
-    if (!usePaymentStore.getState().bookingNumber) return;
-    void cancelPendingReservation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function handleConfirm() {
     if (!selectedSeat || !performanceId || !selectedSeatAvailable) return;
