@@ -125,6 +125,18 @@ export async function mockGetSeatCounts(
   };
 }
 
+/** PENDING 예매 생성 시 좌석 HOLD (랜덤 충돌 없음) */
+export function applyMockSeatHold(performanceId: number, seatId: number) {
+  ensureSeatState(performanceId);
+  const statusMap = seatStateByPerformance.get(performanceId)!;
+  statusMap.set(seatId, "HOLD");
+  notifyListeners(performanceId, {
+    seatId,
+    status: "HOLD",
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export async function mockHoldSeat(
   performanceId: number,
   seatId: number,

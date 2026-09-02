@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { usePaymentConfirm } from "@/hooks/mutations/usePaymentConfirm";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
+import { CONFIRMING_LEAVE_MESSAGE } from "@/utils/booking/isPaymentInFlight";
 
 export default function PaymentSuccessPage() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +94,7 @@ export default function PaymentSuccessPage() {
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="text-center">
         <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
-        <p className="text-sm text-text-secondary">결제를 확인하고 있습니다...</p>
+        <p className="text-sm text-text-secondary">{CONFIRMING_LEAVE_MESSAGE}</p>
       </div>
     </div>
   );

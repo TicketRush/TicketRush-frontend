@@ -39,11 +39,11 @@ export type BackendPaymentStatus =
  *   IDLE → EXPIRED (타이머 만료)
  *
  * ⚠️ 이건 UI 흐름을 표현하는 상태이며 백엔드 결제 상태(BackendPaymentStatus)와 다름.
- *   REQUESTING: SDK 호출 중 (사용자 결제 창)
- *   CONFIRMING: SDK 완료 후 백엔드 confirm 진행 중
+ *   REQUESTING: SDK 호출 중 (사용자 결제 창). PENDING DELETE 금지.
+ *   CONFIRMING: SDK 완료 후 백엔드 confirm 진행 중. DELETE 금지 + 이탈 경고.
  *   SUCCESS: 백엔드 confirm 성공
  *   FAILED: SDK 실패 or confirm 실패
- *   EXPIRED: 5분 타이머 만료
+ *   EXPIRED: 서버 expires_at 기준 타이머 만료
  */
 export type PaymentStatus =
   | "IDLE"

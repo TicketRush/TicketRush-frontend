@@ -67,7 +67,7 @@ export interface SeatUpdateEvent {
   performanceId?: number;
   seatLayoutId?: number;
   seatNumber?: string;
-  /** HOLD 만료 예정 시각 — 백엔드 포맷 "yyyy-MM-dd HH:mm:ss" (ISO 아님) */
+  /** HOLD 만료 예정 시각 — 백엔드 포맷 "yyyy-MM-dd HH:mm:ss" (ISO 아님). 결제 타이머가 아님 (#167) */
   holdExpiredAt?: string;
   /** @deprecated 백엔드 페이로드에 없음. Mock 시뮬레이터 호환용으로만 유지. */
   timestamp?: string;

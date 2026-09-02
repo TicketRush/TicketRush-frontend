@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { useEffect } from "react";
+import { remainingMsUntil } from "@/utils/booking/parseBackendDateTime";
 
 type TimerStatus = "idle" | "running" | "expired";
 
@@ -9,8 +10,10 @@ interface TimerState {
   remainingMs: number;
   durationMs: number;
 
-  /** 타이머 시작 (default 5분) */
+  /** 타이머 시작 (default 5분). 생성 직후 fallback 전용. */
   startTimer: (durationMs?: number) => void;
+  /** 서버 expires_at 기준 카운트다운. 링 분모는 5분 유지 (#167). */
+  startTimerFromExpiresAt: (expiresAt: string) => void;
   /** 타이머 정지 (정상 종료 — 결제 성공 시) */
   stopTimer: () => void;
   /** 모든 상태 초기화 */
@@ -29,6 +32,28 @@ function clearTimerInterval() {
   }
 }
 
+function beginCountdown(
+  set: (partial: Partial<TimerState>) => void,
+  remainingMs: number,
+  durationMs: number,
+) {
+  clearTimerInterval();
+  const endsAt = Date.now() + remainingMs;
+
+  set({ status: "running", durationMs, remainingMs });
+
+  intervalId = setInterval(() => {
+    const remaining = Math.max(0, endsAt - Date.now());
+
+    if (remaining <= 0) {
+      clearTimerInterval();
+      set({ status: "expired", remainingMs: 0 });
+    } else {
+      set({ remainingMs: remaining });
+    }
+  }, 250);
+}
+
 export const useTimerStore = create<TimerState>()(
   devtools(
     (set) => ({
@@ -37,22 +62,21 @@ export const useTimerStore = create<TimerState>()(
       durationMs: DEFAULT_DURATION_MS,
 
       startTimer: (durationMs = DEFAULT_DURATION_MS) => {
-        clearTimerInterval();
-        const endsAt = Date.now() + durationMs;
+        beginCountdown(set, durationMs, durationMs);
+      },
 
-        set({ status: "running", durationMs, remainingMs: durationMs });
-
-        // 250ms 간격으로 갱신 — CircularTimer가 부드럽게 줄어들도록
-        intervalId = setInterval(() => {
-          const remaining = Math.max(0, endsAt - Date.now());
-
-          if (remaining <= 0) {
-            clearTimerInterval();
-            set({ status: "expired", remainingMs: 0 });
-          } else {
-            set({ remainingMs: remaining });
-          }
-        }, 250);
+      startTimerFromExpiresAt: (expiresAt: string) => {
+        const remaining = remainingMsUntil(expiresAt);
+        if (remaining <= 0) {
+          clearTimerInterval();
+          set({
+            status: "expired",
+            remainingMs: 0,
+            durationMs: DEFAULT_DURATION_MS,
+          });
+          return;
+        }
+        beginCountdown(set, remaining, DEFAULT_DURATION_MS);
       },
 
       stopTimer: () => {
