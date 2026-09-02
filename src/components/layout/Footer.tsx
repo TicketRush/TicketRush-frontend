@@ -1,4 +1,5 @@
 import logo from "@/assets/images/logo.svg";
+import { LEGAL_LINKS } from "@/constants/legalLinks";
 
 export default function Footer() {
   return (
@@ -35,7 +36,7 @@ export default function Footer() {
           {/* 오른쪽: 정책 링크 */}
           <div className="flex justify-end gap-6 font-pretendard text-xs text-text-secondary">
             <a
-              href="https://orange-split-b03.notion.site/TicketRush-35fbd63b04d5802cb228d07f783fd720?source=copy_link"
+              href={LEGAL_LINKS.privacy}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary"
@@ -43,7 +44,7 @@ export default function Footer() {
               개인정보처리방침
             </a>
             <a
-              href="https://orange-split-b03.notion.site/TicketRush-35fbd63b04d580eab531c4f5cf6c2fb1?source=copy_link"
+              href={LEGAL_LINKS.terms}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary"

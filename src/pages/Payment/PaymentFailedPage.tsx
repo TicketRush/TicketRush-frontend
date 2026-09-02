@@ -11,7 +11,7 @@
 //   경우(SDK 자체 오류, 예: 사용자가 결제창을 닫음)에만 뜨는 별개 케이스이며,
 //   그 경우엔 페이지 이동이 없어 여기까지 오지 않는다.
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import PaymentFailedModal from "@/components/payment/FailedModal";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 
 export default function PaymentFailedPage() {
@@ -36,37 +36,10 @@ export default function PaymentFailedPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black/30 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-4">
-          <AlertTriangle size={36} className="text-yellow-600" />
-        </div>
-        <h2 className="text-lg font-bold mb-2">결제 실패</h2>
-        <p className="text-sm text-text-secondary leading-relaxed mb-6">
-          {reason}
-          <br />
-          청구는 발생하지 않았습니다.
-        </p>
-
-        <div className={`grid gap-2 ${canRetry ? "grid-cols-2" : ""}`}>
-          {canRetry && (
-            <button
-              type="button"
-              onClick={handleRetry}
-              className="w-full py-3 rounded-lg bg-primary text-white font-bold hover:opacity-90"
-            >
-              다시 시도
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => navigate(`/concerts/${id}/seats`)}
-            className="w-full py-3 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600"
-          >
-            좌석으로 돌아가기
-          </button>
-        </div>
-      </div>
-    </div>
+    <PaymentFailedModal
+      message={reason}
+      onRetry={canRetry ? handleRetry : undefined}
+      onClose={() => navigate(`/concerts/${id}/seats`)}
+    />
   );
 }

@@ -19,6 +19,8 @@ interface TimeoutOptions {
   onNavigate?: NavigateCallback;
   /** 토스트 메시지 커스터마이즈. */
   message?: string;
+  /** true면 토스트를 생략. 만료 화면이 이미 안내할 때 사용. */
+  silent?: boolean;
 }
 
 interface PaymentFailOptions {
@@ -61,11 +63,12 @@ export function useReservationLifecycle() {
 
   // ───────────────────────────────────────────────────────────────────────
   // 1) 타이머 만료
-  //    seat + timer + payment 초기화 + 안내 토스트 (+ 선택적 서버 정리/이동)
+  //    seat + timer + payment 초기화 (+ 선택적 서버 정리/이동)
+  //    silent가 아니면 안내 토스트를 띄운다.
   // ───────────────────────────────────────────────────────────────────────
   const handleTimeout = useCallback(
     async (options: TimeoutOptions = {}) => {
-      const { onReleaseSeat, onNavigate, message } = options;
+      const { onReleaseSeat, onNavigate, message, silent } = options;
 
       // 서버 정리는 실패해도 클라 상태 초기화는 반드시 진행
       if (onReleaseSeat) {
@@ -80,7 +83,9 @@ export function useReservationLifecycle() {
       resetTimer();
       resetPayment();
 
-      toast.warning(message ?? DEFAULT_TIMEOUT_MSG);
+      if (!silent) {
+        toast.warning(message ?? DEFAULT_TIMEOUT_MSG);
+      }
       onNavigate?.();
     },
     [resetSeat, resetTimer, resetPayment],

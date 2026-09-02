@@ -7,7 +7,7 @@
 // ⚠️ 이슈 #124 후속: 좌석 HOLD는 예매(PENDING) 생성으로 대체됨.
 //   "좌석 다시 선택" 시 및 타이머 만료 시 useReservationLifecycle로 예매를
 //   취소(cancelBookingApi)해 서버 좌석 HOLD도 함께 해제.
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Clock, ArrowLeft, AlertCircle } from "lucide-react";
 import Button from "@/components/common/Button/Button";
@@ -35,6 +35,8 @@ export default function ReservationConfirmPage() {
   const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);
   const { handleTimeout, handleCancelReservation } = useReservationLifecycle();
 
+  const skipExpiredRedirectRef = useRef(false);
+
   function releaseSeat() {
     if (!bookingNumber) return Promise.resolve();
     return releaseSeatMutation.mutateAsync({
@@ -45,14 +47,18 @@ export default function ReservationConfirmPage() {
 
   // 만료 시 예매 취소 + expired 페이지로
   useTimerExpiry(() => {
-    handleTimeout({
+    skipExpiredRedirectRef.current = true;
+    void handleTimeout({
       onReleaseSeat: releaseSeat,
-      onNavigate: () => navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+      onNavigate: () =>
+        navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+      silent: true,
     });
   });
 
-  // 좌석 없으면 좌석 페이지로
+  // 좌석 없으면 좌석 페이지로 (만료 이동 중에는 가로채지 않음)
   useEffect(() => {
+    if (skipExpiredRedirectRef.current) return;
     if (!selectedSeat) {
       navigate(`/concerts/${id}/seats`, { replace: true });
     }
