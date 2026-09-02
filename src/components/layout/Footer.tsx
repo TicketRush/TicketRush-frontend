@@ -33,14 +33,6 @@ export default function Footer() {
                 onClick={handleExternalLeave}
               >
                 GitHub
-              </a>{" "}
-              ·{" "}
-              <a
-                href="/api-docs"
-                className="hover:text-primary"
-                onClick={handleExternalLeave}
-              >
-                API Docs
               </a>
             </p>
             <p>
