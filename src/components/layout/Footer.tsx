@@ -16,10 +16,6 @@ export default function Footer() {
                 className="hover:text-primary"
               >
                 GitHub
-              </a>{" "}
-              ·{" "}
-              <a href="/api-docs" className="hover:text-primary">
-                API Docs
               </a>
             </p>
             <p>
