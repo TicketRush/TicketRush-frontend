@@ -19,6 +19,10 @@ export const queryKeys = {
     list: (params?: ConcertListParams) => ["concerts", "list", params] as const,
     detail: (id: number) => ["concerts", "detail", id] as const,
   },
+  banners: {
+    all: ["banners"] as const,
+    list: () => ["banners", "list"] as const,
+  },
   seats: {
     all: ["seats"] as const,
     /** 좌석 배치 + 상태 통합 조회 */
