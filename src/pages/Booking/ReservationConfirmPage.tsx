@@ -9,7 +9,7 @@
 //   취소(cancelBookingApi)해 서버 좌석 HOLD도 함께 해제.
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Clock, ArrowLeft, AlertCircle } from "lucide-react";
+import { Clock, ArrowLeft, AlertCircle, CreditCard, Shield } from "lucide-react";
 import Button from "@/components/common/Button/Button";
 import { CircularTimer } from "@/components/common/CircularTimer/CircularTimer";
 import PendingTimerRestoreNotice from "@/components/payment/PendingTimerRestoreNotice";
@@ -115,11 +115,11 @@ export default function ReservationConfirmPage() {
 
       <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3">
-          <Clock size={12} /> 한정 좌석 예매중
+          <Clock size={12} /> 좌석 임시 예약 중
         </span>
         <h1 className="text-3xl font-bold mb-1">예매 확인</h1>
         <p className="text-sm text-text-secondary">
-          좌석을 확인하시고 결제를 진행해주세요
+          좌석이 임시 예약되었습니다. 5분 안에 결제를 완료해주세요.
         </p>
       </div>
 
@@ -142,7 +142,10 @@ export default function ReservationConfirmPage() {
         </div>
 
         <div className="bg-white border border-border rounded-xl p-6">
-          <h3 className="font-bold mb-4">📋 예매된 좌석</h3>
+          <h3 className="font-bold mb-4 flex items-center gap-2">
+            <Shield size={20} className="text-primary" />
+            예매된 좌석
+          </h3>
 
           <div className="flex flex-wrap gap-2 mb-4">
             <span className="px-3 py-1.5 rounded bg-primary text-white text-sm font-bold">
@@ -163,8 +166,9 @@ export default function ReservationConfirmPage() {
             type="button"
             onClick={() => navigate(`/concerts/${id}/payment`)}
             disabled={!canProceedToPayment}
-            className="w-full mt-6 py-3 rounded-lg bg-primary text-white font-bold hover:opacity-90 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+            className="w-full mt-6 py-3 rounded-lg bg-primary text-white font-bold hover:opacity-90 inline-flex items-center justify-center gap-2 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
           >
+            <CreditCard size={20} />
             결제하기
           </button>
           <button
