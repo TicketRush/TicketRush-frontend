@@ -1,14 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchBanners } from "@/api/banners";
-
-const bannerKeys = {
-  all: ["banners"] as const,
-  list: () => ["banners", "list"] as const,
-};
+import { queryKeys } from "@/constants/queryKeys";
 
 export function useBanners() {
   return useQuery({
-    queryKey: bannerKeys.list(),
+    queryKey: queryKeys.banners.list(),
     queryFn: fetchBanners,
     staleTime: 5 * 60 * 1000, // 5분
   });
