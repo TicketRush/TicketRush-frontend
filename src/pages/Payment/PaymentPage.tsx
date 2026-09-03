@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useCallback, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   useTimerDisplay,
@@ -34,6 +35,7 @@ import { LEGAL_LINKS } from "@/constants/legalLinks";
 import { requestTossPayment } from "@/utils/payment/tossSdk";
 import TimeoutModal from "@/components/payment/TimeoutModal";
 import PaymentFailedModal from "@/components/payment/FailedModal";
+import { paymentInFlightLeaveMessage } from "@/utils/booking/isPaymentInFlight";
 import type { PaymentMethod } from "@/types/domain/payment";
 
 const PAYMENT_PROVIDERS: Array<{
@@ -195,6 +197,13 @@ export default function PaymentPage() {
   }
 
   function handleTermsLinkClick(event: MouseEvent<HTMLAnchorElement>) {
+    // Toss 요청/확정 중에는 외부 링크로 나가면 안 되므로 navigation을 막는다.
+    if (paymentBusy) {
+      event.preventDefault();
+      event.stopPropagation();
+      toast.info(paymentInFlightLeaveMessage(paymentStatus));
+      return;
+    }
     event.stopPropagation();
   }
 

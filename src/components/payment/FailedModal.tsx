@@ -36,8 +36,9 @@ export default function PaymentFailedModal({
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || closePending) return;
-      if (onRetry) onRetry();
-      else onClose();
+      // dialog 관점에서는 Esc를 누르면 닫기만 수행한다.
+      // 재시도는 명시적인 버튼 클릭으로만 실행되게 한다.
+      onClose();
     };
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);

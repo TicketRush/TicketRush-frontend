@@ -6,6 +6,7 @@ import TimeoutModal from "@/components/payment/TimeoutModal";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
+import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
 
 export default function ReservationExpiredPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,8 +23,9 @@ export default function ReservationExpiredPage() {
 
   // 남은 PENDING을 마운트 시 조용히 취소해 「이미 해제」 카피와 맞춘다.
   useEffect(() => {
-    const { bookingNumber, seatId } = usePaymentStore.getState();
+    const { bookingNumber, seatId, status } = usePaymentStore.getState();
     if (!bookingNumber) return;
+    if (isPaymentInFlight(status)) return;
 
     setClosePending(true);
     void handleTimeoutRef
