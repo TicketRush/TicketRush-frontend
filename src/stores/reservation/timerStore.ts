@@ -10,7 +10,7 @@ interface TimerState {
   remainingMs: number;
   durationMs: number;
 
-  /** 타이머 시작 (default 5분). 생성 직후 fallback 전용. */
+  /** 타이머 시작 (default 5분). 생성 직후 표시용. 이후 화면이 expires_at으로 덮어쓴다. */
   startTimer: (durationMs?: number) => void;
   /** 서버 expires_at 기준 카운트다운. 링 분모는 5분 유지 (#167). */
   startTimerFromExpiresAt: (expiresAt: string) => void;

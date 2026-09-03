@@ -287,6 +287,7 @@ export default function SeatSelectionPage() {
         if (expiresAt) {
           useTimerStore.getState().startTimerFromExpiresAt(expiresAt);
         } else {
+          // 목록에 아직 없으면 잠깐 로컬 5분. 확인 화면에서 서버 시각으로 덮어쓴다.
           startTimer();
         }
       } catch {
