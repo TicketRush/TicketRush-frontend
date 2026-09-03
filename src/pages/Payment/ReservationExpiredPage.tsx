@@ -6,7 +6,6 @@ import TimeoutModal from "@/components/payment/TimeoutModal";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
-import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
 
 export default function ReservationExpiredPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,7 +24,7 @@ export default function ReservationExpiredPage() {
   useEffect(() => {
     const { bookingNumber, seatId, status } = usePaymentStore.getState();
     if (!bookingNumber) return;
-    if (isPaymentInFlight(status)) return;
+    if (status === "REQUESTING" || status === "CONFIRMING") return;
 
     setClosePending(true);
     void handleTimeoutRef

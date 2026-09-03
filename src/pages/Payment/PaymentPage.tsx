@@ -35,7 +35,6 @@ import { LEGAL_LINKS } from "@/constants/legalLinks";
 import { requestTossPayment } from "@/utils/payment/tossSdk";
 import TimeoutModal from "@/components/payment/TimeoutModal";
 import PaymentFailedModal from "@/components/payment/FailedModal";
-import { paymentInFlightLeaveMessage } from "@/utils/booking/isPaymentInFlight";
 import type { PaymentMethod } from "@/types/domain/payment";
 
 const PAYMENT_PROVIDERS: Array<{
@@ -201,7 +200,11 @@ export default function PaymentPage() {
     if (paymentBusy) {
       event.preventDefault();
       event.stopPropagation();
-      toast.info(paymentInFlightLeaveMessage(paymentStatus));
+      const message =
+        paymentStatus === "REQUESTING"
+          ? "결제창으로 이동 중입니다. 잠시만 기다려주세요."
+          : "결제 승인 처리 중입니다. 잠시만 기다려주세요.";
+      toast.info(message);
       return;
     }
     event.stopPropagation();
