@@ -183,14 +183,19 @@ export default function AdminSeatMonitoringPage() {
                       c.soldSeats != null &&
                       c.totalSeats > 0 &&
                       c.soldSeats >= c.totalSeats);
-                  const statusLabel = isSoldOut
-                    ? "매진"
-                    : (STATUS_LABELS[c.status] ?? "판매중");
-                  const statusColor = isSoldOut
+                  const isCanceled = c.status === "CANCELED";
+                  const statusLabel = isCanceled
+                    ? "취소"
+                    : isSoldOut
+                      ? "매진"
+                      : (STATUS_LABELS[c.status] ?? "판매중");
+                  const statusColor = isCanceled
                     ? "#FB2C36"
-                    : c.status === "ON_SALE"
-                      ? "#00C950"
-                      : "#6B7280";
+                    : isSoldOut
+                      ? "#FB2C36"
+                      : c.status === "ON_SALE"
+                        ? "#00C950"
+                        : "#6B7280";
                   return (
                     <tr
                       key={c.id}
