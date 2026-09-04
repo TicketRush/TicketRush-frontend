@@ -58,6 +58,7 @@ export default function ReservationConfirmPage() {
       onReleaseSeat: releaseSeat,
       onNavigate: () =>
         navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+      silent: true,
     });
   }
 

@@ -15,8 +15,9 @@
 //   결제 확정(POST /payment/confirm)은 Toss의 successUrl 리다이렉트를 받는
 //   PaymentSuccessPage에서 처리한다 (Redirect 방식은 이 페이지로 되돌아오지 않음).
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   useTimerDisplay,
@@ -31,7 +32,11 @@ import useAuthStore from "@/stores/global/authStore";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { useRestorePendingTimer } from "@/hooks/booking/useRestorePendingTimer";
-import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
+import { LEGAL_LINKS } from "@/constants/legalLinks";
+import {
+  isPaymentInFlight,
+  paymentInFlightLeaveMessage,
+} from "@/utils/booking/isPaymentInFlight";
 import { requestTossPayment } from "@/utils/payment/tossSdk";
 import PaymentFailedModal from "@/components/payment/FailedModal";
 import PendingTimerRestoreNotice from "@/components/payment/PendingTimerRestoreNotice";
@@ -100,6 +105,7 @@ export default function PaymentPage() {
   const skipSeatsRedirectRef = useRef(false);
 
   const [agreed, setAgreed] = useState(false);
+  const [failClosePending, setFailClosePending] = useState(false);
 
   const cancelPendingBooking = useCallback(async () => {
     if (!bookingNumber) return;
@@ -116,6 +122,7 @@ export default function PaymentPage() {
       onReleaseSeat: cancelPendingBooking,
       onNavigate: () =>
         navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+      silent: true,
     });
   }, [cancelPendingBooking, handleTimeout, id, navigate]);
 
@@ -133,6 +140,22 @@ export default function PaymentPage() {
   }, [selectedSeat, bookingNumber, id, navigate]);
 
   if (!selectedSeat || !bookingNumber) return null;
+
+  const totalAmount = amount || (currentConcert?.price ?? 0);
+  const isWarning = restoreStatus !== "loading" && mm < 1;
+  const paymentLocked = isPaymentInFlight(paymentStatus);
+  const selectionLocked =
+    paymentLocked ||
+    restoreStatus === "failed" ||
+    restoreStatus === "loading" ||
+    timerStatus !== "running";
+  const canPay =
+    !!selectedProvider &&
+    agreed &&
+    timerStatus === "running" &&
+    restoreStatus !== "failed" &&
+    restoreStatus !== "loading" &&
+    !paymentLocked;
 
   function handleSelectProvider(provider: PaymentMethod) {
     if (selectionLocked) return;
@@ -177,10 +200,23 @@ export default function PaymentPage() {
   }
 
   async function handleClosePaymentFailedModal() {
-    await handleCancelReservation({
-      onReleaseSeat: cancelPendingBooking,
-      onNavigate: () => navigate(`/concerts/${id}/seats`),
-    });
+    if (failClosePending) return;
+    setFailClosePending(true);
+    try {
+      await handleCancelReservation({
+        onReleaseSeat: cancelPendingBooking,
+        onNavigate: () => navigate(`/concerts/${id}/seats`),
+      });
+    } finally {
+      setFailClosePending(false);
+    }
+  }
+
+  function handleTermsLinkClick(event: MouseEvent<HTMLAnchorElement>) {
+    event.stopPropagation();
+    if (!paymentLocked) return;
+    event.preventDefault();
+    toast.info(paymentInFlightLeaveMessage(paymentStatus));
   }
 
   function handleRetryPayment() {
@@ -191,22 +227,6 @@ export default function PaymentPage() {
     // Confirm으로 복귀 — PENDING/HOLD는 유지 (이탈·만료 시에만 취소)
     navigate(`/concerts/${id}/payment/confirm`);
   }
-
-  const totalAmount = amount || (currentConcert?.price ?? 0);
-  const isWarning = restoreStatus !== "loading" && mm < 1;
-  const paymentLocked = isPaymentInFlight(paymentStatus);
-  const selectionLocked =
-    paymentLocked ||
-    restoreStatus === "failed" ||
-    restoreStatus === "loading" ||
-    timerStatus !== "running";
-  const canPay =
-    !!selectedProvider &&
-    agreed &&
-    timerStatus === "running" &&
-    restoreStatus !== "failed" &&
-    restoreStatus !== "loading" &&
-    !paymentLocked;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -332,22 +352,43 @@ export default function PaymentPage() {
               </span>
             </div>
 
-            <label
+            <div
               className={`mt-6 flex items-start gap-3 bg-gray-50 border-2 border-border rounded-[10px] p-3 ${
-                selectionLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                selectionLocked ? "opacity-60" : ""
               }`}
             >
               <input
+                id="payment-terms"
                 type="checkbox"
                 checked={agreed}
                 disabled={selectionLocked}
                 onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-1 accent-primary"
+                className={`mt-1 accent-primary ${
+                  selectionLocked ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
               />
               <span className="text-sm text-text leading-5">
-                결제 약관 및 환불 정책에 동의합니다
+                <a
+                  href={LEGAL_LINKS.terms}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`font-semibold text-primary underline underline-offset-2 ${
+                    paymentLocked ? "cursor-not-allowed" : ""
+                  }`}
+                  onClick={handleTermsLinkClick}
+                >
+                  결제 약관 및 환불 정책
+                </a>
+                <label
+                  htmlFor="payment-terms"
+                  className={
+                    selectionLocked ? "cursor-not-allowed" : "cursor-pointer"
+                  }
+                >
+                  에 동의합니다
+                </label>
               </span>
-            </label>
+            </div>
 
             <div className="mt-4 space-y-2">
               <Button
@@ -372,9 +413,7 @@ export default function PaymentPage() {
                 size="md"
                 fullWidth
                 icon={<ArrowLeft size={20} />}
-                disabled={
-                  releaseMutation.isPending || paymentLocked
-                }
+                disabled={releaseMutation.isPending || paymentLocked}
                 onClick={handleBack}
               >
                 이전으로
@@ -386,8 +425,9 @@ export default function PaymentPage() {
 
       {paymentStatus === "FAILED" && (
         <PaymentFailedModal
-          onClose={handleClosePaymentFailedModal}
+          onClose={() => void handleClosePaymentFailedModal()}
           onRetry={handleRetryPayment}
+          closePending={failClosePending}
         />
       )}
     </div>

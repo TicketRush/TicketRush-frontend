@@ -1,6 +1,6 @@
 // 직접 URL 진입 시 fallback 페이지
 // PaymentPage 타이머 만료 시에도 이 화면으로 이동한다
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import TimeoutModal from "@/components/payment/TimeoutModal";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
@@ -16,29 +16,37 @@ export default function ReservationExpiredPage() {
   const { handleTimeout } = useReservationLifecycle();
   const [closePending, setClosePending] = useState(false);
 
-  const handleClose = useCallback(() => {
-    if (closePending) return;
+  const handleTimeoutRef = useRef(handleTimeout);
+  handleTimeoutRef.current = handleTimeout;
+  const releaseMutationRef = useRef(releaseMutation);
+  releaseMutationRef.current = releaseMutation;
+  const didCancelRef = useRef(false);
 
+  // 남은 PENDING을 마운트 시 조용히 취소해 「이미 해제」 카피와 맞춘다.
+  // CTA는 이동만 한다. 의존성 비움: 스토어가 비워진 뒤 재실행되면 안 된다.
+  useEffect(() => {
+    if (didCancelRef.current) return;
     const { bookingNumber, seatId, status } = usePaymentStore.getState();
-    const goSeats = () => navigate(`/concerts/${id}/seats`);
-
-    // 정상 만료는 이동 전에 PENDING을 이미 취소한다.
-    // 직접 URL 진입 시에만 남은 PENDING을 여기서 해제한다.
-    if (!bookingNumber || isPaymentInFlight(status)) {
-      goSeats();
-      return;
-    }
+    if (!bookingNumber || isPaymentInFlight(status)) return;
+    didCancelRef.current = true;
 
     setClosePending(true);
-    void handleTimeout({
-      onReleaseSeat: () =>
-        releaseMutation.mutateAsync({
-          bookingNumber,
-          seatId: seatId ?? undefined,
-        }),
-      onNavigate: goSeats,
-    }).finally(() => setClosePending(false));
-  }, [closePending, handleTimeout, id, navigate, releaseMutation]);
+    void handleTimeoutRef
+      .current({
+        onReleaseSeat: () =>
+          releaseMutationRef.current.mutateAsync({
+            bookingNumber,
+            seatId: seatId ?? undefined,
+          }),
+        silent: true,
+      })
+      .finally(() => setClosePending(false));
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (closePending) return;
+    navigate(`/concerts/${id}/seats`);
+  }, [closePending, id, navigate]);
 
   return <TimeoutModal onClose={handleClose} closePending={closePending} />;
 }

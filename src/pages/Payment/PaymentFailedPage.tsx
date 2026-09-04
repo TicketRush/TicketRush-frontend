@@ -13,9 +13,9 @@
 //
 // #167: 「좌석으로 돌아가기」는 PENDING 즉시 취소 후 좌석 재조회. 「다시 시도」는
 //   bookingNumber를 유지한다.
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import PaymentFailedModal from "@/components/payment/FailedModal";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { useRestorePendingTimer } from "@/hooks/booking/useRestorePendingTimer";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
@@ -28,6 +28,7 @@ export default function PaymentFailedPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const performanceId = id ? Number(id) : 0;
+  const [closePending, setClosePending] = useState(false);
 
   const bookingNumber = usePaymentStore((s) => s.bookingNumber);
   const seatId = usePaymentStore((s) => s.seatId);
@@ -53,6 +54,7 @@ export default function PaymentFailedPage() {
       onReleaseSeat: releasePending,
       onNavigate: () =>
         navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+      silent: true,
     });
   }
 
@@ -90,51 +92,32 @@ export default function PaymentFailedPage() {
   }
 
   async function handleBackToSeats() {
+    if (closePending) return;
     if (!bookingNumber) {
       navigate(`/concerts/${id}/seats`);
       return;
     }
-    await handleCancelReservation({
-      onReleaseSeat: releasePending,
-      onNavigate: () => navigate(`/concerts/${id}/seats`),
-    });
+    setClosePending(true);
+    try {
+      await handleCancelReservation({
+        onReleaseSeat: releasePending,
+        onNavigate: () => navigate(`/concerts/${id}/seats`),
+      });
+    } finally {
+      setClosePending(false);
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black/30 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-4">
-          <AlertTriangle size={36} className="text-yellow-600" />
-        </div>
-        <h2 className="text-lg font-bold mb-2">결제 실패</h2>
-        <p className="text-sm text-text-secondary leading-relaxed mb-6">
-          {expiredOnServer
-            ? "예매 제한 시간이 지나 다시 시도할 수 없습니다."
-            : reason}
-          <br />
-          청구는 발생하지 않았습니다.
-        </p>
-
-        <div className={`grid gap-2 ${canRetry ? "grid-cols-2" : ""}`}>
-          {canRetry && (
-            <button
-              type="button"
-              onClick={handleRetry}
-              className="w-full py-3 rounded-lg bg-primary text-white font-bold hover:opacity-90"
-            >
-              다시 시도
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void handleBackToSeats()}
-            disabled={releaseMutation.isPending}
-            className="w-full py-3 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600"
-          >
-            좌석으로 돌아가기
-          </button>
-        </div>
-      </div>
-    </div>
+    <PaymentFailedModal
+      message={
+        expiredOnServer
+          ? "예매 제한 시간이 지나 다시 시도할 수 없습니다."
+          : reason
+      }
+      onRetry={canRetry ? handleRetry : undefined}
+      onClose={() => void handleBackToSeats()}
+      closePending={closePending}
+    />
   );
 }
