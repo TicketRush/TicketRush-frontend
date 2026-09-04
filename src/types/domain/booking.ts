@@ -21,7 +21,7 @@
 // 각 항목의 refundFailedAt 타임스탬프 유무로 구분함.
 
 // 예매 상태 — 백엔드 booking-service enum과 정확히 일치
-//   PENDING: 결제 대기 (좌석 자동 HOLD 중, 5분 타이머)
+//   PENDING: 결제 대기 (좌석 자동 HOLD 중, 서버 expires_at까지)
 //    CONFIRMED: 결제 완료
 //    CANCELED: 취소됨 (환불 없음, PENDING → CANCELED or 사용자 취소)
 //    REFUNDING: 환불 진행 중
@@ -52,8 +52,8 @@ export interface BookingPendingRequest {
 
 //  백엔드 BookingPendingResponse 대응
 
-//  ⚠️ 백엔드 응답 필드명은 이미 camelCase (bookingId, bookingNumber, status).
-//  status만 백엔드 예시 값은 "PENDING" 고정 (예매 생성 시).
+//  ⚠️ 백엔드 BookingPendingResponse: bookingId, bookingNumber, status.
+//  expires_at 은 생성 응답에 없음 → GET /booking/me?status=PENDING (#559).
 
 export interface BookingPendingResponse {
   bookingId: number;
@@ -87,6 +87,8 @@ export interface BookingSummary {
   // ⚠️ 백엔드 응답에 이 필드 없음. mock 호환 및 표시용으로 optional 유지.
 
   createdAt?: string;
+  /** PENDING만 존재. BE `yyyy-MM-dd HH:mm:ss`, 그 외는 생략 (#559/#167) */
+  expiresAt?: string | null;
 }
 
 // ── 예매 상세 (프론트 aggregation) ───────────────────

@@ -6,7 +6,7 @@ import { usePaymentStore } from "@/stores/reservation/paymentStore";
 
 interface PaymentFailedModalProps {
   onClose: () => void;
-  /** PENDING을 유지한 채 결제만 재시도 */
+  /** PENDING을 유지한 채 결제만 재시도 (#167) */
   onRetry?: () => void;
   /** 스토어 errorMessage 대신 표시할 안내. */
   message?: string;
@@ -42,7 +42,7 @@ export default function PaymentFailedModal({
     };
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);
-  }, [onClose, onRetry, closePending]);
+  }, [onClose, closePending]);
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

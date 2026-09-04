@@ -26,15 +26,19 @@
 //   - sticky top-16 (헤더 아래), 예매 정보/유의사항 shadow-card + border-2
 //   - 관람 시간·상태 안내 박스 border-2 (CTA/좌석 로직 유지)
 //   - 모바일 order-2로 제목 바로 아래, 데스크톱은 우측 row-span sticky
+// - 2026-08-31 (이슈 #203):
+//   - 게이지는 목록 캐시 우선, 없으면 seat-counts. CTA는 availableCount
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 
 interface BookingSidebarProps {
-  /** null이면 미확정 → "-" */
+  /** 상세 게이지 잔여. null이면 `-` (#203) */
+  gaugeRemaining: number | null;
+  gaugeTotal: number;
+  /** seat-counts availableCount. CTA·안내 문구용 (#181) */
   remaining: number | null;
-  total: number;
   price: number;
   duration: number;
   isOnSale: boolean;
@@ -100,7 +104,7 @@ function getStatusNotice(
       };
     }
     return {
-      message: "좌석 선택 후 5분의 제한 시간이 적용됩니다.",
+      message: "좌석 확인 후 제한 시간 안에 결제를 완료해야 합니다.",
       tone: "default",
     };
   }
@@ -135,8 +139,9 @@ const NOTICE_STYLES: Record<
 };
 
 export default function BookingSidebar({
+  gaugeRemaining,
+  gaugeTotal,
   remaining,
-  total,
   price,
   duration,
   isOnSale,
@@ -147,13 +152,17 @@ export default function BookingSidebar({
   notices,
   onBooking,
 }: BookingSidebarProps) {
-  const seatsConfirmed = remaining !== null;
+  const gaugeConfirmed = gaugeRemaining !== null;
   const percent =
-    seatsConfirmed && total > 0 ? (remaining / total) * 100 : 0;
-  // SeatGauge와 동일: 매진(0)은 일반색, ≤20%만 마감임박(danger)
+    gaugeConfirmed && gaugeTotal > 0
+      ? (gaugeRemaining / gaugeTotal) * 100
+      : 0;
   const isEndingSoon =
-    seatsConfirmed && remaining > 0 && percent > 0 && percent <= 20;
-  const showGauge = seatsConfirmed && total > 0;
+    gaugeConfirmed &&
+    gaugeRemaining > 0 &&
+    percent > 0 &&
+    percent <= 20;
+  const showGauge = gaugeConfirmed && gaugeTotal > 0;
 
   const buttonLabel = getBookingCtaLabel({
     status,
@@ -186,16 +195,18 @@ export default function BookingSidebar({
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-xs text-text-secondary">잔여 좌석</span>
             <div className="flex items-baseline gap-0.5">
-              {!seatsConfirmed ? (
+              {!gaugeConfirmed ? (
                 <span className="text-3xl font-bold text-text-secondary">
                   -
                 </span>
               ) : (
                 <>
                   <span className="text-3xl font-bold text-text">
-                    {remaining}
+                    {gaugeRemaining}
                   </span>
-                  <span className="text-xs text-text-secondary">/{total}</span>
+                  <span className="text-xs text-text-secondary">
+                    /{gaugeTotal}
+                  </span>
                 </>
               )}
             </div>
@@ -215,13 +226,7 @@ export default function BookingSidebar({
             <div className="w-full h-1" aria-hidden />
           )}
           <p className="text-[10px] text-text-secondary mt-1">
-            {showGauge
-              ? `${Math.round(percent)}% 잔여`
-              : seatsLoading
-                ? "잔여 좌석을 확인하고 있습니다"
-                : seatsError
-                  ? "잔여 좌석을 확인할 수 없습니다"
-                  : "\u00A0"}
+            {showGauge ? `${Math.round(percent)}% 잔여` : "\u00A0"}
           </p>
         </div>
 

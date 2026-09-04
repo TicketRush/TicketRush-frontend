@@ -6,6 +6,7 @@
 //   fetchMyBookings      → GET    /api/v1/booking/me + performance/seat aggregation
 //   countMyBookingsApi   → GET    /api/v1/booking/me/count
 //   cancelBookingApi     → DELETE /api/v1/booking/{bookingNumber}
+//   fetchPendingBookingExpiresAt → GET /api/v1/booking/me?status=PENDING 의 expires_at
 //
 // 변경 이력:
 // - 2026-07-15 :
@@ -54,8 +55,8 @@ interface BackendBookingSummary {
   seatId: number;
   bookingStatus: BookingStatus;
   confirmedAt: string | null;
-  /** 예매 생성/만료 시각 — BE 응답에 있으면 사용 (없으면 optional) */
   createdAt?: string | null;
+  /** PENDING 결제 마감 시각 — BE `yyyy-MM-dd HH:mm:ss`. 그 외 상태는 생략/null (#559) */
   expiresAt?: string | null;
 }
 
@@ -341,6 +342,27 @@ export async function countMyBookingsApi(
 // -------------------------------------------------------
 // 예매 취소 (DELETE /api/v1/booking/{bookingNumber})
 // -------------------------------------------------------
+
+export async function fetchPendingBookingExpiresAt(
+  bookingNumber: string,
+): Promise<string | null> {
+  if (USE_MOCK) {
+    const { mockFetchPendingBookingExpiresAt } = await import("./mocks/bookings");
+    return mockFetchPendingBookingExpiresAt(bookingNumber);
+  }
+
+  for (let page = 0; page < BOOKING_ME_MAX_PAGES; page++) {
+    const summaries = await fetchMyBookingSummariesPage(
+      "PENDING",
+      page,
+      BOOKING_ME_PAGE_SIZE,
+    );
+    const found = summaries.find((b) => b.bookingNumber === bookingNumber);
+    if (found) return found.expiresAt ?? null;
+    if (summaries.length < BOOKING_ME_PAGE_SIZE) break;
+  }
+  return null;
+}
 
 export async function cancelBookingApi(bookingNumber: string): Promise<void> {
   if (USE_MOCK) return mockCancelBooking(bookingNumber);

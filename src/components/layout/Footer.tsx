@@ -1,7 +1,23 @@
+import { type MouseEvent } from "react";
+import { toast } from "react-toastify";
+import { usePaymentStore } from "@/stores/reservation/paymentStore";
+import {
+  isPaymentInFlight,
+  paymentInFlightLeaveMessage,
+} from "@/utils/booking/isPaymentInFlight";
 import logo from "@/assets/images/logo.svg";
 import { LEGAL_LINKS } from "@/constants/legalLinks";
 
 export default function Footer() {
+  const paymentStatus = usePaymentStore((s) => s.status);
+  const leaveLocked = isPaymentInFlight(paymentStatus);
+
+  function handleExternalLeave(event: MouseEvent<HTMLAnchorElement>) {
+    if (!leaveLocked) return;
+    event.preventDefault();
+    toast.info(paymentInFlightLeaveMessage(paymentStatus));
+  }
+
   return (
     <footer className="bg-white border-t border-border mt-auto">
       <div className="max-w-[1280px] mx-auto px-6 py-6">
@@ -15,6 +31,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 className="hover:text-primary"
+                onClick={handleExternalLeave}
               >
                 GitHub
               </a>
@@ -40,6 +57,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary"
+              onClick={handleExternalLeave}
             >
               개인정보처리방침
             </a>
@@ -48,6 +66,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary"
+              onClick={handleExternalLeave}
             >
               이용약관
             </a>

@@ -1,14 +1,24 @@
 // 관리자 hooks — 도메인별로 작아서 한 파일로 통합
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/admin";
+import { ApiError } from "@/api/errors/errorMapper";
 import type {
   AdminBookingListParams,
+  AdminConcertListParams,
+  AdminDashboardParams,
   ConcertFormData,
 } from "@/types/domain/admin";
+import {
+  isDashboardPeriodWithinLimit,
+  parseLocalDateKey,
+} from "@/utils/admin/dashboardPeriod";
 
 const adminKeys = {
   all: ["admin"] as const,
-  dashboard: () => ["admin", "dashboard"] as const,
+  dashboard: (params?: AdminDashboardParams) =>
+    ["admin", "dashboard", params] as const,
+  concerts: (params?: AdminConcertListParams) =>
+    ["admin", "concerts", params] as const,
   bookings: (params?: AdminBookingListParams) =>
     ["admin", "bookings", params] as const,
   bookingStats: () => ["admin", "bookings", "stats"] as const,
@@ -19,12 +29,42 @@ const adminKeys = {
   concertEdit: (id: number) => ["admin", "concert-edit", id] as const,
 };
 
+function retryUnlessClientError(failureCount: number, error: Error) {
+  if (
+    error instanceof ApiError &&
+    error.httpStatus != null &&
+    error.httpStatus >= 400 &&
+    error.httpStatus < 500
+  ) {
+    return false;
+  }
+  return failureCount < 2;
+}
+
 // ── 대시보드 ──────────────────────────────────────────
-export function useAdminDashboard() {
+export function useAdminDashboard(params: AdminDashboardParams) {
+  const enabled = isDashboardPeriodWithinLimit(
+    parseLocalDateKey(params.from),
+    parseLocalDateKey(params.to),
+  );
+
   return useQuery({
-    queryKey: adminKeys.dashboard(),
-    queryFn: api.fetchAdminDashboard,
+    queryKey: adminKeys.dashboard(params),
+    queryFn: () => api.fetchAdminDashboard(params),
     staleTime: 30_000,
+    enabled,
+    placeholderData: (prev) => prev,
+    retry: retryUnlessClientError,
+  });
+}
+
+export function useAdminConcerts(params: AdminConcertListParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.concerts(params),
+    queryFn: () => api.fetchAdminConcerts(params),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+    retry: retryUnlessClientError,
   });
 }
 
@@ -110,7 +150,7 @@ export function useCreateConcert() {
   return useMutation({
     mutationFn: (data: ConcertFormData) => api.createConcertApi(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.dashboard() });
+      qc.invalidateQueries({ queryKey: adminKeys.all });
     },
   });
 }

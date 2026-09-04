@@ -47,7 +47,7 @@ interface BackendSeatLayoutResponse {
   seatLayoutId: number;
   seatNumber: string;
   seatStatus: SeatStatus;
-  /** HOLD 상태의 만료 예정 시각 (그 외 상태에서는 null 가능) */
+  /** HOLD 좌석 Kafka delay 만료. 예매 결제 타이머(`expires_at`)와 다름 — 카운트다운에 쓰지 않음 (#167) */
   holdExpiredAt?: string;
 }
 
