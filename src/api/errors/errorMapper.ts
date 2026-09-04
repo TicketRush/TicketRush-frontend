@@ -112,6 +112,11 @@ const ERROR_MESSAGE_OVERRIDES: Partial<Record<ErrorCode | string, string>> = {
   UNKNOWN: "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
   AUTH_UNAUTHORIZED: "로그인이 만료되었습니다. 다시 로그인해주세요.",
 
+  [ERROR_CODES.PERFORMANCE_INVALID_DASHBOARD_PERIOD]:
+    "조회 시작일은 종료일보다 늦을 수 없습니다.",
+  [ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG]:
+    "조회 기간은 최대 92일까지 지정할 수 있습니다.",
+
   // 예시: 백엔드 에러 코드가 확정되는 대로 여기에 추가
   // [ERROR_CODES.UNAUTHORIZED]: "로그인이 필요합니다.",
   // [ERROR_CODES.FORBIDDEN]: "접근 권한이 없습니다.",
