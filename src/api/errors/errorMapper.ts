@@ -180,6 +180,7 @@ export function isIgnorablePendingCancelError(error: unknown): boolean {
   return (
     apiError.code === ERROR_CODES.BOOKING_NOT_FOUND ||
     apiError.code === ERROR_CODES.BOOKING_EXPIRED ||
+    apiError.code === ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED ||
     // mock alias (실 API 코드표에는 없음)
     apiError.code === "BOOKING_ALREADY_CANCELED"
   );

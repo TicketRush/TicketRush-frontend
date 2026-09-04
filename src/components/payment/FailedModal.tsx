@@ -3,10 +3,13 @@ import { usePaymentStore } from "@/stores/reservation/paymentStore";
 
 interface PaymentFailedModalProps {
   onClose: () => void;
+  /** PENDING을 유지한 채 결제만 재시도 (#167) */
+  onRetry?: () => void;
 }
 
 export default function PaymentFailedModal({
   onClose,
+  onRetry,
 }: PaymentFailedModalProps) {
   const errorMessage = usePaymentStore((s) => s.errorMessage);
 
@@ -22,13 +25,24 @@ export default function PaymentFailedModal({
           <br />
           청구는 발생하지 않았습니다.
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full py-3 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600"
-        >
-          좌석으로 돌아가기
-        </button>
+        <div className={`grid gap-2 ${onRetry ? "grid-cols-2" : ""}`}>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="w-full py-3 rounded-lg bg-primary text-white font-bold hover:opacity-90"
+            >
+              다시 시도
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-3 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600"
+          >
+            좌석으로 돌아가기
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ import type {
   AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
 import { MOCK_CONCERTS } from "./concerts";
+import { applyMockSeatHold, mockReleaseSeat } from "./seats";
 import samplePoster from "@/assets/images/sample-poster.svg";
 
 const POSTER = samplePoster;
@@ -150,6 +151,7 @@ export async function mockCreateBooking(
     cancelledAt: null,
   };
 
+  applyMockSeatHold(req.performanceId, req.seatId);
   bookingStore.unshift(booking);
 
   return {
@@ -168,6 +170,24 @@ export async function mockGetBookingDetail(
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
   return booking!;
+}
+
+function toBackendDateTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** GET /booking/me?status=PENDING 의 expires_at — 생성 시각 + 5분 (#167) */
+export async function mockFetchPendingBookingExpiresAt(
+  bookingNumber: string,
+): Promise<string | null> {
+  await mockDelay(150);
+  const booking = bookingStore.find(
+    (b) => b.bookingNumber === bookingNumber && b.status === "PENDING",
+  );
+  if (!booking) return null;
+  const created = new Date(booking.createdAt).getTime();
+  return toBackendDateTime(new Date(created + 5 * 60 * 1000));
 }
 
 export async function mockGetMyBookings(
@@ -219,8 +239,12 @@ export async function mockCancelBooking(bookingNumber: string): Promise<void> {
   if (booking!.status === "CANCELED") {
     await mockError("BOOKING_ALREADY_CANCELED", "이미 취소된 예매입니다.");
   }
+  const wasPending = booking!.status === "PENDING";
   booking!.status = "CANCELED";
   booking!.cancelledAt = new Date().toISOString();
+  if (wasPending) {
+    await mockReleaseSeat(booking!.performanceId, booking!.seatId);
+  }
 }
 
 /** 결제 confirm 시 booking 상태 업데이트 (mock 내부용) */

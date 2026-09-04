@@ -75,7 +75,7 @@ interface PaymentStoreState {
   /** 타이머 만료 */
   expire: () => void;
 
-  /** 결제 실패 모달 close 후 재시도 — 예매 정보는 유지, 상태만 IDLE로 */
+  /** 결제 실패 후 재시도 — 예매 정보는 유지, 상태만 IDLE로 (#167) */
   retryPayment: () => void;
 
   /** 전체 초기화 (다음 예매 시작 시) */
@@ -98,9 +98,11 @@ export const usePaymentStore = create<PaymentStoreState>()(
     (set) => ({
       ...initial,
 
+      // 새 예매는 이전 결제 수단을 물려주지 않는다. 실패 후 재시도는 retryPayment가 method를 유지한다.
       startBooking: (bookingNumber, bookingId, seatId, amount) =>
         set({
           status: "IDLE",
+          method: null,
           bookingNumber,
           bookingId,
           seatId,

@@ -5,6 +5,10 @@ import { useConcertStore } from "@/stores/reservation/concertStore";
 import useSeatStore from "@/stores/reservation/seatStore";
 import useTimerStore from "@/stores/reservation/timerStore";
 import usePaymentStore from "@/stores/reservation/paymentStore";
+import {
+  ApiError,
+  isIgnorablePendingCancelError,
+} from "@/api/errors/errorMapper";
 
 /** 서버 통신(좌석 hold 해제 등)이 필요할 때 주입하는 콜백. async 허용. */
 type ReleaseSeatCallback = () => void | Promise<void>;
@@ -128,17 +132,24 @@ export function useReservationLifecycle() {
 
   // ───────────────────────────────────────────────────────────────────────
   // 4) 예매 취소 (사용자가 명시적으로 뒤로가기/취소)
-  //    seat + timer + payment 초기화 + 이동
+  //    DELETE 성공 또는 이미 만료/없음 → store 초기화 + 이동
+  //    네트워크·5xx → store 유지 (재시도 가능), false 반환
   // ───────────────────────────────────────────────────────────────────────
   const handleCancelReservation = useCallback(
-    async (options: CancelOptions = {}) => {
+    async (options: CancelOptions = {}): Promise<boolean> => {
       const { onReleaseSeat, onNavigate, message } = options;
 
       if (onReleaseSeat) {
         try {
           await onReleaseSeat();
-        } catch {
-          /* 무시 */
+        } catch (error) {
+          if (!isIgnorablePendingCancelError(error)) {
+            const err = ApiError.fromUnknown(error);
+            toast.error(
+              err.message || "예매 취소에 실패했습니다. 다시 시도해 주세요.",
+            );
+            return false;
+          }
         }
       }
 
@@ -147,6 +158,7 @@ export function useReservationLifecycle() {
 
       toast.info(message ?? DEFAULT_CANCEL_MSG);
       onNavigate?.();
+      return true;
     },
     [resetSeatAndTimer, resetPayment],
   );

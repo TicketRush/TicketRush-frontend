@@ -104,7 +104,7 @@ function getStatusNotice(
       };
     }
     return {
-      message: "좌석 선택 후 5분의 제한 시간이 적용됩니다.",
+      message: "좌석 확인 후 제한 시간 안에 결제를 완료해야 합니다.",
       tone: "default",
     };
   }
