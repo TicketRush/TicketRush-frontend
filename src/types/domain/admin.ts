@@ -5,9 +5,8 @@
 // 필드(`showDate`/`showTime`)와 내부 표현이 다르므로, 백엔드가 확정되면
 // 폼 값은 전송시 변환(adapter)을 통해 `showDate`/`showTime`로 매핑됩니다.
 //
-// 관리자 API(및 mock 데이터)는 2026-06-30 기준 백엔드 미구현이므로
-// `USE_MOCK = true` 상태입니다. 이 파일의 타입·주석은 현재 상태를
-// 명확히 설명하기 위해 정리되어 있으며, 필드 네이밍 차이는 의도적입니다.
+// 대시보드·관리자 공연 목록은 performance admin API(#563)에 맞춘다.
+// 집계 필드는 전역 NON_NULL이라 실패 시 키가 생략되므로 optional이다.
 //
 // 변경 요약(리팩터링 관련):
 //   - AdminBookingItem: seatNumbers 배열로 표준화
@@ -19,19 +18,40 @@ import type { BookingStatus } from "./booking";
 import type { SeatStatus } from "./seat";
 
 // ── 대시보드 ──────────────────────────────────────────
+export interface AdminDashboardParams {
+  /** YYYY-MM-DD — 일별 매출에만 적용 */
+  from: string;
+  /** YYYY-MM-DD — 일별 매출에만 적용 */
+  to: string;
+}
+
 export interface AdminDashboardStats {
+  /** registeredPerformances. 삭제 제외 전체 */
   totalConcerts: number;
-  soldTickets: number;
-  totalRevenue: number;
-  /** 평균 점유율 0.0 ~ 1.0 */
-  averageOccupancyRate: number;
+  /** 예매 축 실패 시 생략 */
+  soldTickets?: number;
+  /** 예매 축 실패 시 생략. 기간 파라미터와 무관 */
+  totalRevenue?: number;
+  /** 0.0 ~ 1.0. 좌석 축 실패 시 생략. ON_SALE·CLOSED 가중평균 */
+  averageOccupancyRate?: number;
+  revenueComplete?: boolean;
+  missingAmountBookings?: number;
+}
+
+export interface AdminDashboardData {
+  stats: AdminDashboardStats;
+  /** 예매 축 실패 시 생략. 빈 배열은 기간 내 매출 0 */
+  dailyRevenue?: DailyRevenue[];
+  /** 예매 축 실패 시 생략 */
+  genreRevenue?: GenreRevenue[];
 }
 
 export interface DailyRevenue {
   /** YYYY-MM-DD */
   date: string;
   revenue: number;
-  ticketsSold: number;
+  /** BE 일별 매출에는 없음. mock 전용 */
+  ticketsSold?: number;
 }
 
 export interface GenreRevenue {
@@ -39,7 +59,7 @@ export interface GenreRevenue {
   /** 라벨 — 한글 표시명 */
   label: string;
   revenue: number;
-  /** 백분율 (0~100) */
+  /** 백분율 (0~100). 클라에서 매출 합으로 계산 */
   percentage: number;
 }
 
@@ -47,13 +67,30 @@ export interface ConcertSalesStatus {
   concertId: number;
   title: string;
   genre: Genre;
+  genreName?: string;
   date: string;
-  soldSeats: number;
-  totalSeats: number;
+  soldSeats?: number;
+  totalSeats?: number;
   /** 0.0 ~ 1.0 */
-  occupancyRate: number;
-  revenue: number;
-  isSoldOut: boolean;
+  occupancyRate?: number;
+  revenue?: number;
+  isSoldOut?: boolean;
+}
+
+export interface AdminConcertListParams {
+  page?: number;
+  size?: number;
+}
+
+export interface AdminConcertListResponse {
+  items: AdminConcertItem[];
+  pagination: {
+    pageIndex: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    hasNext: boolean;
+  };
 }
 
 /** 관리자 공연 목록 (수정/삭제 가능한 행) */
@@ -61,11 +98,16 @@ export interface AdminConcertItem {
   id: number;
   title: string;
   genre: Genre;
+  /** BE `genreName`. 없으면 클라 라벨로 폴백 */
+  genreName?: string;
   date: string;
-  soldSeats: number;
-  totalSeats: number;
-  occupancyRate: number;
-  revenue: number;
+  /** BE `showTime` (HH:mm:ss 등). 없으면 날짜만 표시 */
+  showTime?: string;
+  soldSeats?: number;
+  totalSeats?: number;
+  occupancyRate?: number;
+  revenue?: number;
+  soldOut?: boolean;
   status: ConcertStatus;
 }
 

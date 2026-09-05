@@ -18,10 +18,15 @@ import type {
   MyBookingsParams,
   MyBookingsResponse,
   BookingStatus,
+  AdminRefundBookingItem,
+  AdminRefundBookingListParams,
+  AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
 import { MOCK_CONCERTS } from "./concerts";
+import { applyMockSeatHold, mockReleaseSeat } from "./seats";
+import samplePoster from "@/assets/images/sample-poster.svg";
 
-const POSTER = "/placeholder-poster.png";
+const POSTER = samplePoster;
 
 // ── 메모리 저장소 (앱 새로고침 시 초기 데이터로 리셋) ────
 const bookingStore: BookingDetail[] = [
@@ -146,6 +151,7 @@ export async function mockCreateBooking(
     cancelledAt: null,
   };
 
+  applyMockSeatHold(req.performanceId, req.seatId);
   bookingStore.unshift(booking);
 
   return {
@@ -164,6 +170,24 @@ export async function mockGetBookingDetail(
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
   return booking!;
+}
+
+function toBackendDateTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** GET /booking/me?status=PENDING 의 expires_at — 생성 시각 + 5분 (#167) */
+export async function mockFetchPendingBookingExpiresAt(
+  bookingNumber: string,
+): Promise<string | null> {
+  await mockDelay(150);
+  const booking = bookingStore.find(
+    (b) => b.bookingNumber === bookingNumber && b.status === "PENDING",
+  );
+  if (!booking) return null;
+  const created = new Date(booking.createdAt).getTime();
+  return toBackendDateTime(new Date(created + 5 * 60 * 1000));
 }
 
 export async function mockGetMyBookings(
@@ -215,8 +239,12 @@ export async function mockCancelBooking(bookingNumber: string): Promise<void> {
   if (booking!.status === "CANCELED") {
     await mockError("BOOKING_ALREADY_CANCELED", "이미 취소된 예매입니다.");
   }
+  const wasPending = booking!.status === "PENDING";
   booking!.status = "CANCELED";
   booking!.cancelledAt = new Date().toISOString();
+  if (wasPending) {
+    await mockReleaseSeat(booking!.performanceId, booking!.seatId);
+  }
 }
 
 /** 결제 confirm 시 booking 상태 업데이트 (mock 내부용) */
@@ -257,4 +285,102 @@ export function _findMockBookingBySeat(
       b.seatId === seatId &&
       (b.status === "PENDING" || b.status === "CONFIRMED"),
   );
+}
+
+// ── 관리자: 환불 모니터링 (mock) ────────────────────────
+// 백엔드 GET /booking/admin/bookings/refund-failed, refunding-stuck 흉내.
+// 실제 유저 booking 데이터와 별개인 고정 mock 세트 — 데모/개발용.
+const MOCK_REFUND_FAILED: AdminRefundBookingItem[] = [
+  {
+    bookingId: 901,
+    bookingNumber: "R9F01-ZK3Q8",
+    userId: 12,
+    performanceId: 1,
+    seatId: 15,
+    status: "CANCELED",
+    confirmedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    refundFailedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    bookingId: 902,
+    bookingNumber: "R9F02-LM8T4",
+    userId: 27,
+    performanceId: 4,
+    seatId: 61,
+    status: "CANCELED",
+    confirmedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    refundFailedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  },
+];
+
+const MOCK_REFUNDING_STUCK: AdminRefundBookingItem[] = [
+  {
+    bookingId: 910,
+    bookingNumber: "R9S01-PX2N7",
+    userId: 8,
+    performanceId: 3,
+    seatId: 90,
+    status: "REFUNDING",
+    confirmedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+    refundFailedAt: null,
+    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+async function toAdminRefundListResponse(
+  items: AdminRefundBookingItem[],
+  params: AdminRefundBookingListParams,
+): Promise<AdminRefundBookingListResponse> {
+  const size = params.size ?? 20;
+  const page = params.page ?? 0;
+  const paged = items.slice(page * size, page * size + size);
+
+  const richItems = paged.map((b) => {
+    const concert = MOCK_CONCERTS.find((c) => c.id === b.performanceId);
+    return {
+      ...b,
+      performanceTitle: concert?.title ?? "알 수 없는 공연",
+      seatNumber: `mock-seat-${b.seatId}`,
+    };
+  });
+
+  return { items: richItems, hasNext: page * size + size < items.length };
+}
+
+export async function mockGetRefundFailedBookings(
+  params: AdminRefundBookingListParams,
+): Promise<AdminRefundBookingListResponse> {
+  await mockDelay(400);
+  return toAdminRefundListResponse(MOCK_REFUND_FAILED, params);
+}
+
+export async function mockGetRefundingStuckBookings(
+  params: AdminRefundBookingListParams,
+): Promise<AdminRefundBookingListResponse> {
+  await mockDelay(400);
+  return toAdminRefundListResponse(MOCK_REFUNDING_STUCK, params);
+}
+
+export async function mockRetryRefund(bookingNumber: string): Promise<void> {
+  await mockDelay(500);
+  const failedIdx = MOCK_REFUND_FAILED.findIndex(
+    (b) => b.bookingNumber === bookingNumber,
+  );
+  if (failedIdx !== -1) {
+    // mock: 재시도 성공 시 해당 목록에서 제거
+    MOCK_REFUND_FAILED.splice(failedIdx, 1);
+    return;
+  }
+
+  const stuckIdx = MOCK_REFUNDING_STUCK.findIndex(
+    (b) => b.bookingNumber === bookingNumber,
+  );
+  if (stuckIdx !== -1) {
+    MOCK_REFUNDING_STUCK.splice(stuckIdx, 1);
+    return;
+  }
+
+  await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
 }
