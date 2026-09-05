@@ -38,6 +38,7 @@ interface Concert {
   address?: string;
   durationMinutes?: number;
   totalSeats?: number;
+  /** 확정된 숫자만. 모름을 `?? 0`으로 0석 취급하지 않는다 (#203). */
   remainingSeats?: number;
   status?: ConcertStatus;
 }

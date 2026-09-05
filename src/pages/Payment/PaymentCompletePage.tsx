@@ -1,12 +1,19 @@
 // 결제 완료 페이지 — `/reservations/:reservationId` 라우트
 // 결제 직후 진입 + 마이페이지에서 예매 상세로도 진입
 // ※ App.tsx 파라미터명은 reservationId (bookingNumber와 동일 값)
+//
+// 변경 이력:
+// - 이슈 #127: qrPayload = JSON.stringify(...) mock 제거.
+//   GET /api/v1/ticket/bookings/{bookingId}/qr 실 API(useTicketQr)로 교체.
+//   payload는 발급 후 5분만 유효 — 4분마다 자동 재발급 + expiresAt 도달 시 refetch.
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { CheckCircle, Calendar, Clock, Music, Download } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useBookingDetail } from "@/hooks/queries/useBookingDetail";
+import { useTicketQr } from "@/hooks/queries/useTicketQr";
+import { useCountdownTo } from "@/hooks/useCountdownTo";
 import useSeatStore from "@/stores/reservation/seatStore";
 import usePaymentStore from "@/stores/reservation/paymentStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
@@ -20,6 +27,8 @@ export default function PaymentCompletePage() {
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
+  const { data: qrData, isLoading: isQrLoading } = useTicketQr(data?.bookingId);
+  const remainingMs = useCountdownTo(qrData?.expiresAt);
 
   const resetSeat = useSeatStore((s) => s.reset);
   const resetPayment = usePaymentStore((s) => s.reset);
@@ -57,13 +66,11 @@ export default function PaymentCompletePage() {
     );
   }
 
-  // QR 페이로드 — 백엔드 qrToken 응답 시 그걸 우선 사용
-  // TODO: 백엔드 응답에 qrToken 필드 추가되면 (data as any).qrToken ?? JSON.stringify(...) 패턴으로
-  const qrPayload = JSON.stringify({
-    reservationId: data.bookingNumber,
-    seatLabel: data.seatNumber,
-    issuedAt: new Date().toISOString(),
-  });
+  const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
+  const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
+  const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
+    Math.floor((remainingMs % 60000) / 1000),
+  ).padStart(2, "0")}`;
 
   // ── 다운로드 (#91) — 공통 유틸 사용 ─────────────────
   function handleDownload() {
@@ -151,19 +158,49 @@ export default function PaymentCompletePage() {
         {/* QR 코드 */}
         <div className="bg-white border-2 border-primary rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-48 h-48 bg-white border-4 border-primary rounded-xl flex items-center justify-center p-3">
-              <QRCodeSVG
-                value={qrPayload}
-                size={168}
-                level="M"
-                bgColor="#FFFFFF"
-                fgColor="#1F2937"
-              />
+            <div className="w-48 h-48 bg-white border-4 border-primary rounded-xl flex items-center justify-center p-3 relative">
+              {isQrLoading && !qrData ? (
+                <span className="text-xs text-text-secondary">QR 발급 중...</span>
+              ) : qrData ? (
+                <QRCodeSVG
+                  value={qrData.payload}
+                  size={168}
+                  level="M"
+                  bgColor="#FFFFFF"
+                  fgColor="#1F2937"
+                />
+              ) : (
+                <span className="text-xs text-error">
+                  QR 코드를 불러올 수 없습니다.
+                </span>
+              )}
+              {!isTicketUsable && (
+                <div className="absolute inset-0 bg-white/85 rounded-xl flex items-center justify-center">
+                  <span className="text-sm font-bold text-text-secondary">
+                    {qrData?.ticketStatus === "USED"
+                      ? "입장 완료된 티켓"
+                      : "취소된 티켓"}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <p className="text-center text-sm text-text-secondary">
             공연장 입장 시 스캔하세요
           </p>
+          {qrData && isTicketUsable && (
+            <p
+              className={`text-center text-xs mt-2 ${
+                isExpiringSoon
+                  ? "text-red-500 font-semibold"
+                  : "text-text-secondary"
+              }`}
+            >
+              {remainingMs > 0
+                ? `QR 만료까지 ${remainingLabel}`
+                : "QR 코드 갱신 중..."}
+            </p>
+          )}
         </div>
       </div>
       {/* ─── 다운로드 캡처 영역 끝 ─── */}

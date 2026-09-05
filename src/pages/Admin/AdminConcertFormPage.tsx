@@ -23,6 +23,11 @@ import {
   resolveStoredHairStyle,
   type HairStyle,
 } from "@/components/admin/character/characterHair";
+import {
+  normalizeHexColor,
+  resolveStoredSkinTone,
+  type SkinToneSelection,
+} from "@/components/admin/character/characterSkin";
 
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
@@ -52,16 +57,18 @@ const INITIAL_FORM: ConcertFormData = {
 
 const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const DEFAULT_HAIR_COLOR = "#151515";
+const DEFAULT_OUTFIT_COLOR = "#60A5FA";
 
 interface Props {
   mode: "create" | "edit";
 }
 
-type CharacterSkinTone = "light" | "medium" | "tan" | "dark";
 type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
 
 interface CharacterDraft {
-  skinTone: CharacterSkinTone;
+  skinTone: SkinToneSelection;
+  skinColor: string;
   hairStyle: HairStyle;
   hairColor: string;
   outfitName: string;
@@ -71,13 +78,6 @@ interface CharacterDraft {
   background: string;
 }
 
-const CHARACTER_SKIN_COLORS: Record<CharacterSkinTone, string> = {
-  light: "#f7c6a8",
-  medium: "#d9a78c",
-  tan: "#bf7f54",
-  dark: "#8b5a2b",
-};
-
 function loadSavedCharacter(): CharacterDraft | null {
   const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
 
@@ -86,17 +86,45 @@ function loadSavedCharacter(): CharacterDraft | null {
   }
 
   try {
-    const parsed = JSON.parse(savedCharacter) as Omit<
-      CharacterDraft,
-      "hairStyle"
+    const parsed = JSON.parse(savedCharacter) as Partial<
+      Omit<
+        CharacterDraft,
+        | "skinTone"
+        | "skinColor"
+        | "hairStyle"
+        | "hairColor"
+        | "outfitColor"
+      >
     > & {
+      skinTone?: unknown;
+      skinColor?: unknown;
       hairStyle?: unknown;
+      hairColor?: unknown;
+      outfitColor?: unknown;
     };
+
+    const resolvedSkin = resolveStoredSkinTone(
+      parsed.skinTone,
+      parsed.skinColor,
+    );
+
+    const resolvedHairColor =
+      typeof parsed.hairColor === "string"
+        ? normalizeHexColor(parsed.hairColor)
+        : null;
+
+    const resolvedOutfitColor =
+      typeof parsed.outfitColor === "string"
+        ? normalizeHexColor(parsed.outfitColor)
+        : null;
 
     return {
       ...parsed,
+      ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
-    };
+      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
+      outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+    } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     return null;
@@ -851,7 +879,7 @@ function CharacterCreatorLinkBox({
       >
         <CharacterModelViewer
           modelUrl="/models/chibi-base.glb"
-          skinColor={CHARACTER_SKIN_COLORS[character.skinTone]}
+          skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
           outfitName={character.outfitName}
@@ -865,8 +893,8 @@ function CharacterCreatorLinkBox({
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          피부: {character.skinTone} / 헤어: {character.hairStyle} / 포즈:{" "}
-          {character.pose}
+          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
+          헤어: {character.hairStyle} / 포즈: {character.pose}
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">

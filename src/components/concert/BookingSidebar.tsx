@@ -22,15 +22,23 @@
 // - 2026-08-07 (#178 보완2):
 //   - ON_SALE 매진/로딩/실패 시 5분 타이머 안내 대신 상태 맞춤 문구
 //   - bookingOpenAt 포맷을 Asia/Seoul 기준으로 통일
+// - 2026-08-27 (이슈 #98):
+//   - sticky top-16 (헤더 아래), 예매 정보/유의사항 shadow-card + border-2
+//   - 관람 시간·상태 안내 박스 border-2 (CTA/좌석 로직 유지)
+//   - 모바일 order-2로 제목 바로 아래, 데스크톱은 우측 row-span sticky
+// - 2026-08-31 (이슈 #203):
+//   - 게이지는 목록 캐시 우선, 없으면 seat-counts. CTA는 availableCount
 import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 
 interface BookingSidebarProps {
-  /** null이면 미확정 → "-" */
+  /** 상세 게이지 잔여. null이면 `-` (#203) */
+  gaugeRemaining: number | null;
+  gaugeTotal: number;
+  /** seat-counts availableCount. CTA·안내 문구용 (#181) */
   remaining: number | null;
-  total: number;
   price: number;
   duration: number;
   isOnSale: boolean;
@@ -96,7 +104,7 @@ function getStatusNotice(
       };
     }
     return {
-      message: "좌석 선택 후 5분의 제한 시간이 적용됩니다.",
+      message: "좌석 확인 후 제한 시간 안에 결제를 완료해야 합니다.",
       tone: "default",
     };
   }
@@ -109,30 +117,31 @@ const NOTICE_STYLES: Record<
   { box: string; icon: string; text: string }
 > = {
   default: {
-    box: "bg-warning-bg border-warning-border",
+    box: "bg-warning-bg border-2 border-warning-border",
     icon: "text-yellow-700",
     text: "text-yellow-800",
   },
   muted: {
-    box: "bg-gray-100 border-gray-200",
+    box: "bg-gray-100 border-2 border-gray-200",
     icon: "text-gray-600",
     text: "text-gray-700",
   },
   danger: {
-    box: "bg-red-50 border-red-200",
+    box: "bg-red-50 border-2 border-red-200",
     icon: "text-red-600",
     text: "text-red-800",
   },
   success: {
-    box: "bg-green-50 border-green-200",
+    box: "bg-green-50 border-2 border-green-200",
     icon: "text-green-700",
     text: "text-green-800",
   },
 };
 
 export default function BookingSidebar({
+  gaugeRemaining,
+  gaugeTotal,
   remaining,
-  total,
   price,
   duration,
   isOnSale,
@@ -143,13 +152,17 @@ export default function BookingSidebar({
   notices,
   onBooking,
 }: BookingSidebarProps) {
-  const seatsConfirmed = remaining !== null;
+  const gaugeConfirmed = gaugeRemaining !== null;
   const percent =
-    seatsConfirmed && total > 0 ? (remaining / total) * 100 : 0;
-  // SeatGauge와 동일: 매진(0)은 일반색, ≤20%만 마감임박(danger)
+    gaugeConfirmed && gaugeTotal > 0
+      ? (gaugeRemaining / gaugeTotal) * 100
+      : 0;
   const isEndingSoon =
-    seatsConfirmed && remaining > 0 && percent > 0 && percent <= 20;
-  const showGauge = seatsConfirmed && total > 0;
+    gaugeConfirmed &&
+    gaugeRemaining > 0 &&
+    percent > 0 &&
+    percent <= 20;
+  const showGauge = gaugeConfirmed && gaugeTotal > 0;
 
   const buttonLabel = getBookingCtaLabel({
     status,
@@ -174,24 +187,26 @@ export default function BookingSidebar({
       : AlertTriangle;
 
   return (
-    <div className="lg:sticky lg:top-4 space-y-3">
-      <div className="bg-white border border-border rounded-xl p-5 space-y-4">
+    <div className="order-2 space-y-3 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-16">
+      <div className="bg-white border-2 border-border rounded-xl p-5 space-y-4 shadow-card">
         <h3 className="font-bold">예매 정보</h3>
 
         <div>
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-xs text-text-secondary">잔여 좌석</span>
             <div className="flex items-baseline gap-0.5">
-              {!seatsConfirmed ? (
+              {!gaugeConfirmed ? (
                 <span className="text-3xl font-bold text-text-secondary">
                   -
                 </span>
               ) : (
                 <>
                   <span className="text-3xl font-bold text-text">
-                    {remaining}
+                    {gaugeRemaining}
                   </span>
-                  <span className="text-xs text-text-secondary">/{total}</span>
+                  <span className="text-xs text-text-secondary">
+                    /{gaugeTotal}
+                  </span>
                 </>
               )}
             </div>
@@ -211,13 +226,7 @@ export default function BookingSidebar({
             <div className="w-full h-1" aria-hidden />
           )}
           <p className="text-[10px] text-text-secondary mt-1">
-            {showGauge
-              ? `${Math.round(percent)}% 잔여`
-              : seatsLoading
-                ? "잔여 좌석을 확인하고 있습니다"
-                : seatsError
-                  ? "잔여 좌석을 확인할 수 없습니다"
-                  : "\u00A0"}
+            {showGauge ? `${Math.round(percent)}% 잔여` : "\u00A0"}
           </p>
         </div>
 
@@ -228,7 +237,7 @@ export default function BookingSidebar({
           </p>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+        <div className="border-2 border-border rounded-lg p-3 bg-white flex items-center justify-between">
           <span className="text-xs text-text-secondary">관람 시간</span>
           <span className="text-sm font-semibold">{duration}분</span>
         </div>
@@ -249,7 +258,7 @@ export default function BookingSidebar({
 
         {statusNotice && (
           <div
-            className={`border rounded-lg p-3 flex items-start gap-2 ${noticeStyle.box}`}
+            className={`rounded-lg p-3 flex items-start gap-2 ${noticeStyle.box}`}
           >
             <NoticeIcon
               size={14}
@@ -269,7 +278,7 @@ export default function BookingSidebar({
         )}
       </div>
 
-      <div className="bg-white border border-border rounded-xl p-4">
+      <div className="bg-white border-2 border-border rounded-xl p-4 shadow-card">
         <ul className="text-xs text-text-secondary space-y-1.5">
           {notices.map((n, i) => (
             <li key={i} className="flex items-start gap-1.5">

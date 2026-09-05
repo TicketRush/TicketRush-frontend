@@ -1,23 +1,24 @@
 // 결제 페이지
 //
-// 백엔드 스펙 반영 변경:
-//   - PAYMENT_METHODS → PAYMENT_PROVIDERS 리네임 (개념 정리)
-//     * PaymentMethod = "CARD" | "SIMPLE_PAY" (결제 방식)
-//     * PaymentProvider = "KAKAO" | "NAVER" | "TOSS" (결제 제공자)
-//     * 기존 코드는 두 개념 혼동. 카카오/네이버/토스는 provider.
-//   - KAKAO → KAKAO, NAVER → NAVER, TOSS → TOSS
-//   - selectedSeat.seatNumber → seatNumber
-//   - selectedSeat 제거 → currentConcert 사용
-//   - paymentStore.setMethod에는 "SIMPLE_PAY" 저장 (3개 다 간편결제 카테고리)
-//     * 실 SDK 연동 시 paymentStore에 provider 필드 추가 예정
+// 백엔드 스펙 반영:
+//   - PaymentMethod = KAKAO | NAVER | TOSS (PG provider)
+//   - paymentStore에 bookingId/bookingNumber/seatId 보관 (hold 후 전달)
 //
-// 이슈 #124/#125:
-//   - 타이머 만료/이탈 시 cancelBooking으로 PENDING 해제
-//   - 결제 완료 이동은 store bookingNumber 사용 (하드코딩 제거)
+// 변경 이력:
+// - 이슈 #104: 결제 수단/만료 안내 카피·예매 정보 사이드바를 Figma에 맞춤.
+// - 이슈 #124 후속 wiring 수정:
+//   * 타이머 만료 시 PENDING 취소 후 expired 페이지로 이동 (#167).
+//     토스 이동·확정 중(REQUESTING/CONFIRMING)에는 취소하지 않는다.
+//   * 결제 실패 모달 「좌석으로 돌아가기」는 PENDING 취소 후 좌석 페이지로 이동.
+//     「다시 시도」는 bookingNumber를 유지한 채 결제만 재시도 (#167).
+// - 이슈 #126: handlePayment를 mock setTimeout → 실 Toss SDK 호출로 교체.
+//   결제 확정(POST /payment/confirm)은 Toss의 successUrl 리다이렉트를 받는
+//   PaymentSuccessPage에서 처리한다 (Redirect 방식은 이 페이지로 되돌아오지 않음).
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { toast } from "react-toastify";
+import { ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   useTimerDisplay,
   useTimerStore,
@@ -26,16 +27,25 @@ import {
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
-import TimeoutModal from "@/components/payment/TimeoutModal";
-import PaymentFailedModal from "@/components/payment/FailedModal";
+import Button from "@/components/common/Button/Button";
+import useAuthStore from "@/stores/global/authStore";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
-import type { PaymentProvider } from "@/types/domain/payment";
+import { useRestorePendingTimer } from "@/hooks/booking/useRestorePendingTimer";
+import { LEGAL_LINKS } from "@/constants/legalLinks";
+import {
+  isPaymentInFlight,
+  paymentInFlightLeaveMessage,
+} from "@/utils/booking/isPaymentInFlight";
+import { requestTossPayment } from "@/utils/payment/tossSdk";
+import PaymentFailedModal from "@/components/payment/FailedModal";
+import PendingTimerRestoreNotice from "@/components/payment/PendingTimerRestoreNotice";
+import type { PaymentMethod } from "@/types/domain/payment";
 
-// 결제 제공자 3종 (카카오페이/네이버페이/토스페이는 모두 간편결제)
 const PAYMENT_PROVIDERS: Array<{
-  value: PaymentProvider;
+  value: PaymentMethod;
   label: string;
+  description: string;
   initial: string;
   bgColor: string;
   textColor: string;
@@ -43,20 +53,23 @@ const PAYMENT_PROVIDERS: Array<{
   {
     value: "KAKAO",
     label: "카카오페이",
+    description: "카카오톡으로 간편하게 결제",
     initial: "K",
-    bgColor: "bg-[#FEE500]",
-    textColor: "text-yellow-900",
+    bgColor: "bg-kakao",
+    textColor: "text-kakao-text",
   },
   {
     value: "NAVER",
     label: "네이버페이",
+    description: "네이버로 안전하게 결제",
     initial: "N",
-    bgColor: "bg-[#03C75A]",
-    textColor: "text-white",
+    bgColor: "bg-naver",
+    textColor: "text-naver-text",
   },
   {
     value: "TOSS",
     label: "토스페이",
+    description: "토스로 빠르게 결제",
     initial: "T",
     bgColor: "bg-[#0064FF]",
     textColor: "text-white",
@@ -74,103 +87,140 @@ export default function PaymentPage() {
   const timerStatus = useTimerStore((s) => s.status);
 
   const paymentStatus = usePaymentStore((s) => s.status);
+  const selectedProvider = usePaymentStore((s) => s.method);
   const bookingNumber = usePaymentStore((s) => s.bookingNumber);
+  const bookingId = usePaymentStore((s) => s.bookingId);
+  const seatId = usePaymentStore((s) => s.seatId);
+  const amount = usePaymentStore((s) => s.amount);
   const setMethod = usePaymentStore((s) => s.setMethod);
-  const expire = usePaymentStore((s) => s.expire);
   const fail = usePaymentStore((s) => s.fail);
-  const succeed = usePaymentStore((s) => s.succeed);
   const startRequest = usePaymentStore((s) => s.startRequest);
-  const startConfirming = usePaymentStore((s) => s.startConfirming);
-  const reset = usePaymentStore((s) => s.reset);
+  const retryPayment = usePaymentStore((s) => s.retryPayment);
+  const user = useAuthStore((s) => s.user);
 
-  const releaseSeatMutation = useReleaseSeat(performanceId);
-  const { handleCancelReservation } = useReservationLifecycle();
+  const releaseMutation = useReleaseSeat(performanceId);
+  const { handleTimeout, handleCancelReservation } = useReservationLifecycle();
+  const { status: restoreStatus, retry: retryRestore } =
+    useRestorePendingTimer(bookingNumber);
+  const skipSeatsRedirectRef = useRef(false);
 
-  const [selectedProvider, setSelectedProvider] =
-    useState<PaymentProvider | null>(null);
   const [agreed, setAgreed] = useState(false);
+  const [failClosePending, setFailClosePending] = useState(false);
 
-  function releaseSeat() {
-    const bn = usePaymentStore.getState().bookingNumber;
-    if (!bn) return Promise.resolve();
-    return releaseSeatMutation.mutateAsync({
-      bookingNumber: bn,
-      seatId: selectedSeat?.id,
+  const cancelPendingBooking = useCallback(async () => {
+    if (!bookingNumber) return;
+    await releaseMutation.mutateAsync({
+      bookingNumber,
+      seatId: seatId ?? selectedSeat?.id,
     });
-  }
+  }, [bookingNumber, releaseMutation, seatId, selectedSeat?.id]);
 
-  // 타이머 만료 → 서버 PENDING 취소 후 모달
-  useTimerExpiry(() => {
-    void (async () => {
-      try {
-        await releaseSeat();
-      } catch {
-        /* 이미 만료됐을 수 있음 */
-      }
-      expire();
-    })();
-  });
+  const expirePendingIfIdle = useCallback(() => {
+    if (isPaymentInFlight(usePaymentStore.getState().status)) return;
+    skipSeatsRedirectRef.current = true;
+    void handleTimeout({
+      onReleaseSeat: cancelPendingBooking,
+      onNavigate: () =>
+        navigate(`/concerts/${id}/payment/expired`, { replace: true }),
+      silent: true,
+    });
+  }, [cancelPendingBooking, handleTimeout, id, navigate]);
+
+  useTimerExpiry(expirePendingIfIdle);
 
   useEffect(() => {
-    if (!selectedSeat) {
+    if (restoreStatus === "missing") expirePendingIfIdle();
+  }, [restoreStatus, expirePendingIfIdle]);
+
+  useEffect(() => {
+    if (skipSeatsRedirectRef.current) return;
+    if (!selectedSeat || !bookingNumber) {
       navigate(`/concerts/${id}/seats`, { replace: true });
     }
-  }, [selectedSeat, id, navigate]);
+  }, [selectedSeat, bookingNumber, id, navigate]);
 
-  if (!selectedSeat) return null;
+  if (!selectedSeat || !bookingNumber) return null;
 
-  function handleSelectProvider(provider: PaymentProvider) {
-    setSelectedProvider(provider);
-    // 3종 다 간편결제 카테고리 → SIMPLE_PAY
-    // 실 SDK 연동 시 paymentStore에 provider 필드 추가하여 별도 저장 예정
-    setMethod("SIMPLE_PAY");
+  const totalAmount = amount || (currentConcert?.price ?? 0);
+  const isWarning = restoreStatus !== "loading" && mm < 1;
+  const paymentLocked = isPaymentInFlight(paymentStatus);
+  const selectionLocked =
+    paymentLocked ||
+    restoreStatus === "failed" ||
+    restoreStatus === "loading" ||
+    timerStatus !== "running";
+  const canPay =
+    !!selectedProvider &&
+    agreed &&
+    timerStatus === "running" &&
+    restoreStatus !== "failed" &&
+    restoreStatus !== "loading" &&
+    !paymentLocked;
+
+  function handleSelectProvider(provider: PaymentMethod) {
+    if (selectionLocked) return;
+    setMethod(provider);
   }
 
   async function handlePayment() {
-    if (!selectedProvider || !agreed) return;
-    const bn = usePaymentStore.getState().bookingNumber;
-    if (!bn) {
-      fail("예매 정보가 없습니다. 좌석을 다시 선택해 주세요.");
+    if (
+      !selectedProvider ||
+      !agreed ||
+      bookingId == null ||
+      seatId == null ||
+      !bookingNumber
+    ) {
       return;
     }
 
     try {
-      startRequest("mock-payment-key");
-      // TODO: 이슈 #B-10 — 실제 Toss SDK 호출로 교체
-      await new Promise((r) => setTimeout(r, 800));
+      startRequest("");
 
-      // mock: 10% 확률로 실패
-      // if (Math.random() < 0.1) {
-      //   throw new Error(
-      //     "결제가 거절되었습니다. 다른 결제 수단을 사용해주세요.",
-      //   );
-      // }
-
-      startConfirming();
-      await new Promise((r) => setTimeout(r, 500));
-      succeed();
-
-      navigate(`/reservations/${bn}`);
+      // Redirect 방식 — 정상 흐름에서는 브라우저가 결제창으로 이동하며
+      // 이 Promise는 resolve되지 않는다. reject되면 결제창이 열리기 전
+      // 단계의 오류(사용자 취소 등)이므로 catch에서 인페이지 모달로 안내.
+      await requestTossPayment({
+        provider: selectedProvider,
+        customerKey: `user_${user?.userId ?? "guest"}`,
+        orderId: bookingNumber,
+        orderName: currentConcert
+          ? `${currentConcert.title} 티켓 1매`
+          : "공연 티켓 1매",
+        amount: totalAmount,
+        customerName: user?.name,
+        customerEmail: user?.email,
+        successUrl: `${window.location.origin}/concerts/${id}/payment/success`,
+        failUrl: `${window.location.origin}/concerts/${id}/payment/failed`,
+      });
     } catch (error: unknown) {
       const err =
-        error instanceof Error ? error : new Error("결제에 실패했습니다.");
+        error instanceof Error ? error : new Error("결제 요청에 실패했습니다.");
       fail(err.message);
     }
   }
 
-  function handleCloseTimeoutModal() {
-    // 만료 시점에 이미 서버 취소 완료 → 클라 정리만
-    reset();
-    navigate(`/concerts/${id}/seats`);
+  async function handleClosePaymentFailedModal() {
+    if (failClosePending) return;
+    setFailClosePending(true);
+    try {
+      await handleCancelReservation({
+        onReleaseSeat: cancelPendingBooking,
+        onNavigate: () => navigate(`/concerts/${id}/seats`),
+      });
+    } finally {
+      setFailClosePending(false);
+    }
   }
 
-  function handleClosePaymentFailedModal() {
-    // 결제 실패 후 좌석 페이지로 이탈 → PENDING 해제
-    handleCancelReservation({
-      onReleaseSeat: releaseSeat,
-      onNavigate: () => navigate(`/concerts/${id}/seats`),
-      message: "결제를 취소하고 좌석을 해제했습니다.",
-    });
+  function handleTermsLinkClick(event: MouseEvent<HTMLAnchorElement>) {
+    event.stopPropagation();
+    if (!paymentLocked) return;
+    event.preventDefault();
+    toast.info(paymentInFlightLeaveMessage(paymentStatus));
+  }
+
+  function handleRetryPayment() {
+    retryPayment();
   }
 
   function handleBack() {
@@ -178,84 +228,81 @@ export default function PaymentPage() {
     navigate(`/concerts/${id}/payment/confirm`);
   }
 
-  // 좌석 단위 가격 없음 → 공연 단가 사용 (백엔드 스펙)
-  const totalAmount = currentConcert?.price ?? 0;
-
-  const isWarning = mm < 1; // 1분 미만
-  const canPay =
-    !!selectedProvider &&
-    agreed &&
-    !!bookingNumber &&
-    timerStatus === "running" &&
-    paymentStatus !== "REQUESTING" &&
-    paymentStatus !== "CONFIRMING";
-
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
-      {/* 헤더 */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          type="button"
+      <div className="mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          icon={<ArrowLeft size={14} />}
+          disabled={releaseMutation.isPending || paymentLocked}
           onClick={handleBack}
-          disabled={releaseSeatMutation.isPending}
-          className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-60"
         >
-          <ArrowLeft size={14} />
           뒤로가기
-        </button>
-        <h1 className="text-2xl font-bold">결제 수단 선택</h1>
+        </Button>
+        <h1 className="text-4xl font-bold mt-4">결제 수단 선택</h1>
+        <p className="text-text-secondary mt-1">
+          안전한 결제를 위해 결제 정보를 입력해주세요
+        </p>
       </div>
 
-      {/* 시간 경고 바 */}
-      <div
-        className={`rounded-xl p-4 mb-6 flex items-center justify-between ${
-          isWarning
-            ? "bg-red-50 border border-red-200"
-            : "bg-warning-bg border border-warning-border"
-        }`}
-      >
-        <div className="flex items-start gap-3">
+      {restoreStatus === "failed" && (
+        <PendingTimerRestoreNotice
+          onRetry={retryRestore}
+          onBackToSeats={() => void handleClosePaymentFailedModal()}
+        />
+      )}
+
+      <div className="rounded-xl px-[18px] py-4 mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white border-2 border-warning-border shadow-card">
+        <div className="flex items-center gap-3 min-w-0">
           <AlertCircle
-            size={20}
-            className={isWarning ? "text-red-600" : "text-yellow-600"}
+            size={24}
+            className={`shrink-0 ${isWarning ? "text-timer-warning" : "text-[#E17100]"}`}
           />
           <div>
-            <p className="font-semibold text-sm">
-              {isWarning
-                ? "결제 시간이 곧 만료됩니다"
-                : "좌석 임시 예매중입니다"}
+            <p className="font-bold text-base text-[#973C00]">
+              {restoreStatus === "loading"
+                ? "만료 시각을 확인하는 중"
+                : "좌석 예약 시간이 곧 만료됩니다"}
             </p>
-            <p className="text-xs mt-0.5 text-text-secondary">
-              시간 내에 결제하지 않으면 좌석 예약이 취소됩니다
+            <p className="text-sm mt-0.5 text-[#BB4D00]">
+              시간 내에 결제를 완료하지 않으면 선택한 좌석이 자동 해제됩니다
             </p>
           </div>
         </div>
-        <div
-          className={`text-3xl font-bold tabular-nums ${
-            isWarning ? "text-red-600" : "text-yellow-900"
-          }`}
-        >
-          {formatted}
+        <div className="text-right shrink-0">
+          <p className="text-sm text-text-secondary">남은 시간</p>
+          <p
+            className={`text-[30px] font-bold tabular-nums leading-9 ${
+              isWarning ? "text-timer-warning" : "text-[#E17100]"
+            }`}
+          >
+            {restoreStatus === "loading" ? "--:--" : formatted}
+          </p>
         </div>
       </div>
 
-      {/* 2단 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        {/* 좌측: 결제 수단 */}
-        <div className="space-y-4">
-          <h2 className="font-bold text-lg">결제 수단</h2>
-          <div className="bg-white border border-border rounded-xl p-6">
-            <p className="text-sm font-semibold mb-4">간편결제 서비스 선택</p>
-            <div className="space-y-2">
-              {PAYMENT_PROVIDERS.map((p) => (
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_334px] gap-6">
+        <div className="bg-white rounded-xl p-6 shadow-card h-fit">
+          <h2 className="font-bold text-lg mb-6">결제 수단</h2>
+          <div className="space-y-2">
+            {PAYMENT_PROVIDERS.map((p) => {
+              const selected = selectedProvider === p.value;
+              return (
                 <button
                   key={p.value}
                   type="button"
+                  disabled={selectionLocked}
+                  aria-pressed={selected}
                   onClick={() => handleSelectProvider(p.value)}
-                  className={`w-full p-4 rounded-lg border-2 transition-all flex items-center gap-3 ${
-                    selectedProvider === p.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-gray-300"
+                  className={`w-full p-4 rounded-[10px] border-2 transition-all flex items-center gap-3 ${
+                    selected
+                      ? "border-primary bg-gray-50"
+                      : "border-border bg-white"
+                  } ${
+                    selectionLocked
+                      ? "opacity-60 cursor-not-allowed"
+                      : "hover:border-gray-300"
                   }`}
                 >
                   <div
@@ -264,87 +311,124 @@ export default function PaymentPage() {
                     {p.initial}
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold">{p.label}</p>
+                    <p className="font-bold">{p.label}</p>
                     <p className="text-xs text-text-secondary">
-                      간편하고 빠른 결제
+                      {p.description}
                     </p>
                   </div>
+                  {selected && (
+                    <CheckCircle2
+                      size={20}
+                      className="text-seat-selected shrink-0"
+                    />
+                  )}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* 우측: 예매 정보 사이드바 (sticky) */}
-        <div className="lg:sticky lg:top-4 h-fit">
-          <div className="bg-white border border-border rounded-xl p-6 space-y-4">
-            <h3 className="font-bold">예매 정보</h3>
+        <div className="lg:sticky lg:top-16 h-fit">
+          <div className="bg-white rounded-xl p-6 shadow-card">
+            <h3 className="font-bold text-lg">예매 정보</h3>
 
-            <div className="space-y-2 text-sm">
-              <Row label="좌석 수" value="1석" />
-              <Row label="좌석" value={selectedSeat.seatNumber} />
-              <Row label="단가" value={`₩${totalAmount.toLocaleString()}`} />
-            </div>
-
-            <div className="pt-3 border-t border-border">
-              <div className="flex justify-between items-baseline">
-                <span className="text-sm font-semibold">총 결제 금액</span>
-                <span className="text-2xl font-bold text-primary">
-                  ₩{totalAmount.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span className="text-xs text-text-secondary leading-relaxed">
-                <span className="font-semibold text-text">
-                  결제 약관 및 환불 정책
-                </span>
-                에 동의합니다.
+            <div className="mt-6">
+              <p className="text-sm text-text-secondary mb-2">선택한 좌석</p>
+              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-primary text-white text-sm font-semibold">
+                {selectedSeat.seatNumber}
               </span>
-            </label>
+            </div>
 
-            <button
-              type="button"
-              onClick={handlePayment}
-              disabled={!canPay}
-              className={`w-full py-3 rounded-lg font-bold transition-colors ${
-                canPay
-                  ? "bg-red-500 text-white hover:bg-red-600"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            <div className="mt-4 pt-4 border-t border-border space-y-2">
+              <Row label="좌석 수" value="1석" />
+              <Row label="단가" value={`₩${totalAmount.toLocaleString()}`} />
+              <Row label="수수료" value="₩0" />
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-border flex justify-between items-baseline">
+              <span className="font-bold">총 결제 금액</span>
+              <span className="text-2xl font-bold text-primary">
+                ₩{totalAmount.toLocaleString()}
+              </span>
+            </div>
+
+            <div
+              className={`mt-6 flex items-start gap-3 bg-gray-50 border-2 border-border rounded-[10px] p-3 ${
+                selectionLocked ? "opacity-60" : ""
               }`}
             >
-              {paymentStatus === "REQUESTING"
-                ? "결제 진행 중..."
-                : paymentStatus === "CONFIRMING"
-                  ? "확인 중..."
-                  : `₩${totalAmount.toLocaleString()} 결제하기`}
-            </button>
+              <input
+                id="payment-terms"
+                type="checkbox"
+                checked={agreed}
+                disabled={selectionLocked}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className={`mt-1 accent-primary ${
+                  selectionLocked ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+              />
+              <span className="text-sm text-text leading-5">
+                <a
+                  href={LEGAL_LINKS.terms}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`font-semibold text-primary underline underline-offset-2 ${
+                    paymentLocked ? "cursor-not-allowed" : ""
+                  }`}
+                  onClick={handleTermsLinkClick}
+                >
+                  결제 약관 및 환불 정책
+                </a>
+                <label
+                  htmlFor="payment-terms"
+                  className={
+                    selectionLocked ? "cursor-not-allowed" : "cursor-pointer"
+                  }
+                >
+                  에 동의합니다
+                </label>
+              </span>
+            </div>
 
-            <button
-              type="button"
-              onClick={handleBack}
-              disabled={releaseSeatMutation.isPending}
-              className="w-full py-2.5 rounded-lg bg-gray-100 text-text-secondary text-sm hover:bg-gray-200 disabled:opacity-60"
-            >
-              ← 이전으로
-            </button>
+            <div className="mt-4 space-y-2">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                disabled={!canPay}
+                loading={
+                  paymentStatus === "REQUESTING" ||
+                  paymentStatus === "CONFIRMING"
+                }
+                onClick={handlePayment}
+              >
+                {paymentStatus === "REQUESTING"
+                  ? "결제 진행 중..."
+                  : paymentStatus === "CONFIRMING"
+                    ? "확인 중..."
+                    : `₩${totalAmount.toLocaleString()} 결제하기`}
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                icon={<ArrowLeft size={20} />}
+                disabled={releaseMutation.isPending || paymentLocked}
+                onClick={handleBack}
+              >
+                이전으로
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 모달 */}
-      {paymentStatus === "EXPIRED" && (
-        <TimeoutModal onClose={handleCloseTimeoutModal} />
-      )}
       {paymentStatus === "FAILED" && (
-        <PaymentFailedModal onClose={handleClosePaymentFailedModal} />
+        <PaymentFailedModal
+          onClose={() => void handleClosePaymentFailedModal()}
+          onRetry={handleRetryPayment}
+          closePending={failClosePending}
+        />
       )}
     </div>
   );
@@ -352,7 +436,7 @@ export default function PaymentPage() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
+    <div className="flex justify-between items-baseline">
       <span className="text-text-secondary">{label}</span>
       <span className="font-semibold">{value}</span>
     </div>

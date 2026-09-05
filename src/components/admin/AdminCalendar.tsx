@@ -1,11 +1,18 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  inclusiveDayCount,
+  MAX_DASHBOARD_PERIOD_DAYS,
+} from "@/utils/admin/dashboardPeriod";
 
 interface AdminCalendarProps {
   /** 단일 날짜 또는 [시작, 종료] 범위 */
   selectedRange: { start: Date; end: Date };
   onRangeChange: (range: { start: Date; end: Date }) => void;
+  maxInclusiveDays?: number;
+  /** 92일 초과 등 거부된 선택 */
+  onRangeReject?: () => void;
 }
 
 const YEAR_RANGE_SIZE = 24;
@@ -14,6 +21,8 @@ const YEAR_RANGE_START = 2022; // 사진과 동일
 export default function AdminCalendar({
   selectedRange,
   onRangeChange,
+  maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+  onRangeReject,
 }: AdminCalendarProps) {
   const [viewYear, setViewYear] = useState(selectedRange.start.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedRange.start.getMonth());
@@ -32,10 +41,28 @@ export default function AdminCalendar({
     );
   }
   function isInRange(date: Date) {
-    const t = date.getTime();
-    return t >= selectedRange.start.getTime() && t <= selectedRange.end.getTime();
+    const range = pendingStart
+      ? { start: pendingStart, end: pendingStart }
+      : selectedRange;
+    const t = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    ).getTime();
+    const start = new Date(
+      range.start.getFullYear(),
+      range.start.getMonth(),
+      range.start.getDate(),
+    ).getTime();
+    const end = new Date(
+      range.end.getFullYear(),
+      range.end.getMonth(),
+      range.end.getDate(),
+    ).getTime();
+    return t >= start && t <= end;
   }
   function isRangeEdge(date: Date) {
+    if (pendingStart) return isSameDay(date, pendingStart);
     return (
       isSameDay(date, selectedRange.start) || isSameDay(date, selectedRange.end)
     );
@@ -61,16 +88,25 @@ export default function AdminCalendar({
   function handleDateClick(day: number) {
     const clicked = new Date(viewYear, viewMonth, day);
     if (!pendingStart) {
-      // 첫 클릭 = 시작일
+      // 첫 클릭은 시작일만 잡고, 확정 전까지는 서버 조회를 치지 않는다.
       setPendingStart(clicked);
-      onRangeChange({ start: clicked, end: clicked });
-    } else {
-      // 두 번째 클릭 = 종료일
-      const start = pendingStart < clicked ? pendingStart : clicked;
-      const end = pendingStart < clicked ? clicked : pendingStart;
-      onRangeChange({ start, end });
-      setPendingStart(null);
+      return;
     }
+    const start = pendingStart < clicked ? pendingStart : clicked;
+    const end = pendingStart < clicked ? clicked : pendingStart;
+    if (inclusiveDayCount(start, end) > maxInclusiveDays) {
+      onRangeReject?.();
+      return;
+    }
+    onRangeChange({ start, end });
+    setPendingStart(null);
+  }
+
+  function isBeyondMax(date: Date) {
+    if (!pendingStart) return false;
+    const start = pendingStart < date ? pendingStart : date;
+    const end = pendingStart < date ? date : pendingStart;
+    return inclusiveDayCount(start, end) > maxInclusiveDays;
   }
 
   function selectMonth(month: number) {
@@ -88,7 +124,7 @@ export default function AdminCalendar({
   const canGoYearNext = yearPageStart + YEAR_RANGE_SIZE < 2200;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 relative">
+    <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-4 relative">
       <p className="text-sm font-bold mb-3 text-gray-900">기간 설정</p>
 
       {/* 월/연도 헤더 */}
@@ -126,9 +162,12 @@ export default function AdminCalendar({
               const todayFlag = isSameDay(date, today);
               const inRange = isInRange(date);
               const edgeFlag = isRangeEdge(date);
+              const beyondMax = isBeyondMax(date);
 
               let bgClass = "";
-              if (edgeFlag) {
+              if (beyondMax) {
+                bgClass = "text-gray-300 cursor-not-allowed";
+              } else if (edgeFlag) {
                 bgClass = "bg-primary text-white font-bold";
               } else if (inRange) {
                 bgClass = "bg-primary/20 text-gray-900";

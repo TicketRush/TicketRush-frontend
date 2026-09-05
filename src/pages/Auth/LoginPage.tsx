@@ -94,7 +94,7 @@ export default function LoginPage() {
     <div className="relative flex justify-center min-h-screen px-6 pt-20 pb-10 bg-[#f8f9fa]">
       <div className="absolute top-6 left-6">
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           onClick={() => {
             clearLoginRedirect();
