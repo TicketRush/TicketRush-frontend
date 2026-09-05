@@ -3,8 +3,10 @@ import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { Center, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
+import type { EyeStyle } from "@/components/admin/character/characterEye";
 
 export type { HairStyle } from "@/components/admin/character/characterHair";
+export type { EyeStyle } from "@/components/admin/character/characterEye";
 
 interface CharacterModelViewerProps {
   modelUrl?: string;
@@ -12,6 +14,7 @@ interface CharacterModelViewerProps {
   hairColor: string;
   outfitColor: string;
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
 }
 
 const HAIR_MODEL_URLS: Record<HairStyle, string> = {
@@ -20,6 +23,15 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   ponytail: "/models/hair/hair_ponytail.glb",
   twintails: "/models/hair/hair_twintails.glb",
   wave: "/models/hair/hair_wave.glb",
+};
+
+const EYE_MODEL_URLS: Record<EyeStyle, string> = {
+  default: "/models/eyes/eye_default.glb",
+  happy: "/models/eyes/eye_happy.glb",
+  wink: "/models/eyes/eye_wink.glb",
+  squeeze: "/models/eyes/eye_squeeze.glb",
+  angry: "/models/eyes/eye_angry.glb",
+  closed: "/models/eyes/eye_closed.glb",
 };
 
 function getPartType(objectName: string) {
@@ -34,6 +46,19 @@ function getPartType(objectName: string) {
   }
 
   return "other";
+}
+
+function isBaseEyeObject(objectName: string) {
+  const name = objectName.toLowerCase();
+
+  return (
+    name === "eye" ||
+    name === "eyes" ||
+    name.startsWith("eye_") ||
+    name.startsWith("eyes_") ||
+    name.endsWith("_eye") ||
+    name.endsWith("_eyes")
+  );
 }
 
 function CharacterBody({
@@ -51,6 +76,13 @@ function CharacterBody({
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      // 기본 캐릭터에 눈 Mesh가 포함되어 있다면 숨깁니다.
+      // 이후 선택한 눈 GLB를 별도로 렌더링합니다.
+      if (isBaseEyeObject(object.name)) {
+        object.visible = false;
         return;
       }
 
@@ -104,12 +136,26 @@ function HairModel({
   return <primitive object={scene} />;
 }
 
+function EyeModel({
+  eyeStyle,
+}: Pick<CharacterModelViewerProps, "eyeStyle">) {
+  const eyeModelUrl = EYE_MODEL_URLS[eyeStyle];
+  const gltf = useGLTF(eyeModelUrl);
+
+  const scene = useMemo(() => {
+    return gltf.scene.clone(true);
+  }, [gltf.scene]);
+
+  return <primitive object={scene} />;
+}
+
 function CharacterModel({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
   outfitColor,
   hairStyle,
+  eyeStyle,
 }: CharacterModelViewerProps) {
   return (
     <Center>
@@ -124,7 +170,12 @@ function CharacterModel({
           outfitColor={outfitColor}
         />
 
-        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+        <HairModel
+          hairStyle={hairStyle}
+          hairColor={hairColor}
+        />
+
+        <EyeModel eyeStyle={eyeStyle} />
       </group>
     </Center>
   );
@@ -136,6 +187,7 @@ export default function CharacterModelViewer({
   hairColor,
   outfitColor,
   hairStyle,
+  eyeStyle,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
@@ -151,6 +203,7 @@ export default function CharacterModelViewer({
             hairColor={hairColor}
             outfitColor={outfitColor}
             hairStyle={hairStyle}
+            eyeStyle={eyeStyle}
           />
         </Suspense>
 
@@ -166,8 +219,16 @@ export default function CharacterModelViewer({
 }
 
 useGLTF.preload("/models/chibi-base.glb");
+
 useGLTF.preload("/models/hair/hair_short.glb");
 useGLTF.preload("/models/hair/hair_long.glb");
 useGLTF.preload("/models/hair/hair_ponytail.glb");
 useGLTF.preload("/models/hair/hair_twintails.glb");
 useGLTF.preload("/models/hair/hair_wave.glb");
+
+useGLTF.preload("/models/eyes/eye_default.glb");
+useGLTF.preload("/models/eyes/eye_happy.glb");
+useGLTF.preload("/models/eyes/eye_wink.glb");
+useGLTF.preload("/models/eyes/eye_squeeze.glb");
+useGLTF.preload("/models/eyes/eye_angry.glb");
+useGLTF.preload("/models/eyes/eye_closed.glb");
