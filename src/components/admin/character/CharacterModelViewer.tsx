@@ -3,15 +3,37 @@ import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { Center, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
+import {
+  getOutfitModelUrl,
+  OUTFIT_MODEL_URLS,
+  type OutfitModelId,
+} from "@/components/admin/character/characterOutfit";
 
 export type { HairStyle } from "@/components/admin/character/characterHair";
+export type { OutfitModelId } from "@/components/admin/character/characterOutfit";
 
 interface CharacterModelViewerProps {
   modelUrl?: string;
   skinColor: string;
   hairColor: string;
+
+  /**
+   * #194에서 파츠별 의상 색상 커스터마이징에 사용할 예정입니다.
+   * 현재 #74에서는 기존 호출부 호환을 위해 유지합니다.
+   */
   outfitColor: string;
-  outfitName: string;
+
+  /**
+   * 화면 표시용 의상 이름입니다.
+   * 3D 모델 분기에는 사용하지 않습니다.
+   */
+  outfitName?: string;
+
+  /**
+   * 3D 의상 모델을 선택하기 위한 stable id입니다.
+   */
+  outfitModelId: OutfitModelId;
+
   hairStyle: HairStyle;
 }
 
@@ -23,67 +45,28 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   wave: "/models/hair/hair_wave.glb",
 };
 
-const CONCERT_OUTFIT_NAME = "마이크 콘서트";
-const CONCERT_OUTFIT_URL = "/models/outfits/concert_outfit.glb";
-
-function getPartType(objectName: string) {
-  const name = objectName.toLowerCase();
-
-  if (name.startsWith("body_")) {
-    return "body";
-  }
-
-  if (name.startsWith("clothes_")) {
-    return "clothes";
-  }
-
-  return "other";
-}
-
 function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
-  outfitColor,
-  outfitName,
-}: Pick<
-  CharacterModelViewerProps,
-  "modelUrl" | "skinColor" | "outfitColor" | "outfitName"
->) {
+}: Pick<CharacterModelViewerProps, "modelUrl" | "skinColor">) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
-    const isConcertOutfit = outfitName === CONCERT_OUTFIT_NAME;
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
         return;
       }
 
-      const partType = getPartType(object.name);
-
-      if (partType === "body") {
-        object.material = new THREE.MeshStandardMaterial({
-          color: skinColor,
-          roughness: 0.8,
-        });
-      }
-
-      if (partType === "clothes") {
-        if (isConcertOutfit) {
-          object.visible = false;
-          return;
-        }
-
-        object.material = new THREE.MeshStandardMaterial({
-          color: outfitColor,
-          roughness: 0.75,
-        });
-      }
+      object.material = new THREE.MeshStandardMaterial({
+        color: skinColor,
+        roughness: 0.8,
+      });
     });
 
     return clonedScene;
-  }, [gltf.scene, skinColor, outfitColor, outfitName]);
+  }, [gltf.scene, skinColor]);
 
   return <primitive object={scene} />;
 }
@@ -115,8 +98,12 @@ function HairModel({
   return <primitive object={scene} />;
 }
 
-function ConcertOutfitModel() {
-  const gltf = useGLTF(CONCERT_OUTFIT_URL);
+function OutfitModel({
+  modelUrl,
+}: {
+  modelUrl: string;
+}) {
+  const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
     return gltf.scene.clone(true);
@@ -129,11 +116,17 @@ function CharacterModel({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
-  outfitColor,
-  outfitName,
+  outfitModelId,
   hairStyle,
-}: CharacterModelViewerProps) {
-  const isConcertOutfit = outfitName === CONCERT_OUTFIT_NAME;
+}: Pick<
+  CharacterModelViewerProps,
+  | "modelUrl"
+  | "skinColor"
+  | "hairColor"
+  | "outfitModelId"
+  | "hairStyle"
+>) {
+  const outfitModelUrl = getOutfitModelUrl(outfitModelId);
 
   return (
     <Center>
@@ -145,13 +138,18 @@ function CharacterModel({
         <CharacterBody
           modelUrl={modelUrl}
           skinColor={skinColor}
-          outfitColor={outfitColor}
-          outfitName={outfitName}
         />
 
-        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+        <HairModel
+          hairStyle={hairStyle}
+          hairColor={hairColor}
+        />
 
-        {isConcertOutfit && <ConcertOutfitModel />}
+        {outfitModelUrl && (
+          <Suspense fallback={null}>
+            <OutfitModel modelUrl={outfitModelUrl} />
+          </Suspense>
+        )}
       </group>
     </Center>
   );
@@ -161,8 +159,7 @@ export default function CharacterModelViewer({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
-  outfitColor,
-  outfitName,
+  outfitModelId,
   hairStyle,
 }: CharacterModelViewerProps) {
   return (
@@ -177,8 +174,7 @@ export default function CharacterModelViewer({
             modelUrl={modelUrl}
             skinColor={skinColor}
             hairColor={hairColor}
-            outfitColor={outfitColor}
-            outfitName={outfitName}
+            outfitModelId={outfitModelId}
             hairStyle={hairStyle}
           />
         </Suspense>
@@ -200,4 +196,9 @@ useGLTF.preload("/models/hair/hair_long.glb");
 useGLTF.preload("/models/hair/hair_ponytail.glb");
 useGLTF.preload("/models/hair/hair_twintails.glb");
 useGLTF.preload("/models/hair/hair_wave.glb");
-useGLTF.preload(CONCERT_OUTFIT_URL);
+
+Object.values(OUTFIT_MODEL_URLS).forEach((modelUrl) => {
+  if (modelUrl) {
+    useGLTF.preload(modelUrl);
+  }
+});

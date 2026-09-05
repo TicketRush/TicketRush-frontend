@@ -14,6 +14,13 @@ import {
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
+import {
+  DEFAULT_OUTFIT_MODEL_ID,
+  OUTFIT_OPTIONS,
+  getOutfitOption,
+  resolveStoredOutfitModelId,
+  type OutfitModelId,
+} from "@/components/admin/character/characterOutfit";
 
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
@@ -22,6 +29,7 @@ interface CharacterConfig {
   skinColor: string;
   hairStyle: HairStyle;
   hairColor: string;
+  outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
   accessory: string;
@@ -60,39 +68,6 @@ const HAIR_COLORS = [
   "#8e5aa6",
   "#4f7c5a",
   "#444889",
-];
-
-const OUTFITS = [
-  {
-    name: "무지개 블라우스",
-    description: "가벼운 공연 의상",
-    icon: "👗",
-  },
-  {
-    name: "마이크 콘서트",
-    description: "K-POP 콘서트 대표룩",
-    icon: "🎤",
-  },
-  {
-    name: "클래식 공연",
-    description: "포멀한 공연 의상",
-    icon: "🎻",
-  },
-  {
-    name: "DJ / 페스티벌",
-    description: "EDM 페스티벌룩",
-    icon: "🎸",
-  },
-  {
-    name: "발레 / 무용 공연",
-    description: "무용 공연 의상",
-    icon: "🩰",
-  },
-  {
-    name: "연극 / 극장",
-    description: "무대 의상",
-    icon: "🎩",
-  },
 ];
 
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
@@ -150,7 +125,8 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
   hairColor: DEFAULT_HAIR_COLOR,
-  outfitName: "무지개 블라우스",
+  outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
+  outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
   outfitColor: DEFAULT_OUTFIT_COLOR,
   accessory: "none",
   pose: "standing",
@@ -172,13 +148,21 @@ function loadSavedCharacter(): CharacterConfig {
     const parsed = JSON.parse(savedCharacter) as Partial<
       Omit<
         CharacterConfig,
-        "skinTone" | "skinColor" | "hairStyle" | "hairColor"
+        | "skinTone"
+        | "skinColor"
+        | "hairStyle"
+        | "hairColor"
+        | "outfitModelId"
+        | "outfitName"
+        | "outfitColor"
       >
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
       hairColor?: unknown;
+      outfitModelId?: unknown;
+      outfitName?: unknown;
       outfitColor?: unknown;
     };
 
@@ -197,12 +181,20 @@ function loadSavedCharacter(): CharacterConfig {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedOutfitModelId = resolveStoredOutfitModelId(
+      parsed.outfitModelId,
+      parsed.outfitName,
+    );
+    const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
+
     return {
       ...DEFAULT_CHARACTER,
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
+      outfitModelId: resolvedOutfitModelId,
+      outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
     } as CharacterConfig;
   } catch {
@@ -286,6 +278,16 @@ export default function AdminCharacterCreatorPage() {
     setCharacter((prev) => ({
       ...prev,
       [key]: value,
+    }));
+  }
+
+  function selectOutfit(outfitModelId: OutfitModelId) {
+    const outfit = getOutfitOption(outfitModelId);
+
+    setCharacter((prev) => ({
+      ...prev,
+      outfitModelId,
+      outfitName: outfit.name,
     }));
   }
 
@@ -874,11 +876,11 @@ export default function AdminCharacterCreatorPage() {
 
             <CreatorSection title="의상 선택">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {OUTFITS.map((outfit) => (
+                {OUTFIT_OPTIONS.map((outfit) => (
                   <OptionCard
-                    key={outfit.name}
-                    selected={character.outfitName === outfit.name}
-                    onClick={() => update("outfitName", outfit.name)}
+                    key={outfit.id}
+                    selected={character.outfitModelId === outfit.id}
+                    onClick={() => selectOutfit(outfit.id)}
                   >
                     <div className="flex items-start gap-3 text-left">
                       <span className="text-2xl">{outfit.icon}</span>
@@ -1200,6 +1202,7 @@ export default function AdminCharacterCreatorPage() {
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
                 outfitName={character.outfitName}
+                outfitModelId={character.outfitModelId}
                 hairStyle={character.hairStyle}
               />
             </div>
