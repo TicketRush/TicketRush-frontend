@@ -13,9 +13,15 @@
  *   - 상세 진입 / 잔여 "-" 표시 검증용 상태별 fixture 추가
  *     (ON_SALE 매진, CLOSED, CANCELED, UPCOMING)
  *   - remainingSeats는 seats mock의 availableCount 시드와 동기화
+ * - 2026-08-31 (이슈 #203):
+ *   - 목록 게이지 3케이스 (정상 / 0석 / 키 없음). 비 ON_SALE은 좌석 키 생략
  *
  * ⚠️ venue 필드는 유지 (백엔드 venueName 요청 대기)
- * ⚠️ remainingSeats는 mock 편의상 유지. 실 API에선 별도 API(/seat/:id/seat-counts).
+ *
+ * #203 목록 게이지:
+ *   id 1  — 정상 좌석 수
+ *   id 2  — remainingSeats: 0
+ *   id 13 — 키 없음 → `-` + 「예매하기」
  *
  * #177 수동 확인 가이드 (VITE_USE_MOCK=true):
  *   id 1  — ON_SALE + 잔여 > 0 → 예매하기 활성, 숫자/게이지 표시
@@ -23,6 +29,7 @@
  *   id 8  — CLOSED → 카드 클릭으로 상세 진입, CTA「예매 마감」, 잔여 "-"
  *   id 9  — CANCELED → 카드 클릭으로 상세 진입, CTA「공연 취소」, 잔여 "-"
  *   id 10 — UPCOMING → 카드 클릭으로 상세 진입, CTA「오픈 예정」, 잔여 "-"
+ *   id 13 — ON_SALE + 키 없음 → CTA「예매하기」활성, 잔여 "-"
  * #178 카드 CTA / 썸네일 뱃지:
  *   id 2  — ON_SALE 매진: 버튼「매진」+ 우상단「매진」뱃지
  *   id 8  — CLOSED「예매 마감」(뱃지 없음)
@@ -33,8 +40,9 @@
  */
 import type { ConcertSummary, ConcertDetail } from "@/types/domain/concert";
 import { mockDelay } from "./_helpers";
+import samplePoster from "@/assets/images/sample-poster.svg";
 
-const POSTER = "/placeholder-poster.png";
+const POSTER = samplePoster;
 
 export const MOCK_CONCERTS: ConcertSummary[] = [
   {
@@ -99,6 +107,21 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     imageMainUrl: POSTER,
     totalSeats: 120,
     remainingSeats: 0,
+    status: "ON_SALE",
+  },
+  {
+    // #203: ON_SALE + 좌석 키 없음 — 게이지 `-`, CTA「예매하기」(fail-open)
+    // 1페이지에 두어 목록 3케이스를 스크롤 없이 확인한다
+    id: 13,
+    title: "[Mock] 좌석 수 미제공 (ON_SALE + 키 없음)",
+    performer: "Unknown Seats",
+    genre: "MUSICAL",
+    venue: "블루스퀘어 신한카드홀",
+    address: "서울특별시 용산구 이태원로 294",
+    showDate: "2026-09-20",
+    showTime: "19:00",
+    price: 99000,
+    imageMainUrl: POSTER,
     status: "ON_SALE",
   },
   {
@@ -188,8 +211,6 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     showTime: "19:00",
     price: 44000,
     imageMainUrl: POSTER,
-    totalSeats: 120,
-    remainingSeats: 0,
     status: "CLOSED",
   },
   {
@@ -204,8 +225,6 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     showTime: "19:30",
     price: 77000,
     imageMainUrl: POSTER,
-    totalSeats: 120,
-    remainingSeats: 40,
     status: "CANCELED",
   },
   {
@@ -221,8 +240,6 @@ export const MOCK_CONCERTS: ConcertSummary[] = [
     showTime: "18:00",
     price: 110000,
     imageMainUrl: POSTER,
-    totalSeats: 120,
-    remainingSeats: 120,
     status: "UPCOMING",
   },
 ];
@@ -232,9 +249,10 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
   if (!summary) return null;
 
   const totalSeats = summary.totalSeats ?? 120;
+  const { remainingSeats: _listRemaining, ...rest } = summary;
 
   return {
-    ...summary,
+    ...rest,
     totalSeats,
     // 상세 API에만 있는 bookingOpenAt (목록 mock에는 없음)
     // Seoul(+09:00) offset 명시 — formatBookingOpenAt이 Asia/Seoul 벽시계로 표시

@@ -21,7 +21,7 @@
 // 각 항목의 refundFailedAt 타임스탬프 유무로 구분함.
 
 // 예매 상태 — 백엔드 booking-service enum과 정확히 일치
-//   PENDING: 결제 대기 (좌석 자동 HOLD 중, 5분 타이머)
+//   PENDING: 결제 대기 (좌석 자동 HOLD 중, 서버 expires_at까지)
 //    CONFIRMED: 결제 완료
 //    CANCELED: 취소됨 (환불 없음, PENDING → CANCELED or 사용자 취소)
 //    REFUNDING: 환불 진행 중
@@ -52,8 +52,8 @@ export interface BookingPendingRequest {
 
 //  백엔드 BookingPendingResponse 대응
 
-//  ⚠️ 백엔드 응답 필드명은 이미 camelCase (bookingId, bookingNumber, status).
-//  status만 백엔드 예시 값은 "PENDING" 고정 (예매 생성 시).
+//  ⚠️ 백엔드 BookingPendingResponse: bookingId, bookingNumber, status.
+//  expires_at 은 생성 응답에 없음 → GET /booking/me?status=PENDING (#559).
 
 export interface BookingPendingResponse {
   bookingId: number;
@@ -87,6 +87,8 @@ export interface BookingSummary {
   // ⚠️ 백엔드 응답에 이 필드 없음. mock 호환 및 표시용으로 optional 유지.
 
   createdAt?: string;
+  /** PENDING만 존재. BE `yyyy-MM-dd HH:mm:ss`, 그 외는 생략 (#559/#167) */
+  expiresAt?: string | null;
 }
 
 // ── 예매 상세 (프론트 aggregation) ───────────────────
@@ -166,4 +168,44 @@ export interface MyBookingsResponse {
 /** 내 예매 수 응답 — 백엔드 GET /booking/me/count 대응 */
 export interface MyBookingCountResponse {
   count: number;
+}
+
+// ── 관리자: 환불 모니터링 (백엔드 확정, 2026-07-18 swagger-ui 실측) ────
+// 백엔드 endpoint:
+//   GET  /api/v1/booking/admin/bookings/refund-failed    (환불 처리 자체가 실패한 건)
+//   GET  /api/v1/booking/admin/bookings/refunding-stuck  (REFUNDING 상태로 오래 멈춰있는 건)
+//   POST /api/v1/booking/admin/{bookingNumber}/refund-retry (재시도)
+
+// 응답은 BookingSummaryResponse와 동일 shape + userId/refundFailedAt/updatedAt.
+// ⚠️ 사용자 이름/이메일/공연명/좌석번호는 이 응답에 없음
+// userId만 있고
+// 프론트에서 조회 가능한 "userId → 사용자 정보" API가 없어(내부 전용 API만 존재)
+// 사용자 식별 정보는 표시 불가.
+// 공연명/좌석번호는 performance/seat 서비스에서 aggregation.
+export interface AdminRefundBookingItem {
+  bookingId: number;
+  bookingNumber: string;
+  userId: number;
+  performanceId: number;
+  seatId: number;
+  status: BookingStatus;
+  confirmedAt: string | null;
+  refundFailedAt: string | null;
+  updatedAt: string;
+}
+
+/** AdminRefundBookingItem + performance/seat aggregation (프론트 표시용) */
+export interface AdminRefundBookingListItem extends AdminRefundBookingItem {
+  performanceTitle: string;
+  seatNumber: string;
+}
+
+export interface AdminRefundBookingListParams {
+  page?: number;
+  size?: number;
+}
+
+export interface AdminRefundBookingListResponse {
+  items: AdminRefundBookingListItem[];
+  hasNext: boolean;
 }

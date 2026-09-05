@@ -35,8 +35,7 @@ import {
 import { mockDelay } from "./mocks/_helpers";
 import { safeParseSeatNumber } from "@/utils/seat/parseSeatNumber";
 import apiClient from "./instance";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+import { USE_MOCK } from "./useMock";
 
 // -------------------------------------------------------
 // 백엔드 응답 타입 (원본 스펙)
@@ -48,7 +47,7 @@ interface BackendSeatLayoutResponse {
   seatLayoutId: number;
   seatNumber: string;
   seatStatus: SeatStatus;
-  /** HOLD 상태의 만료 예정 시각 (그 외 상태에서는 null 가능) */
+  /** HOLD 좌석 Kafka delay 만료. 예매 결제 타이머(`expires_at`)와 다름 — 카운트다운에 쓰지 않음 (#167) */
   holdExpiredAt?: string;
 }
 

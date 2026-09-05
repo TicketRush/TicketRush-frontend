@@ -12,6 +12,40 @@ describe("canBookConcert", () => {
     ).toBe(true);
   });
 
+  it("list surface는 키 없는 ON_SALE을 허용하고 잔여 0만 막는다", () => {
+    expect(
+      canBookConcert({
+        status: "ON_SALE",
+        remaining: null,
+        surface: "list",
+      }),
+    ).toBe(true);
+
+    expect(
+      canBookConcert({
+        status: "ON_SALE",
+        remaining: 12,
+        surface: "list",
+      }),
+    ).toBe(true);
+
+    expect(
+      canBookConcert({
+        status: "ON_SALE",
+        remaining: 0,
+        surface: "list",
+      }),
+    ).toBe(false);
+
+    expect(
+      canBookConcert({
+        status: "CLOSED",
+        remaining: 0,
+        surface: "list",
+      }),
+    ).toBe(false);
+  });
+
   it("매진·미확정·비 ON_SALE 은 false", () => {
     expect(
       canBookConcert({
