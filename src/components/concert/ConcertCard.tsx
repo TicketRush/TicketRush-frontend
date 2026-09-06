@@ -9,40 +9,21 @@
 //   - useSeatCounts 훅으로 잔여 좌석 실 API 조회
 //     (concert.remainingSeats는 mock 호환 fallback만 사용)
 //   - venue optional 처리 (백엔드 venueName 필드 없음, address fallback)
-// - 2026-07-15 (이슈 #122 정리):
-//   - useSeatCounts import 경로 정정: @/hooks/queries/useSeats
-//     (별도 useSeatCounts.ts 파일은 중복이므로 삭제 예정)
-// - 2026-08-05 (#134 리뷰):
-//   - seat-counts 로딩/실패 시 mock fallback으로 예매 CTA를 열지 않음
-//   - UPCOMING → "오픈 예정" / 비활성 (BE 생성 시 기본 상태)
-//   - ON_SALE + 조회 성공 + availableCount > 0 일 때만 "예매하기"
 // - 2026-08-06 (이슈 #177):
 //   - CLOSED/CANCELED/매진도 카드 클릭으로 상세 진입 허용 (예매 버튼만 비활성)
 //   - 잔여 좌석 미확정 시 "0" 대신 "-", 게이지 숨김
-// - 2026-08-07 (#178 리뷰):
-//   - seatsReady에 shouldFetchSeats(ON_SALE) 포함
-//     enabled=false여도 캐시가 있으면 옛 좌석 수/게이지가 보이던 문제 방지
-// - 2026-08-07 (#178):
-//   - 상태별 CTA 문구 (매진/예매 마감/공연 취소/오픈 예정)
-//   - ON_SALE 미확정 시 CTA「잔여 좌석 확인 중」(Sidebar와 동일)
-//   - 썸네일 우상단 소프트 칩 (매진 / 마감임박) — 목록 bookingOpenAt 미사용
-//   - CANCELED만 썸네일 dim (뱃지 없음)
-// - 2026-08-07 (#178 보완):
-//   - CTA 문구는 getBookingCtaLabel 공통 헬퍼 사용
-//
-// ⚠️ N+1 문제 우려: 각 카드마다 useSeatCounts 호출 = 목록 8개면 8개 API 호출.
-// React Query 캐시로 중복 억제되긴 하지만, 실제 트래픽 부담이 크면
-// 백엔드에 batch endpoint (e.g. POST /seat-counts?ids=1,2,3) 요청 고려.
+// - 2026-08-07 (이슈 #178):
+//   - 상태별 CTA 문구, 썸네일 소프트 칩
+// - 2026-08-31 (이슈 #203):
+//   - 목록 게이지를 GET /performance 의 totalSeats/remainingSeats로 전환
+//   - 카드별 useSeatCounts(N+1) 제거. 키 없는 ON_SALE은 fail-open 「예매하기」
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Calendar } from "lucide-react";
 import type { ConcertSummary } from "@/types/domain/concert";
-import { useSeatCounts } from "@/hooks/queries/useSeats";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
-import {
-  canBookConcert,
-  shouldFetchSeatCounts,
-} from "@/utils/concert/canBookConcert";
+import { canBookConcert } from "@/utils/concert/canBookConcert";
+import { hasSeatCounts } from "@/utils/concert/hasSeatCounts";
 import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -59,53 +40,33 @@ function ConcertCard({ concert }: ConcertCardProps) {
   const navigate = useNavigate();
 
   const isCanceled = concert.status === "CANCELED";
+  const seatsKnown = hasSeatCounts(concert);
+  const remaining = seatsKnown ? concert.remainingSeats : null;
+  const total = seatsKnown ? concert.totalSeats : 0;
 
-  // Detail과 동일: ON_SALE일 때만 seat-counts 조회 (#178 리뷰)
-  // seatsReady에도 포함해야 enabled=false + 캐시 hit 시 옛 숫자가 안 보임
-  const shouldFetchSeats = shouldFetchSeatCounts(concert.status);
-  const {
-    data: seatCounts,
-    isLoading: seatCountsLoading,
-    isError: seatCountsError,
-  } = useSeatCounts(concert.id, shouldFetchSeats);
-
-  const seatsReady =
-    shouldFetchSeats &&
-    !!seatCounts &&
-    !seatCountsLoading &&
-    !seatCountsError;
-
-  // 확정된 잔여만 숫자로 사용. 미확정(로딩/실패/미호출)은 null → UI에서 "-"
-  const remaining = seatsReady ? seatCounts.availableCount : null;
-  const total = seatsReady
-    ? seatCounts.totalCount
-    : (concert.totalSeats ?? 0);
-
-  // 예매 CTA 활성: ON_SALE + seat-counts 성공 + availableCount > 0 (#181 공통)
   const canBook = canBookConcert({
     status: concert.status,
-    seatsReady,
     remaining,
+    surface: "list",
   });
 
-  // ON_SALE + 잔여 0 (기술적 매진). CLOSED/CANCELED와 구분
-  const isSoldOut = seatsReady && remaining === 0;
+  const isSoldOut =
+    concert.status === "ON_SALE" && seatsKnown && remaining === 0;
 
   const buttonLabel = getBookingCtaLabel({
     status: concert.status,
-    seatsLoading: seatCountsLoading,
-    seatsError: seatCountsError,
     remaining,
+    surface: "list",
   });
 
   const remainingPercent =
-    seatsReady && remaining !== null && total > 0
-      ? (remaining / total) * 100
-      : 0;
+    seatsKnown && total > 0 ? (remaining! / total) * 100 : 0;
   const isEndingSoon =
-    canBook && remainingPercent > 0 && remainingPercent <= 20;
+    concert.status === "ON_SALE" &&
+    seatsKnown &&
+    remainingPercent > 0 &&
+    remainingPercent <= 20;
 
-  // 썸네일 우상단: 매진 / 마감임박 (D-N은 목록 API 필드 없어 미사용)
   let thumbBadge: { label: string; tone: string } | null = null;
   if (isSoldOut) {
     thumbBadge = { label: "매진", tone: "bg-gray-500/10 text-gray-600" };
@@ -118,10 +79,8 @@ function ConcertCard({ concert }: ConcertCardProps) {
   const d = new Date(concert.showDate);
   const formattedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-  // venue fallback: venue > address
   const venueDisplay = concert.venue ?? concert.address ?? "";
 
-  // 상세는 상태와 무관하게 진입 가능. 예매만 canBook으로 제어 (#177)
   function handleClick() {
     navigate(`/concerts/${concert.id}`);
   }
@@ -150,12 +109,10 @@ function ConcertCard({ concert }: ConcertCardProps) {
           }}
         />
 
-        {/* CANCELED만 썸네일 dim (살짝만 — 포스터 가독성 유지) */}
         {isCanceled && (
           <div className="absolute inset-0 bg-black/30 pointer-events-none" />
         )}
 
-        {/* 우상단 소프트 칩: 매진 / 마감임박 */}
         {thumbBadge && (
           <div className="absolute top-3 right-3 z-[1]">
             <span className={`${THUMB_BADGE_BASE} ${thumbBadge.tone}`}>
@@ -164,7 +121,6 @@ function ConcertCard({ concert }: ConcertCardProps) {
           </div>
         )}
 
-        {/* 장르 뱃지 (좌하단) */}
         <div className="absolute bottom-2 left-2 z-[1]">
           <GenreBadge genre={concert.genre} />
         </div>
@@ -189,13 +145,11 @@ function ConcertCard({ concert }: ConcertCardProps) {
           </p>
         </div>
 
-        {/* 가격 (라벨 좌측, 금액 우측) */}
         <div className="flex items-baseline justify-between pt-1">
           <span className="text-xs text-gray-500">가격</span>
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        {/* 잔여 좌석: 확정 시 숫자+게이지, 미확정 시 "-" */}
         <SeatGauge remaining={remaining} total={total} />
 
         <button
@@ -207,7 +161,6 @@ function ConcertCard({ concert }: ConcertCardProps) {
           }`}
           disabled={!canBook}
           onClick={(e) => {
-            // 카드 클릭(상세)과 분리 — 예매 가능 시에만 동일 진입 허용
             e.stopPropagation();
             if (!canBook) return;
             handleClick();

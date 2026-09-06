@@ -6,8 +6,7 @@
 import type { TicketQrResponse } from "@/types/domain/ticket";
 import { mockGetTicketQr } from "./mocks/tickets";
 import apiClient from "./instance";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+import { USE_MOCK } from "./useMock";
 
 // 입장권 QR payload 조회.
 

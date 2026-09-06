@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -38,114 +38,98 @@ import DevNavPage from "@/pages/Dev/DevNavPage";
 
 import OAuthCallbackPage from "./pages/Auth/OAuthCallbackPage";
 
+/** useBlocker는 data router가 필요하다. BrowserRouter로는 결제 이탈 가드가 깨진다. */
+const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
+  { path: "/signup", element: <SignupPage /> },
+  { path: "/dev", element: <DevNavPage /> },
+  { path: "/oauth/callback/:provider", element: <OAuthCallbackPage /> },
+  {
+    element: <UserLayout />,
+    children: [
+      { path: "/", element: <ConcertListPage /> },
+      { path: "/concerts", element: <ConcertListPage /> },
+      { path: "/concerts/:id", element: <ConcertDetailPage /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: "/concerts/:id/seats", element: <SeatSelectionPage /> },
+          {
+            path: "/concerts/:id/payment/confirm",
+            element: <ReservationConfirmPage />,
+          },
+          { path: "/concerts/:id/payment", element: <PaymentPage /> },
+          {
+            path: "/concerts/:id/payment/success",
+            element: <PaymentSuccessPage />,
+          },
+          {
+            path: "/concerts/:id/payment/expired",
+            element: <ReservationExpiredPage />,
+          },
+          {
+            path: "/concerts/:id/payment/failed",
+            element: <PaymentFailedPage />,
+          },
+          { path: "/reservations/mypage", element: <MyBookingsPage /> },
+          {
+            path: "/reservations/mypage/:bookingNumber",
+            element: <TicketDetailPage />,
+          },
+          {
+            path: "/reservations/:reservationId",
+            element: <PaymentCompletePage />,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    element: <AdminRoute />,
+    children: [
+      {
+        path: "/admin/character-creator",
+        element: <AdminCharacterCreatorPage />,
+      },
+      {
+        element: <AdminLayout />,
+        children: [
+          { path: "/admin", element: <AdminDashboardPage /> },
+          { path: "/admin/bookings", element: <AdminBookingsPage /> },
+          { path: "/admin/refunds", element: <AdminRefundsPage /> },
+          {
+            path: "/admin/seat-monitoring",
+            element: <AdminSeatMonitoringPage />,
+          },
+          {
+            path: "/admin/concerts/new",
+            element: <AdminConcertFormPage mode="create" />,
+          },
+          {
+            path: "/admin/concerts/:id/edit",
+            element: <AdminConcertFormPage mode="edit" />,
+          },
+        ],
+      },
+    ],
+  },
+  { path: "*", element: <NotFoundPage /> },
+]);
+
 function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <Routes>
-          {/* ────────────────────────────────────────
-            인증 페이지 — 자체 레이아웃 사용
-          ──────────────────────────────────────── */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/dev" element={<DevNavPage />} />
-          <Route
-            path="/oauth/callback/:provider"
-            element={<OAuthCallbackPage />}
-          />
-
-          {/* ────────────────────────────────────────
-            사용자 영역 — UserLayout
-          ──────────────────────────────────────── */}
-          <Route element={<UserLayout />}>
-            {/* 공개 페이지 */}
-            <Route path="/" element={<ConcertListPage />} />
-            <Route path="/concerts" element={<ConcertListPage />} />
-            <Route path="/concerts/:id" element={<ConcertDetailPage />} />
-
-            {/* 회원 전용 */}
-            <Route element={<ProtectedRoute />}>
-              <Route
-                path="/concerts/:id/seats"
-                element={<SeatSelectionPage />}
-              />
-              <Route
-                path="/concerts/:id/payment/confirm"
-                element={<ReservationConfirmPage />}
-              />
-              <Route path="/concerts/:id/payment" element={<PaymentPage />} />
-              <Route
-                path="/concerts/:id/payment/success"
-                element={<PaymentSuccessPage />}
-              />
-              <Route
-                path="/concerts/:id/payment/expired"
-                element={<ReservationExpiredPage />}
-              />
-              <Route
-                path="/concerts/:id/payment/failed"
-                element={<PaymentFailedPage />}
-              />
-
-              {/* 마이페이지 — 내 예매 목록 */}
-              <Route path="/reservations/mypage" element={<MyBookingsPage />} />
-
-              {/* 티켓 확인 — 예약 번호 기준 (mypage 하위) */}
-              <Route
-                path="/reservations/mypage/:bookingNumber"
-                element={<TicketDetailPage />}
-              />
-
-              {/* 결제 완료 후 — 동적 파라미터라 mypage보다 뒤에 둠 */}
-              <Route
-                path="/reservations/:reservationId"
-                element={<PaymentCompletePage />}
-              />
-            </Route>
-          </Route>
-
-          {/* ────────────────────────────────────────
-            관리자 영역 — AdminRoute + AdminLayout
-          ──────────────────────────────────────── */}
-          <Route element={<AdminRoute />}>
-            <Route
-              path="/admin/character-creator"
-              element={<AdminCharacterCreatorPage />}
-              />
-            <Route element={<AdminLayout />}>
-              <Route path="/admin" element={<AdminDashboardPage />} />
-              <Route path="/admin/bookings" element={<AdminBookingsPage />} />
-              <Route path="/admin/refunds" element={<AdminRefundsPage />} />
-              <Route
-                path="/admin/seat-monitoring"
-                element={<AdminSeatMonitoringPage />}
-              />
-              <Route
-                path="/admin/concerts/new"
-                element={<AdminConcertFormPage mode="create" />}
-              />
-              <Route
-                path="/admin/concerts/:id/edit"
-                element={<AdminConcertFormPage mode="edit" />}
-              />
-            </Route>
-          </Route>
-
-          {/* 404 — 가장 마지막 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-
-        <ToastContainer
-          position="bottom-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          draggable
-          style={{ zIndex: 9999 }}
-        />
-      </BrowserRouter>
+      <RouterProvider router={router} />
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+        style={{ zIndex: 9999 }}
+      />
     </ErrorBoundary>
   );
 }

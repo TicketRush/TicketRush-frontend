@@ -16,8 +16,8 @@
 //
 // 주의:
 //   - 프론트 관점의 "concert" 도메인은 백엔드 "performance" 서비스와 매핑됨.
-//   - remainingSeats는 백엔드 응답에 없음. 실 API 연동 시 useSeatCounts로 별도 조회.
-//     mock은 편의상 필드 유지 (optional).
+//   - 목록 `totalSeats`/`remainingSeats`는 BE #176 (PR #623). 키 생략 가능.
+//     상세 `totalSeats`는 공연 등록값이며 목록 게이지 분모로 쓰지 않는다 (#203).
 
 import type {
   ConcertDetail,
@@ -32,8 +32,8 @@ import type { CursorInfo } from "./types/pagination";
 import { MOCK_CONCERTS, getMockConcertDetail } from "./mocks/concerts";
 import { mockDelay, mockError } from "./mocks/_helpers";
 import apiClient from "./instance";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
+import { USE_MOCK } from "./useMock";
+import { hasSeatCounts } from "@/utils/concert/hasSeatCounts";
 
 // -------------------------------------------------------
 // 백엔드 응답 타입 (원본 스펙)
@@ -51,6 +51,9 @@ interface PerformanceListResponse {
   imageMainUrl: string;
   performanceStatus: ConcertStatus;
   price: number;
+  /** 좌석 조회 성공 시에만 포함. 실패·totalCount==0이면 키 생략 (#203) */
+  totalSeats?: number;
+  remainingSeats?: number;
 }
 
 /** 백엔드 PerformanceDetailResponse (원본 스펙) */
@@ -104,7 +107,7 @@ function mapFacilityIcon(label: string): string {
 }
 
 function mapListItem(item: PerformanceListResponse): ConcertSummary {
-  return {
+  const mapped: ConcertSummary = {
     id: item.performanceId,
     title: item.title,
     performer: item.performer,
@@ -118,8 +121,14 @@ function mapListItem(item: PerformanceListResponse): ConcertSummary {
     price: item.price,
     imageMainUrl: item.imageMainUrl,
     status: item.performanceStatus,
-    // totalSeats, remainingSeats, bookingOpenAt은 목록 응답에 없음
   };
+  if (typeof item.totalSeats === "number") {
+    mapped.totalSeats = item.totalSeats;
+  }
+  if (typeof item.remainingSeats === "number") {
+    mapped.remainingSeats = item.remainingSeats;
+  }
+  return mapped;
 }
 
 function mapDetail(item: PerformanceDetailResponse): ConcertDetail {
@@ -188,11 +197,14 @@ async function buildMockConcertListResponse(
     filtered.sort((a, b) => b.price - a.price);
   } else if (params.sort === "POPULAR") {
     filtered.sort((a, b) => {
-      const remA = a.remainingSeats ?? a.totalSeats ?? 0;
-      const remB = b.remainingSeats ?? b.totalSeats ?? 0;
-      const totalA = a.totalSeats ?? 1;
-      const totalB = b.totalSeats ?? 1;
-      return remA / totalA - remB / totalB;
+      const aKnown = hasSeatCounts(a);
+      const bKnown = hasSeatCounts(b);
+      if (!aKnown && !bKnown) return 0;
+      if (!aKnown) return 1;
+      if (!bKnown) return -1;
+      const totalA = a.totalSeats > 0 ? a.totalSeats : 1;
+      const totalB = b.totalSeats > 0 ? b.totalSeats : 1;
+      return a.remainingSeats / totalA - b.remainingSeats / totalB;
     });
   }
   // LATEST는 기본 순서 유지

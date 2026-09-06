@@ -8,6 +8,12 @@ import {
 import { Edit, Trash2 } from "lucide-react";
 import type { AdminConcertItem } from "@/types/domain/admin";
 import type { ConcertStatus, Genre } from "@/types/domain/concert";
+import {
+  formatAdminOccupancy,
+  formatAdminSeats,
+  formatAdminShowSchedule,
+  formatAdminWon,
+} from "@/utils/admin/formatAdminMetric";
 
 interface AdminConcertTableProps {
   data: AdminConcertItem[];
@@ -38,7 +44,12 @@ function statusBadge(row: AdminConcertItem): { label: string; color: string } {
   if (row.status === "CANCELED") {
     return { label: "취소", color: STATUS_STYLES.취소 };
   }
-  const soldOut = row.totalSeats > 0 && row.soldSeats >= row.totalSeats;
+  const soldOut =
+    row.soldOut === true ||
+    (row.totalSeats != null &&
+      row.soldSeats != null &&
+      row.totalSeats > 0 &&
+      row.soldSeats >= row.totalSeats);
   if (soldOut) {
     return { label: "매진", color: STATUS_STYLES.매진 };
   }
@@ -77,37 +88,52 @@ export default function AdminConcertTable({
     {
       accessorKey: "genre",
       header: "장르",
-      cell: ({ getValue }) =>
-        GENRE_LABELS[getValue() as Genre] ?? (getValue() as string),
+      cell: ({ row }) =>
+        row.original.genreName ??
+        GENRE_LABELS[row.original.genre] ??
+        row.original.genre,
     },
-    { accessorKey: "date", header: "날짜" },
+    {
+      accessorKey: "date",
+      header: "날짜",
+      cell: ({ row }) =>
+        formatAdminShowSchedule(row.original.date, row.original.showTime),
+    },
     {
       id: "sales",
       header: "판매/총",
       cell: ({ row }) => (
         <span>
-          {row.original.soldSeats}/{row.original.totalSeats}
+          {formatAdminSeats(row.original.soldSeats, row.original.totalSeats)}
         </span>
       ),
     },
     {
       accessorKey: "occupancyRate",
       header: "점유율",
-      cell: ({ getValue }) => {
-        const rate = (getValue() as number) * 100;
+      cell: ({ row }) => {
+        const rate = row.original.occupancyRate;
+        if (rate == null) {
+          return <span className="text-gray-400">-</span>;
+        }
+        const pct = rate * 100;
         const color =
-          rate >= 90
+          pct >= 90
             ? "text-green-600"
-            : rate >= 50
+            : pct >= 50
               ? "text-blue-600"
               : "text-gray-500";
-        return <span className={`font-bold ${color}`}>{rate.toFixed(0)}%</span>;
+        return (
+          <span className={`font-bold ${color}`}>
+            {formatAdminOccupancy(rate)}
+          </span>
+        );
       },
     },
     {
       accessorKey: "revenue",
       header: "매출",
-      cell: ({ getValue }) => `₩${(getValue() as number).toLocaleString()}`,
+      cell: ({ row }) => formatAdminWon(row.original.revenue),
     },
     {
       accessorKey: "status",

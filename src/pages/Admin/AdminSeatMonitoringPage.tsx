@@ -9,20 +9,58 @@ import {
   useAdminSeatMonitoring,
   useAdminSeatDetail,
   useAdminReleaseSeat,
-  useAdminDashboard,
+  useAdminConcerts,
 } from "@/hooks/admin/useAdmin";
 import type { SeatWithStatus } from "@/types/domain/seat";
+import type { AdminConcertItem } from "@/types/domain/admin";
+import type { ConcertStatus, Genre } from "@/types/domain/concert";
+import Pagination from "@/components/admin/Pagination";
+import {
+  formatAdminOccupancy,
+  formatAdminSeats,
+  formatAdminShowSchedule,
+  formatAdminWon,
+} from "@/utils/admin/formatAdminMetric";
+
+const MONITORING_PAGE_SIZE = 50;
+
+const STATUS_LABELS: Record<ConcertStatus, string> = {
+  UPCOMING: "예정",
+  ON_SALE: "판매중",
+  CLOSED: "종료",
+  CANCELED: "취소",
+};
+
+const GENRE_LABELS: Record<Genre, string> = {
+  CONCERT: "콘서트",
+  MUSICAL: "뮤지컬",
+  CLASSIC: "클래식",
+  JAZZ: "재즈",
+  FESTIVAL: "페스티벌",
+  FANMEETING: "팬미팅",
+  BALLET: "발레",
+};
 
 export default function AdminSeatMonitoringPage() {
   const navigate = useNavigate();
   const [selectedConcertId, setSelectedConcertId] = useState<number | null>(
     null,
   );
+  const [selectedConcert, setSelectedConcert] =
+    useState<AdminConcertItem | null>(null);
   const [selectedSeatId, setSelectedSeatId] = useState<number | null>(null);
+  const [listPage, setListPage] = useState(0);
 
-  // 대시보드 데이터에서 공연 목록 활용
-  const { data: dashboard } = useAdminDashboard();
-  const concertList = dashboard?.concertList ?? [];
+  const {
+    data: concerts,
+    isLoading: concertsLoading,
+    isError: concertsError,
+    isPlaceholderData: concertsPlaceholder,
+  } = useAdminConcerts({
+    page: listPage,
+    size: MONITORING_PAGE_SIZE,
+  });
+  const concertList = concerts?.items ?? [];
 
   const { data, isLoading, refetch, isFetching } = useAdminSeatMonitoring(
     selectedConcertId ?? undefined,
@@ -99,11 +137,21 @@ export default function AdminSeatMonitoringPage() {
             전체 공연 목록
           </h3>
 
-          {concertList.length === 0 ? (
+          {concertsError && concertList.length === 0 ? (
+            <div className="text-center py-12 text-red-400">
+              공연 목록을 불러올 수 없습니다.
+            </div>
+          ) : (concertsLoading && concertList.length === 0) ||
+            concertsPlaceholder ? (
             <div className="text-center py-12 text-admin-text-secondary">
               공연 정보를 불러오는 중...
             </div>
+          ) : concertList.length === 0 ? (
+            <div className="text-center py-12 text-admin-text-secondary">
+              등록된 공연이 없습니다.
+            </div>
           ) : (
+            <>
             <table className="w-full text-sm text-left admin-table">
               <thead className="border-b border-admin-border">
                 <tr className="text-xs text-admin-text-secondary">
@@ -119,45 +167,71 @@ export default function AdminSeatMonitoringPage() {
               </thead>
               <tbody>
                 {concertList.map((c) => {
-                  const rate = c.occupancyRate * 100;
+                  const rate =
+                    c.occupancyRate == null ? null : c.occupancyRate * 100;
                   const rateColor =
-                    rate >= 100
-                      ? "text-[#00C950]"
-                      : rate >= 80
-                        ? "text-[#1D7DFF]"
-                        : "text-admin-text";
+                    rate == null
+                      ? "text-admin-text-secondary"
+                      : rate >= 100
+                        ? "text-[#00C950]"
+                        : rate >= 80
+                          ? "text-[#1D7DFF]"
+                          : "text-admin-text";
                   const isSoldOut =
-                    c.status === "CLOSED" ||
-                    c.totalSeats - c.soldSeats <= 0;
+                    c.soldOut === true ||
+                    (c.totalSeats != null &&
+                      c.soldSeats != null &&
+                      c.totalSeats > 0 &&
+                      c.soldSeats >= c.totalSeats);
+                  const isCanceled = c.status === "CANCELED";
+                  const statusLabel = isCanceled
+                    ? "취소"
+                    : isSoldOut
+                      ? "매진"
+                      : (STATUS_LABELS[c.status] ?? "판매중");
+                  const statusColor = isCanceled
+                    ? "#FB2C36"
+                    : isSoldOut
+                      ? "#FB2C36"
+                      : c.status === "ON_SALE"
+                        ? "#00C950"
+                        : "#6B7280";
                   return (
                     <tr
                       key={c.id}
-                      onClick={() => setSelectedConcertId(c.id)}
+                      onClick={() => {
+                        setSelectedConcert(c);
+                        setSelectedConcertId(c.id);
+                      }}
                       className="border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
                     >
                       <td className="py-3 px-3 font-mono text-xs">
                         E{String(c.id).padStart(3, "0")}
                       </td>
                       <td className="py-3 px-3 font-bold">{c.title}</td>
-                      <td className="py-3 px-3">{c.genre}</td>
-                      <td className="py-3 px-3">{c.date}</td>
                       <td className="py-3 px-3">
-                        {c.soldSeats}/{c.totalSeats}
+                        {c.genreName ?? GENRE_LABELS[c.genre] ?? c.genre}
+                      </td>
+                      <td className="py-3 px-3">
+                        {formatAdminShowSchedule(c.date, c.showTime)}
+                      </td>
+                      <td className="py-3 px-3">
+                        {formatAdminSeats(c.soldSeats, c.totalSeats)}
                       </td>
                       <td className={`py-3 px-3 font-bold ${rateColor}`}>
-                        {rate.toFixed(0)}%
+                        {formatAdminOccupancy(c.occupancyRate)}
                       </td>
                       <td className="py-3 px-3">
-                        ₩{c.revenue.toLocaleString()}
+                        {formatAdminWon(c.revenue)}
                       </td>
                       <td className="py-3 px-3">
                         <span
                           className="px-3 py-1 rounded-md text-xs font-bold text-white"
                           style={{
-                            backgroundColor: isSoldOut ? "#FB2C36" : "#00C950",
+                            backgroundColor: statusColor,
                           }}
                         >
-                          {isSoldOut ? "매진" : "판매중"}
+                          {statusLabel}
                         </span>
                       </td>
                     </tr>
@@ -165,6 +239,14 @@ export default function AdminSeatMonitoringPage() {
                 })}
               </tbody>
             </table>
+            {concerts?.pagination ? (
+              <Pagination
+                pageIndex={listPage}
+                totalPages={concerts.pagination.totalPages}
+                onChange={setListPage}
+              />
+            ) : null}
+            </>
           )}
         </div>
       </div>
@@ -172,7 +254,9 @@ export default function AdminSeatMonitoringPage() {
   }
 
   // ── 2단계: 좌석 맵 화면 ─────────────────────────
-  const selectedConcert = concertList.find((c) => c.id === selectedConcertId);
+  const selected =
+    selectedConcert ??
+    concertList.find((c) => c.id === selectedConcertId);
 
   return (
     <div className="p-8 space-y-6">
@@ -202,9 +286,10 @@ export default function AdminSeatMonitoringPage() {
           <input
             type="text"
             readOnly
-            value={selectedConcert?.title ?? ""}
+            value={selected?.title ?? ""}
             onClick={() => {
               setSelectedConcertId(null);
+              setSelectedConcert(null);
               setSelectedSeatId(null);
             }}
             className="flex-1 bg-admin-bg border border-admin-border rounded-lg px-3 py-2 text-sm cursor-pointer"

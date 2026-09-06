@@ -11,7 +11,7 @@ import {
   Monitor,
   ArrowRight,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import StatCard from "@/components/admin/StatCard";
 import RevenueChart from "@/components/admin/RevenueChart";
@@ -19,43 +19,81 @@ import GenrePieChart from "@/components/admin/GenrePieChart";
 import SalesChart from "@/components/admin/SalesChart";
 import AdminConcertTable from "@/components/admin/AdminConcertTable";
 import AdminCalendar from "@/components/admin/AdminCalendar";
-import { useAdminDashboard, useDeleteConcert } from "@/hooks/admin/useAdmin";
+import Pagination from "@/components/admin/Pagination";
+import {
+  useAdminConcerts,
+  useAdminDashboard,
+  useDeleteConcert,
+} from "@/hooks/admin/useAdmin";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
+import { mapErrorToMessage } from "@/api/errors/errorMapper";
+import type {
+  AdminConcertItem,
+  ConcertSalesStatus,
+} from "@/types/domain/admin";
+import {
+  defaultDashboardRange,
+  fillDailyRevenueGaps,
+  isDashboardPeriodWithinLimit,
+  toLocalDateKey,
+} from "@/utils/admin/dashboardPeriod";
+import {
+  formatAdminCount,
+  formatAdminOccupancy,
+  formatAdminWon,
+} from "@/utils/admin/formatAdminMetric";
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
+const CONCERT_PAGE_SIZE = 10;
 
-function toLocalDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function toSalesStatus(items: AdminConcertItem[]): ConcertSalesStatus[] {
+  return items.map((item) => ({
+    concertId: item.id,
+    title: item.title,
+    genre: item.genre,
+    genreName: item.genreName,
+    date: item.date,
+    soldSeats: item.soldSeats,
+    totalSeats: item.totalSeats,
+    occupancyRate: item.occupancyRate,
+    revenue: item.revenue,
+    isSoldOut: item.soldOut,
+  }));
 }
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { data, isLoading, isError } = useAdminDashboard();
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [concertPage, setConcertPage] = useState(0);
+  const [selectedRange, setSelectedRange] = useState(defaultDashboardRange);
+
+  const from = toLocalDateKey(selectedRange.start);
+  const to = toLocalDateKey(selectedRange.end);
+  const { data, isLoading, isError, isPlaceholderData } = useAdminDashboard({
+    from,
+    to,
+  });
+  const {
+    data: concertPageData,
+    isLoading: concertsLoading,
+    isError: concertsError,
+    isPlaceholderData: concertsPlaceholder,
+  } = useAdminConcerts({ page: concertPage, size: CONCERT_PAGE_SIZE });
   const deleteMutation = useDeleteConcert();
 
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
-  const [selectedRange, setSelectedRange] = useState<{
-    start: Date;
-    end: Date;
-  }>(() => {
-    const today = startOfDay(new Date());
-    const start = startOfDay(new Date());
-    start.setDate(start.getDate() - 6);
-    return { start, end: today };
-  });
+  const chartRevenue = useMemo(() => {
+    if (data?.dailyRevenue == null) return undefined;
+    return fillDailyRevenueGaps(data.dailyRevenue, from, to);
+  }, [data?.dailyRevenue, from, to]);
 
-  const filteredRevenue = useMemo(() => {
-    if (!data) return [];
-    const startStr = toLocalDateKey(selectedRange.start);
-    const endStr = toLocalDateKey(selectedRange.end);
-    return data.dailyRevenue.filter(
-      (d) => d.date >= startStr && d.date <= endStr,
-    );
-  }, [data, selectedRange]);
+  function handleRangeChange(range: { start: Date; end: Date }) {
+    if (!isDashboardPeriodWithinLimit(range.start, range.end)) {
+      toast.error(
+        mapErrorToMessage(ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG),
+      );
+      return;
+    }
+    setSelectedRange(range);
+  }
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
@@ -70,25 +108,17 @@ export default function AdminDashboardPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="text-center py-20 text-admin-text-secondary">
-          대시보드 불러오는 중...
-        </div>
-      </div>
-    );
-  }
+  const stats = data?.stats;
+  const concertItems = concertPageData?.items ?? [];
+  const concertPagination = concertPageData?.pagination;
 
-  if (isError || !data) {
-    return (
-      <div className="p-8">
-        <div className="text-center py-20 text-red-400">
-          대시보드 데이터를 불러올 수 없습니다.
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (concertPagination == null) return;
+    const totalPages = concertPagination.totalPages;
+    if (concertPage > 0 && concertPage >= totalPages) {
+      setConcertPage(Math.max(0, totalPages - 1));
+    }
+  }, [concertPage, concertPagination]);
 
   return (
     <div className="p-8 space-y-6">
@@ -121,41 +151,71 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 통계 카드 4개 */}
+      {isError && !data ? (
+        <div className="text-sm text-red-400">
+          대시보드 집계를 불러올 수 없습니다. 공연 목록은 아래를 확인하세요.
+        </div>
+      ) : null}
+
+      {/* 통계 카드 4개 — 기간과 무관. 생략된 필드는 "-" */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<Calendar size={24} />}
           badge="TOTAL"
           badgeColor="purple"
           iconClassName="text-admin-kpi-events"
-          value={data.stats.totalConcerts}
+          value={
+            isLoading && !stats ? "..." : formatAdminCount(stats?.totalConcerts)
+          }
           label="등록된 공연"
+          hint="판매 전·취소 포함"
         />
         <StatCard
           icon={<Users size={24} />}
           badge="SOLD"
           badgeColor="green"
           iconClassName="text-admin-kpi-tickets"
-          value={data.stats.soldTickets.toLocaleString()}
+          value={
+            isLoading && !stats ? "..." : formatAdminCount(stats?.soldTickets)
+          }
           label="판매된 티켓"
+          hint="전체 기간"
         />
         <StatCard
           icon={<DollarSign size={24} />}
           badge="REVENUE"
           badgeColor="orange"
           iconClassName="text-admin-kpi-revenue"
-          value={`₩${data.stats.totalRevenue.toLocaleString()}`}
+          value={
+            isLoading && !stats ? "..." : formatAdminWon(stats?.totalRevenue)
+          }
           label="총 매출"
+          hint="전체 기간"
         />
         <StatCard
           icon={<TrendingUp size={24} />}
           badge="RATE"
           badgeColor="purple"
           iconClassName="text-admin-kpi-occupancy"
-          value={`${(data.stats.averageOccupancyRate * 100).toFixed(0)}%`}
+          value={
+            isLoading && !stats
+              ? "..."
+              : formatAdminOccupancy(stats?.averageOccupancyRate)
+          }
           label="전체 좌석 판매율"
+          hint="판매중·종료 가중평균"
         />
       </div>
+
+      {stats?.revenueComplete === false ? (
+        <p className="text-xs text-amber-600">
+          결제 금액이 없는 확정 예매
+          {stats.missingAmountBookings != null
+            ? ` ${stats.missingAmountBookings.toLocaleString()}건`
+            : ""}
+          이 있어 표시된 총 매출이 실제보다 작을 수 있습니다.
+        </p>
+      ) : null}
 
       {/* 관리 기능 카드 3개 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -182,35 +242,66 @@ export default function AdminDashboardPage() {
         />
       </div>
 
-      {/* 달력 + 매출 차트 */}
+      {/* 달력 + 매출 차트 — 기간은 일별 매출에만 적용 */}
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
         <AdminCalendar
           selectedRange={selectedRange}
-          onRangeChange={setSelectedRange}
+          onRangeChange={handleRangeChange}
+          onRangeReject={() =>
+            toast.error(
+              mapErrorToMessage(
+                ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG,
+              ),
+            )
+          }
         />
-        <RevenueChart data={filteredRevenue} />
-      </div>
-
-      {/* 장르 차트 */}
-      <GenrePieChart data={data.genreRevenue} />
-
-      {/* 공연별 판매 현황 */}
-      <SalesChart data={data.concertSales} />
-
-      {/* 전체 공연 목록 */}
-      <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-6">
-        <span className="text-[10px] font-bold tracking-wider bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block mb-2">
-          EVENTS LIST
-        </span>
-        <h3 className="text-base font-bold mb-4 text-gray-900">
-          전체 공연 목록
-        </h3>
-        <AdminConcertTable
-          data={data.concertList}
-          onEdit={(id) => navigate(`/admin/concerts/${id}/edit`)}
-          onDelete={(id) => setDeleteTarget(id)}
+        <RevenueChart
+          data={chartRevenue}
+          isLoading={(isLoading && !data) || isPlaceholderData}
         />
       </div>
+
+      {/* 장르 차트 — 기간과 무관 */}
+      <GenrePieChart
+        data={data?.genreRevenue}
+        isLoading={isLoading && !data}
+      />
+
+      {/* 공연별 판매 현황 + 전체 공연 목록 — GET /performance/admin */}
+      {concertsError && !concertPageData ? (
+        <div className="text-sm text-red-400">
+          공연 목록을 불러올 수 없습니다.
+        </div>
+      ) : (concertsLoading && !concertPageData) || concertsPlaceholder ? (
+        <div className="py-12 text-center text-sm text-gray-500">
+          공연 목록을 불러오는 중...
+        </div>
+      ) : (
+        <>
+          <SalesChart data={toSalesStatus(concertItems)} />
+
+          <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-6">
+            <span className="text-[10px] font-bold tracking-wider bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block mb-2">
+              EVENTS LIST
+            </span>
+            <h3 className="text-base font-bold mb-4 text-gray-900">
+              전체 공연 목록
+            </h3>
+            <AdminConcertTable
+              data={concertItems}
+              onEdit={(id) => navigate(`/admin/concerts/${id}/edit`)}
+              onDelete={(id) => setDeleteTarget(id)}
+            />
+            {concertPagination ? (
+              <Pagination
+                pageIndex={concertPage}
+                totalPages={concertPagination.totalPages}
+                onChange={setConcertPage}
+              />
+            ) : null}
+          </div>
+        </>
+      )}
 
       {/* 삭제 확인 모달 */}
       {deleteTarget !== null && (

@@ -5,7 +5,7 @@ import { useBanners } from "@/hooks/queries/useBanners";
 
 const AUTO_SLIDE_INTERVAL = 4000;
 
-// 슬라이드별 배경 그라데이션 (id 기준 순환)
+// 슬라이드별 배경 그라데이션 (인덱스 기준 순환)
 const GRADIENTS = [
   "from-purple-500 to-indigo-600",
   "from-pink-500 to-purple-600",
@@ -14,13 +14,13 @@ const GRADIENTS = [
 
 export default function BannerSlider() {
   const navigate = useNavigate();
-  const { data: banners, isLoading } = useBanners();
+  const { data: banners, isLoading, isError } = useBanners();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
   const totalSlides = banners?.length ?? 0;
 
-  // 자동 슬라이드 + hover pause
+  // 자동 슬라이드 + hover/focus pause
   useEffect(() => {
     if (isPaused || totalSlides <= 1) return;
     const interval = setInterval(() => {
@@ -38,31 +38,49 @@ export default function BannerSlider() {
     );
   }
 
-  if (!banners || banners.length === 0) {
+  // 조회 실패와 빈 목록은 모두 배너 영역을 숨긴다 (이슈 #190).
+  if (isError || !banners || banners.length === 0) {
     return null;
   }
 
   const current = banners[safeIndex];
-  const gradient = GRADIENTS[currentIndex % GRADIENTS.length];
+  const gradient = GRADIENTS[safeIndex % GRADIENTS.length];
   const isClickable = !!current.linkConcertId;
+
+  function goToLinkedConcert() {
+    if (!current.linkConcertId) return;
+    navigate(`/concerts/${current.linkConcertId}`);
+  }
 
   return (
     <div
       className="relative w-full"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      onFocus={() => setIsPaused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setIsPaused(false);
+        }
+      }}
     >
       <div
         className={`bg-gradient-to-r ${gradient} rounded-2xl p-8 overflow-hidden relative transition-all duration-500 ${
           isClickable ? "cursor-pointer" : ""
         }`}
-        onClick={() => {
-          if (current.linkConcertId) {
-            navigate(`/concerts/${current.linkConcertId}`);
+        onClick={goToLinkedConcert}
+        onKeyDown={(e) => {
+          if (!isClickable) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            goToLinkedConcert();
           }
         }}
         role={isClickable ? "button" : undefined}
         tabIndex={isClickable ? 0 : -1}
+        aria-label={
+          isClickable ? `${current.title} 공연 상세 보기` : undefined
+        }
       >
         {/* 컨텐츠 */}
         <div className="relative z-10 text-white max-w-2xl">
@@ -111,7 +129,7 @@ export default function BannerSlider() {
               type="button"
               onClick={() => setCurrentIndex(idx)}
               className={`h-2 rounded-full transition-all ${
-                idx === currentIndex
+                idx === safeIndex
                   ? "w-6 bg-primary"
                   : "w-2 bg-gray-300 hover:bg-gray-400"
               }`}

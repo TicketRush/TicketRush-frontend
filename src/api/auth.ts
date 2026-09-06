@@ -21,6 +21,7 @@
 //   getMeApi                    → GET  /api/v1/user/me (신규)
 
 import apiClient from "./instance";
+import { USE_MOCK } from "./useMock";
 import type {
   SocialOauthLoginRequest,
   OauthLoginResponse,
@@ -38,8 +39,6 @@ import type {
   DevAuthTokenResponse,
   MeResponse,
 } from "@/types/domain/auth";
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 // ── 소셜 로그인 ───────────────────────────────────────
 export async function socialLoginApi(

@@ -53,6 +53,41 @@ describe("getBookingCtaLabel", () => {
     ).toBe("예매하기");
   });
 
+  it("목록은 키 없는 ON_SALE도 예매하기이고 확인 중 문구를 쓰지 않는다", () => {
+    expect(
+      getBookingCtaLabel({
+        status: "ON_SALE",
+        remaining: null,
+        surface: "list",
+      }),
+    ).toBe("예매하기");
+
+    expect(
+      getBookingCtaLabel({
+        status: "ON_SALE",
+        seatsLoading: true,
+        remaining: null,
+        surface: "list",
+      }),
+    ).toBe("예매하기");
+
+    expect(
+      getBookingCtaLabel({
+        status: "ON_SALE",
+        remaining: 0,
+        surface: "list",
+      }),
+    ).toBe("매진");
+
+    expect(
+      getBookingCtaLabel({
+        status: "CLOSED",
+        remaining: 0,
+        surface: "list",
+      }),
+    ).toBe("예매 마감");
+  });
+
   it("비 ON_SALE에서는 좌석 플래그보다 상태를 우선한다", () => {
     expect(
       getBookingCtaLabel({

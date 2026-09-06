@@ -24,6 +24,7 @@
 // - #123: SSE/polling으로 선택 좌석이 AVAILABLE이 아니게 되면 선택 해제
 import { useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import Button from "@/components/common/Button/Button";
 import SeatMap from "@/components/seat/SeatMap";
@@ -33,12 +34,13 @@ import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
+import { useCancelPendingReservation } from "@/hooks/booking/useCancelPendingReservation";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { clearSelectedSeatIfTaken } from "@/utils/seat/clearSelectedSeatIfTaken";
-import { toast } from "react-toastify";
+import { fetchPendingBookingExpiresAt } from "@/api/bookings";
 import {
   ApiError,
   isIgnorablePendingCancelError,
@@ -62,13 +64,17 @@ export default function SeatSelectionPage() {
   const setConcert = useConcertStore((s) => s.setConcert);
   const currentConcert = useConcertStore((s) => s.currentConcert);
   const bookingNumber = usePaymentStore((s) => s.bookingNumber);
+  const pendingSeatId = usePaymentStore((s) => s.seatId);
   const resetPayment = usePaymentStore((s) => s.reset);
+  const cancelPendingReservation = useCancelPendingReservation();
 
-  /** 내 「좌석 확인」 진행 중 seatId — Confirm 진입 전까지 선택 해제 스킵 */
+  /** 내 「좌석 확인」 진행 중·내 PENDING HOLD는 선택 해제 스킵 (#167) */
   const confirmingSeatIdRef = useRef<number | null>(null);
   const shouldPreserveSelection = useCallback(
-    (seatId: number) => confirmingSeatIdRef.current === seatId,
-    [],
+    (seatId: number) =>
+      confirmingSeatIdRef.current === seatId ||
+      (!!bookingNumber && pendingSeatId === seatId),
+    [bookingNumber, pendingSeatId],
   );
 
   // URL의 공연이 바뀌면 이전 공연 selectedSeat 잔존 방지
@@ -174,6 +180,15 @@ export default function SeatSelectionPage() {
     setConcert,
   ]);
 
+  // 브라우저 뒤로가기·F5로 좌석에 남은 PENDING은 이탈로 보고 즉시 취소 (#167).
+  // 의존성 비움: 「좌석 확인」직후 bookingNumber가 생긴 뒤 이 effect가 다시 돌면
+  // 방금 만든 PENDING을 취소하게 된다.
+  useEffect(() => {
+    if (!usePaymentStore.getState().bookingNumber) return;
+    void cancelPendingReservation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stats = {
     total: seatCounts?.totalCount ?? 0,
     available: seatCounts?.availableCount ?? 0,
@@ -265,7 +280,19 @@ export default function SeatSelectionPage() {
           selectedSeat.id,
           totalAmount,
         );
-      startTimer();
+      try {
+        const expiresAt = await fetchPendingBookingExpiresAt(
+          booking.bookingNumber,
+        );
+        if (expiresAt) {
+          useTimerStore.getState().startTimerFromExpiresAt(expiresAt);
+        } else {
+          // 목록에 아직 없으면 잠깐 로컬 5분. 확인 화면에서 서버 시각으로 덮어쓴다.
+          startTimer();
+        }
+      } catch {
+        startTimer();
+      }
       navigate(`/concerts/${performanceId}/payment/confirm`);
     } catch (error: unknown) {
       confirmingSeatIdRef.current = null;
@@ -345,9 +372,9 @@ export default function SeatSelectionPage() {
             예약 시간 안내
           </p>
           <p className="text-xs leading-relaxed text-yellow-800">
-            좌석 선택 후 좌석 확인 버튼을 누르는 시점부터 5분의 제한 시간이
-            시작됩니다. 결제 페이지에서도 동일한 타이머가 유지되며, 시간 내에
-            결제를 완료해야 합니다.
+            좌석 확인을 누른 시점부터 서버가 정한 만료 시각까지 결제가
+            가능합니다. 결제 페이지에서도 같은 타이머가 이어지며, 새로고침해도
+            만료 시각 기준으로 복원됩니다.
           </p>
         </div>
       </div>
@@ -416,8 +443,8 @@ export default function SeatSelectionPage() {
             n={1}
             text="좌석 선택: 원하는 좌석을 클릭하여 선택 (시간 제한 없음)"
           />
-          <Step n={2} text="확인 클릭: 좌석 확인 시점부터 5분 타이머 시작" />
-          <Step n={3} text="결제 진행: 5분 안에 결제 완료해야 예약 확정" />
+          <Step n={2} text="확인 클릭: 서버 만료 시각까지 타이머 시작" />
+          <Step n={3} text="결제 진행: 만료 전에 결제 완료해야 예약 확정" />
           <Step variant="success" text="예약 완료: 결제 완료 시 티켓 발급" />
           <Step
             variant="error"

@@ -7,6 +7,7 @@ import {
 import * as api from "@/api/admin";
 import type {
   AdminBookingListParams,
+  AdminDashboardParams,
   ConcertFormData,
 } from "@/types/domain/admin";
 
@@ -14,7 +15,8 @@ import type {
 // 임시로 여기서 인라인 정의. 머지 시 queryKeys.ts에 통합 권장.
 const adminKeys = {
   all: ["admin"] as const,
-  dashboard: () => ["admin", "dashboard"] as const,
+  dashboard: (params?: AdminDashboardParams) =>
+    ["admin", "dashboard", params] as const,
   bookings: (params?: AdminBookingListParams) =>
     ["admin", "bookings", params] as const,
   bookingStats: () => ["admin", "bookings", "stats"] as const,
@@ -26,10 +28,10 @@ const adminKeys = {
 };
 
 // ── 대시보드 ───────────────────────────────────────────
-export function useAdminDashboard() {
+export function useAdminDashboard(params: AdminDashboardParams) {
   return useQuery({
-    queryKey: adminKeys.dashboard(),
-    queryFn: api.fetchAdminDashboard,
+    queryKey: adminKeys.dashboard(params),
+    queryFn: () => api.fetchAdminDashboard(params),
     staleTime: 30_000,
   });
 }
@@ -114,7 +116,7 @@ export function useCreateConcert() {
   return useMutation({
     mutationFn: (data: ConcertFormData) => api.createConcertApi(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.dashboard() });
+      qc.invalidateQueries({ queryKey: adminKeys.all });
     },
   });
 }
