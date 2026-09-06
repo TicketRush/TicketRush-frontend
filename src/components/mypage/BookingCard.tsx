@@ -10,7 +10,8 @@ import type {
   BookingStatus,
   BookingTab,
 } from "@/types/domain/booking";
-import { toShowDateTime } from "@/utils/booking";
+import { toShowDateTime, formatPaymentAmount, displayBookingText } from "@/utils/booking";
+import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
 
 interface BookingCardProps {
@@ -123,8 +124,16 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
 
   const createdAtLabel = (() => {
     if (!booking.createdAt) return "-";
-    const d = new Date(booking.createdAt);
-    return Number.isNaN(d.getTime()) ? "-" : formatShowDateTime(d);
+    const ms = parseBackendDateTime(booking.createdAt);
+    if (ms == null) return "-";
+    return formatShowDateTime(new Date(ms));
+  })();
+
+  const showDateLabel = (() => {
+    if (!booking.performanceDate) return "-";
+    if (!booking.performanceTime?.trim()) return booking.performanceDate;
+    if (Number.isNaN(showDateTime.getTime())) return booking.performanceDate;
+    return formatShowDateTime(showDateTime);
   })();
 
   const isTerminal =
@@ -138,7 +147,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-lg font-bold text-gray-900">
-            {booking.performanceTitle}
+            {displayBookingText(booking.performanceTitle)}
           </h3>
           <span
             className={`text-xs px-2.5 py-1 rounded font-medium ${statusBadge.bg} ${statusBadge.text}`}
@@ -158,11 +167,11 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       <div className="space-y-1 text-sm text-gray-600 mb-4">
         <div className="flex items-center gap-1.5">
           <Calendar className="w-4 h-4" />
-          <span>{formatShowDateTime(showDateTime)}</span>
+          <span>{showDateLabel}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <MapPin className="w-4 h-4" />
-          <span>{booking.performanceVenue}</span>
+          <span>{displayBookingText(booking.performanceVenue)}</span>
         </div>
       </div>
 
@@ -172,14 +181,14 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           <p className="text-xs text-gray-500 mb-2">좌석</p>
           {/* 1인 1석 — 단일 좌석 번호 */}
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-white font-medium">
-            {booking.seatNumber}
+            {displayBookingText(booking.seatNumber)}
           </span>
         </div>
 
         <div>
           <p className="text-xs text-gray-500 mb-2">결제 금액</p>
           <p className="text-base font-bold text-primary">
-            ₩{booking.price.toLocaleString()}
+            {formatPaymentAmount(booking.price)}
           </p>
         </div>
 

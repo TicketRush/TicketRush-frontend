@@ -177,7 +177,7 @@ function toBackendDateTime(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** GET /booking/me?status=PENDING 의 expires_at — 생성 시각 + 5분 (#167) */
+/** GET /booking/{bookingNumber} 의 expires_at — PENDING이면 생성 시각 + 5분 (#168) */
 export async function mockFetchPendingBookingExpiresAt(
   bookingNumber: string,
 ): Promise<string | null> {

@@ -12,7 +12,7 @@ export type PendingTimerRestoreStatus =
   | "failed";
 
 /**
- * GET /booking/me?status=PENDING 의 expires_at 으로 카운트다운을 맞춘다 (#167).
+ * GET /api/v1/booking/{bookingNumber} 의 expires_at 으로 카운트다운을 맞춘다 (#168).
  * 로컬 5분이 이미 돌아도 서버 시각이 오면 덮어쓴다. running 중 조회 실패는 만료로 보지 않는다.
  *
  * - missing: 타이머가 없는데 PENDING 목록에도 없음 → 서버에서 이미 만료/취소된 것으로 본다
