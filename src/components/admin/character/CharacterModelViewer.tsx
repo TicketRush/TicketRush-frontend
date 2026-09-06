@@ -1,7 +1,7 @@
 import { Suspense, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { Center, OrbitControls, useGLTF } from "@react-three/drei";
+import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
 
 export type { HairStyle } from "@/components/admin/character/characterHair";
@@ -21,6 +21,18 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   twintails: "/models/hair/hair_twintails.glb",
   wave: "/models/hair/hair_wave.glb",
 };
+function CharacterModelLoadingFallback() {
+  return (
+    <Html fullscreen pointerEvents="none">
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-600 shadow-sm">
+          3D 모델 불러오는 중...
+        </div>
+      </div>
+    </Html>
+  );
+}
+
 
 function getPartType(objectName: string) {
   const name = objectName.toLowerCase();
@@ -144,7 +156,7 @@ export default function CharacterModelViewer({
         <directionalLight position={[3, 5, 5]} intensity={2.2} />
         <directionalLight position={[-3, 2, 2]} intensity={0.8} />
 
-        <Suspense fallback={null}>
+        <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
             modelUrl={modelUrl}
             skinColor={skinColor}
