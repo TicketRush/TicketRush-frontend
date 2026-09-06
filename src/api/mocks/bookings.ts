@@ -22,6 +22,8 @@ import type {
   AdminRefundBookingListParams,
   AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
+import type { AdminBookingBookerResponse } from "../adminSeatMapper";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
 import { MOCK_CONCERTS } from "./concerts";
 import { applyMockSeatHold, mockReleaseSeat } from "./seats";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -383,4 +385,38 @@ export async function mockRetryRefund(bookingNumber: string): Promise<void> {
   }
 
   await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
+}
+
+/** GET /api/v1/booking/admin/bookings/{bookingNumber} (#169) */
+export async function mockGetAdminBookingByNumber(
+  bookingNumber: string,
+): Promise<AdminBookingBookerResponse> {
+  await mockDelay(150);
+  const booking = _findMockBooking(bookingNumber);
+  if (!booking) {
+    await mockError(
+      ERROR_CODES.BOOKING_NOT_FOUND,
+      "예매 정보를 찾을 수 없습니다.",
+      0,
+      404,
+    );
+  }
+
+  const paid =
+    booking!.status === "CONFIRMED" ||
+    booking!.status === "REFUNDED" ||
+    booking!.status === "REFUNDING";
+
+  return {
+    bookingNumber: booking!.bookingNumber,
+    bookerName: booking!.status === "PENDING" ? "예매 진행자" : "김철수",
+    bookerEmail: "user@example.com",
+    bookedAt: booking!.paidAt ?? booking!.createdAt,
+    bookingStatus: booking!.status,
+    performanceTitle: booking!.performanceTitle,
+    performanceDate: booking!.performanceDate,
+    seatNumber: booking!.seatNumber,
+    seatCount: 1,
+    paymentAmount: paid ? booking!.price : null,
+  };
 }
