@@ -172,7 +172,12 @@ function loadSavedCharacter(): CharacterConfig {
     const parsed = JSON.parse(savedCharacter) as Partial<
       Omit<
         CharacterConfig,
-        "skinTone" | "skinColor" | "hairStyle" | "hairColor"
+        | "skinTone"
+        | "skinColor"
+        | "hairStyle"
+        | "hairColor"
+        | "outfitColor"
+        | "background"
       >
     > & {
       skinTone?: unknown;
@@ -180,6 +185,7 @@ function loadSavedCharacter(): CharacterConfig {
       hairStyle?: unknown;
       hairColor?: unknown;
       outfitColor?: unknown;
+      background?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -197,6 +203,11 @@ function loadSavedCharacter(): CharacterConfig {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedBackground =
+      typeof parsed.background === "string"
+        ? normalizeHexColor(parsed.background)
+        : null;
+
     return {
       ...DEFAULT_CHARACTER,
       ...parsed,
@@ -204,6 +215,7 @@ function loadSavedCharacter(): CharacterConfig {
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      background: resolvedBackground ?? DEFAULT_CHARACTER.background,
     } as CharacterConfig;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);

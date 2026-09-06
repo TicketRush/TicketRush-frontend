@@ -59,6 +59,7 @@ const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_HAIR_COLOR = "#151515";
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
+const DEFAULT_BACKGROUND_COLOR = "#E9DDFF";
 
 interface Props {
   mode: "create" | "edit";
@@ -94,6 +95,7 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "hairStyle"
         | "hairColor"
         | "outfitColor"
+        | "background"
       >
     > & {
       skinTone?: unknown;
@@ -101,6 +103,7 @@ function loadSavedCharacter(): CharacterDraft | null {
       hairStyle?: unknown;
       hairColor?: unknown;
       outfitColor?: unknown;
+      background?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -118,12 +121,18 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedBackground =
+      typeof parsed.background === "string"
+        ? normalizeHexColor(parsed.background)
+        : null;
+
     return {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
