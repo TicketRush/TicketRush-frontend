@@ -1,5 +1,5 @@
 // 예매 내역 관리 — 이미지 4
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Ticket,
@@ -56,11 +56,15 @@ export default function AdminBookingsPage() {
     () => new Set(),
   );
 
-  const { data, isLoading, isError, isFetching, isPlaceholderData } =
-    useAdminBookings({
-      page,
-      size: PAGE_SIZE,
-    });
+  const { data, isLoading, isError, isPlaceholderData } = useAdminBookings({
+    page,
+    size: PAGE_SIZE,
+  });
+  const lastTotalPages = useRef<number | null>(null);
+  if (data?.pagination) {
+    lastTotalPages.current = data.pagination.totalPages;
+  }
+  const totalPages = data?.pagination.totalPages ?? lastTotalPages.current ?? 1;
   const {
     data: stats,
     isLoading: isStatsLoading,
@@ -223,20 +227,22 @@ export default function AdminBookingsPage() {
             불러오는 중...
           </div>
         ) : isError && !data ? (
-          <div className="text-center py-12 text-red-400">
-            예매 내역을 불러올 수 없습니다.
-          </div>
-        ) : isPlaceholderData && isError && !isFetching ? (
-          <>
+          lastTotalPages.current != null ? (
+            <>
+              <div className="text-center py-12 text-red-400">
+                이 페이지를 불러올 수 없습니다. 다른 페이지를 확인해 주세요.
+              </div>
+              <Pagination
+                pageIndex={page}
+                totalPages={lastTotalPages.current}
+                onChange={setPage}
+              />
+            </>
+          ) : (
             <div className="text-center py-12 text-red-400">
-              이 페이지를 불러올 수 없습니다. 다른 페이지를 확인해 주세요.
+              예매 내역을 불러올 수 없습니다.
             </div>
-            <Pagination
-              pageIndex={page}
-              totalPages={data?.pagination.totalPages ?? 1}
-              onChange={setPage}
-            />
-          </>
+          )
         ) : isPlaceholderData ? (
           <>
             <div className="text-center py-12 text-admin-text-secondary">
@@ -244,7 +250,7 @@ export default function AdminBookingsPage() {
             </div>
             <Pagination
               pageIndex={page}
-              totalPages={data?.pagination.totalPages ?? 1}
+              totalPages={totalPages}
               onChange={setPage}
             />
           </>
@@ -264,7 +270,7 @@ export default function AdminBookingsPage() {
             )}
             <Pagination
               pageIndex={page}
-              totalPages={data?.pagination.totalPages ?? 1}
+              totalPages={totalPages}
               onChange={setPage}
             />
           </>
