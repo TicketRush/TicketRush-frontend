@@ -346,8 +346,8 @@ export default function AdminConcertFormPage({ mode }: Props) {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-[760px] space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto w-full max-w-[760px] space-y-5 sm:space-y-6 lg:max-w-[960px] xl:max-w-[1080px] 2xl:max-w-[1200px]">
         <button
           type="button"
           onClick={() => navigate("/admin")}
@@ -362,7 +362,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
             CONCERT FORM
           </span>
 
-          <h1 className="mt-3 text-3xl font-bold">
+          <h1 className="mt-3 text-2xl font-bold sm:text-3xl xl:text-4xl">
             {mode === "create" ? "공연 등록" : "공연 수정"}
           </h1>
 
@@ -396,7 +396,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
               value={form.genre}
               onChange={(e) => update("genre", e.target.value as Genre)}
               onKeyDown={handleEnterMoveNext}
-              className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+              className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
             >
               {GENRES.map((genre) => (
                 <option key={genre.value} value={genre.value}>
@@ -494,7 +494,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
               onChange={(e) => update("description", e.target.value)}
               rows={8}
               placeholder="공연 소개, 공연 특징, 관람 안내를 입력하세요."
-              className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+              className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
             />
           </Field>
 
@@ -620,7 +620,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
           </Field>
         </Section>
 
-        <div className="grid grid-cols-[1fr_auto] gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
           <button
             type="button"
             onClick={handleSubmit}
@@ -658,8 +658,8 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-admin-border bg-admin-card p-6 shadow-sm">
-      <h2 className="mb-4 text-base font-bold">{title}</h2>
+    <section className="rounded-xl border border-admin-border bg-admin-card p-4 shadow-sm sm:p-6 xl:p-7">
+      <h2 className="mb-4 text-base font-bold xl:text-lg">{title}</h2>
       <div className="space-y-4">{children}</div>
     </section>
   );
@@ -707,7 +707,7 @@ function FormInput({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
 }
@@ -801,7 +801,7 @@ function EditableDateInput({
       placeholder={placeholder}
       maxLength={10}
       inputMode="numeric"
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
 }
@@ -837,7 +837,7 @@ function EditableTimeInput({
       placeholder={placeholder}
       maxLength={5}
       inputMode="numeric"
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
 }
