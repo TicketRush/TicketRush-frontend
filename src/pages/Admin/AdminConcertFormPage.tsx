@@ -32,6 +32,11 @@ import {
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
+import {
+  getOutfitOption,
+  resolveStoredOutfitModelId,
+  type OutfitModelId,
+} from "@/components/admin/character/characterOutfit";
 
 
 const GENRES: { value: Genre; label: string }[] = [
@@ -77,6 +82,7 @@ interface CharacterDraft {
   hairStyle: HairStyle;
   eyeStyle: EyeStyle;
   hairColor: string;
+  outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
   accessory: string;
@@ -100,6 +106,8 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "hairStyle"
         | "eyeStyle"
         | "hairColor"
+        | "outfitModelId"
+        | "outfitName"
         | "outfitColor"
       >
     > & {
@@ -108,6 +116,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       hairStyle?: unknown;
       eyeStyle?: unknown;
       hairColor?: unknown;
+      outfitModelId?: unknown;
+      outfitName?: unknown;
       outfitColor?: unknown;
     };
 
@@ -126,12 +136,20 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedOutfitModelId = resolveStoredOutfitModelId(
+      parsed.outfitModelId,
+      parsed.outfitName,
+    );
+    const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
+
     return {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
+      outfitModelId: resolvedOutfitModelId,
+      outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
     } as CharacterDraft;
   } catch {
@@ -891,6 +909,8 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          outfitName={character.outfitName}
+          outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
           eyeStyle={character.eyeStyle}
         />
