@@ -17,6 +17,8 @@ import { useTicketQr } from "@/hooks/queries/useTicketQr";
 import { useCountdownTo } from "@/hooks/useCountdownTo";
 import useAuthStore from "@/stores/global/authStore";
 import { downloadTicket } from "@/utils/ticket/downloadTicket";
+import { displayBookingText, formatPaymentAmount, canFetchTicketQr, bookingQrPlaceholder } from "@/utils/booking";
+import { formatBackendDateTimeLabel } from "@/utils/booking/parseBackendDateTime";
 
 const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 const COLS_CNT = 12;
@@ -32,7 +34,9 @@ export default function TicketDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
-  const { data: qrData, isLoading: isQrLoading } = useTicketQr(data?.bookingId);
+  const { data: qrData, isLoading: isQrLoading } = useTicketQr(
+    data && canFetchTicketQr(data.status) ? data.bookingId : undefined,
+  );
   const remainingMs = useCountdownTo(qrData?.expiresAt);
 
   // 다운로드 영역 ref
@@ -76,6 +80,7 @@ export default function TicketDetailPage() {
     );
   }
 
+  const isConfirmed = canFetchTicketQr(data.status);
   const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
   const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
   const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
@@ -134,24 +139,26 @@ export default function TicketDetailPage() {
           </div>
 
           <div className="p-5">
-            <h2 className="text-lg font-bold mb-4">{data.performanceTitle}</h2>
+            <h2 className="text-lg font-bold mb-4">
+              {displayBookingText(data.performanceTitle)}
+            </h2>
 
             {/* 디테일 2x2 — 좌석 칸은 long-press 영역 */}
             <div className="grid grid-cols-2 gap-3 mb-3">
               <InfoBox
                 icon={<Calendar size={14} />}
                 label="날짜"
-                value={data.performanceDate}
+                value={displayBookingText(data.performanceDate)}
               />
               <InfoBox
                 icon={<Clock size={14} />}
                 label="시간"
-                value={data.performanceTime}
+                value={displayBookingText(data.performanceTime)}
               />
               <InfoBox
                 icon={<MapPin size={14} />}
                 label="장소"
-                value={data.performanceVenue}
+                value={displayBookingText(data.performanceVenue)}
               />
               {/* 좌석 — long-press로 좌석맵 표시 */}
               <div
@@ -165,7 +172,9 @@ export default function TicketDetailPage() {
                   <TicketIcon size={14} />
                   <span>좌석</span>
                 </div>
-                <p className="text-sm font-bold truncate">{data.seatNumber}</p>
+                <p className="text-sm font-bold truncate">
+                  {displayBookingText(data.seatNumber)}
+                </p>
 
                 {/* 진입 시 안내 툴팁 — 좌석 박스 아래로 배치 (body transform으로 위쪽 좌표 밀림 대응) */}
                 {showTooltip && (
@@ -203,7 +212,8 @@ export default function TicketDetailPage() {
           <p className="text-center text-sm font-semibold mb-4">입장 QR 코드</p>
           <div className="flex items-center justify-center mb-4">
             <div className="w-44 h-44 bg-white border-2 border-primary rounded-xl flex items-center justify-center p-3 relative">
-              {isQrLoading && !qrData ? (
+              {isConfirmed ? (
+                isQrLoading && !qrData ? (
                 <span className="text-xs text-text-secondary">QR 발급 중...</span>
               ) : qrData ? (
                 <QRCodeSVG
@@ -217,8 +227,13 @@ export default function TicketDetailPage() {
                 <span className="text-xs text-error">
                   QR 코드를 불러올 수 없습니다.
                 </span>
+              )
+              ) : (
+                <span className="text-xs text-text-secondary text-center px-2">
+                  {bookingQrPlaceholder(data.status)}
+                </span>
               )}
-              {!isTicketUsable && (
+              {!isTicketUsable && isConfirmed && (
                 <div className="absolute inset-0 bg-white/85 rounded-xl flex items-center justify-center">
                   <span className="text-sm font-bold text-text-secondary">
                     {qrData?.ticketStatus === "USED"
@@ -229,10 +244,12 @@ export default function TicketDetailPage() {
               )}
             </div>
           </div>
+          {isConfirmed && (
           <p className="text-center text-xs text-text-secondary mb-3">
             공연장 입장 시 스캔하세요
           </p>
-          {qrData && isTicketUsable && (
+          )}
+          {isConfirmed && qrData && isTicketUsable && (
             <p
               className={`text-center text-xs mb-3 ${
                 isExpiringSoon
@@ -269,13 +286,13 @@ export default function TicketDetailPage() {
           <PersonRow
             icon={<Calendar size={14} />}
             label="예매 일시"
-            value={new Date(data.createdAt).toLocaleString("ko-KR")}
+            value={formatBackendDateTimeLabel(data.paidAt)}
           />
           {/* 결제 금액 강조 */}
           <div className="bg-primary/5 rounded-lg px-3 py-2.5">
             <p className="text-xs text-text-secondary mb-0.5">총 결제 금액</p>
             <p className="text-lg font-bold text-primary">
-              ₩{data.price.toLocaleString()}
+              {formatPaymentAmount(data.price)}
             </p>
           </div>
         </div>

@@ -5,11 +5,12 @@
 // 변경 이력:
 // - 이슈 #127: qrPayload = JSON.stringify(...) mock 제거.
 //   GET /api/v1/ticket/bookings/{bookingId}/qr 실 API(useTicketQr)로 교체.
-//   payload는 발급 후 5분만 유효 — 4분마다 자동 재발급 + expiresAt 도달 시 refetch.
+// - 이슈 #168: 예매 상세는 GET /api/v1/booking/{bookingNumber} 단건 조회.
+//   응답 bookingId로 QR을 조회한다 (딥링크/새로고침에서도 /booking/me 스캔 불필요).
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
-import { CheckCircle, Calendar, Clock, Music, Download } from "lucide-react";
+import { CheckCircle, Calendar, Clock, Music, Download, AlertCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useBookingDetail } from "@/hooks/queries/useBookingDetail";
 import { useTicketQr } from "@/hooks/queries/useTicketQr";
@@ -18,6 +19,14 @@ import useSeatStore from "@/stores/reservation/seatStore";
 import usePaymentStore from "@/stores/reservation/paymentStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { downloadTicket } from "@/utils/ticket/downloadTicket";
+import {
+  displayBookingText,
+  formatPaymentAmount,
+  canFetchTicketQr,
+  bookingQrPlaceholder,
+  paymentCompleteHeading,
+} from "@/utils/booking";
+import { formatBackendDateTimeLabel } from "@/utils/booking/parseBackendDateTime";
 
 export default function PaymentCompletePage() {
   // App.tsx: path="/reservations/:reservationId"
@@ -27,7 +36,9 @@ export default function PaymentCompletePage() {
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
-  const { data: qrData, isLoading: isQrLoading } = useTicketQr(data?.bookingId);
+  const { data: qrData, isLoading: isQrLoading } = useTicketQr(
+    data && canFetchTicketQr(data.status) ? data.bookingId : undefined,
+  );
   const remainingMs = useCountdownTo(qrData?.expiresAt);
 
   const resetSeat = useSeatStore((s) => s.reset);
@@ -66,6 +77,8 @@ export default function PaymentCompletePage() {
     );
   }
 
+  const isConfirmed = canFetchTicketQr(data.status);
+  const heading = paymentCompleteHeading(data.status);
   const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
   const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
   const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
@@ -81,13 +94,23 @@ export default function PaymentCompletePage() {
     <div className="max-w-2xl mx-auto px-6 py-12">
       {/* ─── 다운로드 캡처 영역 시작 ─── */}
       <div ref={ticketRef} className="bg-white">
-        {/* 성공 헤더 */}
+        {/* 상태별 헤더 — PENDING·취소 건을 결제 완료로 표시하지 않는다 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
-            <CheckCircle size={48} className="text-green-600" />
-          </div>
-          <h1 className="text-3xl font-bold mb-1">결제 완료!</h1>
-          <p className="text-text-secondary">디지털 티켓이 발급되었습니다</p>
+          {isConfirmed ? (
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
+              <CheckCircle size={48} className="text-green-600" />
+            </div>
+          ) : data.status === "PENDING" ? (
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-100 mb-4">
+              <Clock size={48} className="text-amber-700" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
+              <AlertCircle size={48} className="text-text-secondary" />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold mb-1">{heading.title}</h1>
+          <p className="text-text-secondary">{heading.subtitle}</p>
         </div>
 
         {/* 티켓 카드 */}
@@ -107,10 +130,10 @@ export default function PaymentCompletePage() {
             )}
             <div className="min-w-0">
               <h2 className="text-xl font-bold truncate">
-                {data.performanceTitle}
+                {displayBookingText(data.performanceTitle)}
               </h2>
               <p className="text-sm text-text-secondary mt-0.5 truncate">
-                {data.performanceVenue}
+                {displayBookingText(data.performanceVenue)}
               </p>
             </div>
           </div>
@@ -120,14 +143,18 @@ export default function PaymentCompletePage() {
             <InfoBox
               icon={<Calendar size={14} />}
               label="공연일"
-              value={data.performanceDate}
+              value={displayBookingText(data.performanceDate)}
             />
             <InfoBox
               icon={<Clock size={14} />}
               label="시간"
-              value={data.performanceTime}
+              value={displayBookingText(data.performanceTime)}
             />
-            <InfoBox icon={null} label="좌석" value={data.seatNumber} />
+            <InfoBox
+              icon={null}
+              label="좌석"
+              value={displayBookingText(data.seatNumber)}
+            />
             <InfoBox
               icon={null}
               label="예매 번호"
@@ -141,16 +168,12 @@ export default function PaymentCompletePage() {
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-text-secondary">결제 금액</span>
               <span className="text-xl font-bold text-primary">
-                ₩{data.price.toLocaleString()}
+                {formatPaymentAmount(data.price)}
               </span>
             </div>
             <div className="flex justify-between text-xs text-text-secondary">
               <span>결제일</span>
-              <span>
-                {data.paidAt
-                  ? new Date(data.paidAt).toLocaleString("ko-KR")
-                  : "-"}
-              </span>
+              <span>{formatBackendDateTimeLabel(data.paidAt)}</span>
             </div>
           </div>
         </div>
@@ -159,7 +182,8 @@ export default function PaymentCompletePage() {
         <div className="bg-white border-2 border-primary rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-center mb-4">
             <div className="w-48 h-48 bg-white border-4 border-primary rounded-xl flex items-center justify-center p-3 relative">
-              {isQrLoading && !qrData ? (
+              {isConfirmed ? (
+                isQrLoading && !qrData ? (
                 <span className="text-xs text-text-secondary">QR 발급 중...</span>
               ) : qrData ? (
                 <QRCodeSVG
@@ -173,8 +197,13 @@ export default function PaymentCompletePage() {
                 <span className="text-xs text-error">
                   QR 코드를 불러올 수 없습니다.
                 </span>
+              )
+              ) : (
+                <span className="text-xs text-text-secondary text-center px-2">
+                  {bookingQrPlaceholder(data.status)}
+                </span>
               )}
-              {!isTicketUsable && (
+              {!isTicketUsable && isConfirmed && (
                 <div className="absolute inset-0 bg-white/85 rounded-xl flex items-center justify-center">
                   <span className="text-sm font-bold text-text-secondary">
                     {qrData?.ticketStatus === "USED"
@@ -185,10 +214,12 @@ export default function PaymentCompletePage() {
               )}
             </div>
           </div>
+          {isConfirmed && (
           <p className="text-center text-sm text-text-secondary">
             공연장 입장 시 스캔하세요
           </p>
-          {qrData && isTicketUsable && (
+          )}
+          {isConfirmed && qrData && isTicketUsable && (
             <p
               className={`text-center text-xs mt-2 ${
                 isExpiringSoon

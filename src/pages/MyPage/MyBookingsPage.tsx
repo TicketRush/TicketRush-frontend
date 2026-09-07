@@ -14,7 +14,8 @@ export default function MyBookingsPage() {
   const { data, isLoading, isError } = useMyBookings();
 
   const allBookings = data?.items ?? [];
-  // 탭 전환 시 API 재요청 없이 프론트에서 필터 (정책: 공연 시작시각 기준)
+  // 탭 전환 시 API 재요청 없이 프론트에서 필터
+  // 목록 API에 공연 시간이 없어 공연 날짜(performanceDate) 기준 (#168)
   const bookings = filterBookingsByTab(allBookings, tab);
 
   return (
