@@ -4,6 +4,10 @@ import { Canvas } from "@react-three/fiber";
 import { Center, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
+  MUSICAL_OUTFIT_PART_NAMES,
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
   type OutfitModelId,
@@ -18,10 +22,14 @@ interface CharacterModelViewerProps {
   hairColor: string;
 
   /**
-   * #194에서 파츠별 의상 색상 커스터마이징에 사용할 예정입니다.
-   * 현재 #74에서는 기존 호출부 호환을 위해 유지합니다.
+   * 기존 단일 의상 컬러입니다.
+   * 다른 의상 및 기존 저장 데이터 호환을 위해 유지합니다.
    */
   outfitColor: string;
+
+  musicalJacketColor?: string;
+  musicalInnerColor?: string;
+  musicalShortsColor?: string;
 
   /**
    * 화면 표시용 의상 이름입니다.
@@ -98,16 +106,84 @@ function HairModel({
   return <primitive object={scene} />;
 }
 
+function cloneMaterialWithColor(
+  material: THREE.Material,
+  color: string,
+): THREE.Material {
+  const clonedMaterial = material.clone();
+
+  if (clonedMaterial instanceof THREE.MeshStandardMaterial) {
+    clonedMaterial.color.set(color);
+
+    // Blender vertex color가 선택 색상과 곱해지는 것을 방지합니다.
+    clonedMaterial.vertexColors = false;
+    clonedMaterial.needsUpdate = true;
+  }
+
+  return clonedMaterial;
+}
+
+function applyMeshColor(object: THREE.Mesh, color: string) {
+  if (Array.isArray(object.material)) {
+    object.material = object.material.map((material) =>
+      cloneMaterialWithColor(material, color),
+    );
+    return;
+  }
+
+  object.material = cloneMaterialWithColor(object.material, color);
+}
+
 function OutfitModel({
   modelUrl,
+  outfitModelId,
+  musicalJacketColor,
+  musicalInnerColor,
+  musicalShortsColor,
 }: {
   modelUrl: string;
+  outfitModelId: OutfitModelId;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
 }) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
-    return gltf.scene.clone(true);
-  }, [gltf.scene]);
+    const clonedScene = gltf.scene.clone(true);
+
+    if (outfitModelId !== "musical") {
+      return clonedScene;
+    }
+
+    clonedScene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (object.name === MUSICAL_OUTFIT_PART_NAMES.jacket) {
+        applyMeshColor(object, musicalJacketColor);
+        return;
+      }
+
+      if (object.name === MUSICAL_OUTFIT_PART_NAMES.inner) {
+        applyMeshColor(object, musicalInnerColor);
+        return;
+      }
+
+      if (object.name === MUSICAL_OUTFIT_PART_NAMES.shorts) {
+        applyMeshColor(object, musicalShortsColor);
+      }
+    });
+
+    return clonedScene;
+  }, [
+    gltf.scene,
+    outfitModelId,
+    musicalJacketColor,
+    musicalInnerColor,
+    musicalShortsColor,
+  ]);
 
   return <primitive object={scene} />;
 }
@@ -118,6 +194,9 @@ function CharacterModel({
   hairColor,
   outfitModelId,
   hairStyle,
+  musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
 }: Pick<
   CharacterModelViewerProps,
   | "modelUrl"
@@ -125,6 +204,9 @@ function CharacterModel({
   | "hairColor"
   | "outfitModelId"
   | "hairStyle"
+  | "musicalJacketColor"
+  | "musicalInnerColor"
+  | "musicalShortsColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
 
@@ -147,7 +229,13 @@ function CharacterModel({
 
         {outfitModelUrl && (
           <Suspense fallback={null}>
-            <OutfitModel modelUrl={outfitModelUrl} />
+            <OutfitModel
+              modelUrl={outfitModelUrl}
+              outfitModelId={outfitModelId}
+              musicalJacketColor={musicalJacketColor}
+              musicalInnerColor={musicalInnerColor}
+              musicalShortsColor={musicalShortsColor}
+            />
           </Suspense>
         )}
       </group>
@@ -161,6 +249,9 @@ export default function CharacterModelViewer({
   hairColor,
   outfitModelId,
   hairStyle,
+  musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
@@ -176,6 +267,9 @@ export default function CharacterModelViewer({
             hairColor={hairColor}
             outfitModelId={outfitModelId}
             hairStyle={hairStyle}
+            musicalJacketColor={musicalJacketColor}
+            musicalInnerColor={musicalInnerColor}
+            musicalShortsColor={musicalShortsColor}
           />
         </Suspense>
 

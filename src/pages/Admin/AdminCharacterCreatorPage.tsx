@@ -15,6 +15,9 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_OUTFIT_MODEL_ID,
   OUTFIT_OPTIONS,
   getOutfitOption,
@@ -32,6 +35,9 @@ interface CharacterConfig {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   accessory: string;
   pose: Pose;
   background: string;
@@ -85,6 +91,31 @@ const OUTFIT_COLORS = [
   "#ff3333",
 ];
 
+function isSameHexColor(first: string, second: string) {
+  return first.toUpperCase() === second.toUpperCase();
+}
+
+function createPartColorPresets(defaultColor: string) {
+  return [
+    defaultColor,
+    ...OUTFIT_COLORS.filter(
+      (color) => !isSameHexColor(color, defaultColor),
+    ).slice(0, 9),
+  ];
+}
+
+const MUSICAL_JACKET_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_JACKET_COLOR,
+);
+
+const MUSICAL_INNER_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_INNER_COLOR,
+);
+
+const MUSICAL_SHORTS_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_SHORTS_COLOR,
+);
+
 const ACCESSORIES = [
   { value: "none", label: "제거", icon: "❌" },
   { value: "sunglasses", label: "선글라스", icon: "🕶️" },
@@ -128,14 +159,13 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
   outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
   outfitColor: DEFAULT_OUTFIT_COLOR,
+  musicalJacketColor: DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor: DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor: DEFAULT_MUSICAL_SHORTS_COLOR,
   accessory: "none",
   pose: "standing",
   background: "#E9DDFF",
 };
-
-function isSameHexColor(first: string, second: string) {
-  return first.toUpperCase() === second.toUpperCase();
-}
 
 function loadSavedCharacter(): CharacterConfig {
   const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
@@ -155,6 +185,9 @@ function loadSavedCharacter(): CharacterConfig {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "musicalJacketColor"
+        | "musicalInnerColor"
+        | "musicalShortsColor"
       >
     > & {
       skinTone?: unknown;
@@ -164,6 +197,9 @@ function loadSavedCharacter(): CharacterConfig {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      musicalJacketColor?: unknown;
+      musicalInnerColor?: unknown;
+      musicalShortsColor?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -181,10 +217,26 @@ function loadSavedCharacter(): CharacterConfig {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedMusicalJacketColor =
+      typeof parsed.musicalJacketColor === "string"
+        ? normalizeHexColor(parsed.musicalJacketColor)
+        : null;
+
+    const resolvedMusicalInnerColor =
+      typeof parsed.musicalInnerColor === "string"
+        ? normalizeHexColor(parsed.musicalInnerColor)
+        : null;
+
+    const resolvedMusicalShortsColor =
+      typeof parsed.musicalShortsColor === "string"
+        ? normalizeHexColor(parsed.musicalShortsColor)
+        : null;
+
     const resolvedOutfitModelId = resolveStoredOutfitModelId(
       parsed.outfitModelId,
       parsed.outfitName,
     );
+
     const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
 
     return {
@@ -196,6 +248,12 @@ function loadSavedCharacter(): CharacterConfig {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      musicalJacketColor:
+        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
+      musicalInnerColor:
+        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
+      musicalShortsColor:
+        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
     } as CharacterConfig;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -248,6 +306,23 @@ export default function AdminCharacterCreatorPage() {
   );
   const [outfitHexError, setOutfitHexError] = useState("");
 
+  const [musicalJacketHexInput, setMusicalJacketHexInput] = useState(
+    () => character.musicalJacketColor,
+  );
+  const [musicalJacketHexError, setMusicalJacketHexError] =
+    useState("");
+
+  const [musicalInnerHexInput, setMusicalInnerHexInput] = useState(
+    () => character.musicalInnerColor,
+  );
+  const [musicalInnerHexError, setMusicalInnerHexError] = useState("");
+
+  const [musicalShortsHexInput, setMusicalShortsHexInput] = useState(
+    () => character.musicalShortsColor,
+  );
+  const [musicalShortsHexError, setMusicalShortsHexError] =
+    useState("");
+
   const [backgroundHexInput, setBackgroundHexInput] = useState(
     () => character.background,
   );
@@ -265,11 +340,27 @@ export default function AdminCharacterCreatorPage() {
   );
   const isCustomOutfitColor = !selectedOutfitColorPreset;
 
+  const selectedMusicalJacketPreset = MUSICAL_JACKET_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalJacketColor),
+  );
+  const isCustomMusicalJacketColor = !selectedMusicalJacketPreset;
+
+  const selectedMusicalInnerPreset = MUSICAL_INNER_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalInnerColor),
+  );
+  const isCustomMusicalInnerColor = !selectedMusicalInnerPreset;
+
+  const selectedMusicalShortsPreset = MUSICAL_SHORTS_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalShortsColor),
+  );
+  const isCustomMusicalShortsColor = !selectedMusicalShortsPreset;
+
   const selectedBackgroundPreset = BACKGROUNDS.find((background) =>
     isSameHexColor(background.color, character.background),
   );
 
   const isCustomBackground = !selectedBackgroundPreset;
+  const isMusicalOutfit = character.outfitModelId === "musical";
 
   function update<K extends keyof CharacterConfig>(
     key: K,
@@ -466,6 +557,168 @@ export default function AdminCharacterCreatorPage() {
     setOutfitHexError("");
   }
 
+  function applyMusicalJacketColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalJacketColor", normalized);
+    setMusicalJacketHexInput(normalized);
+    setMusicalJacketHexError("");
+
+    return true;
+  }
+
+  function handleMusicalJacketHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalJacketHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalJacketColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalJacketHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalJacketHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalJacketHexError("");
+  }
+
+  function handleMusicalJacketHexBlur() {
+    const normalized = normalizeHexColor(musicalJacketHexInput);
+
+    if (normalized) {
+      applyMusicalJacketColor(normalized);
+      return;
+    }
+
+    setMusicalJacketHexInput(character.musicalJacketColor);
+    setMusicalJacketHexError("");
+  }
+
+  function applyMusicalInnerColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalInnerColor", normalized);
+    setMusicalInnerHexInput(normalized);
+    setMusicalInnerHexError("");
+
+    return true;
+  }
+
+  function handleMusicalInnerHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalInnerHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalInnerColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalInnerHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalInnerHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalInnerHexError("");
+  }
+
+  function handleMusicalInnerHexBlur() {
+    const normalized = normalizeHexColor(musicalInnerHexInput);
+
+    if (normalized) {
+      applyMusicalInnerColor(normalized);
+      return;
+    }
+
+    setMusicalInnerHexInput(character.musicalInnerColor);
+    setMusicalInnerHexError("");
+  }
+
+  function applyMusicalShortsColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalShortsColor", normalized);
+    setMusicalShortsHexInput(normalized);
+    setMusicalShortsHexError("");
+
+    return true;
+  }
+
+  function handleMusicalShortsHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalShortsHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalShortsColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalShortsHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalShortsHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalShortsHexError("");
+  }
+
+  function handleMusicalShortsHexBlur() {
+    const normalized = normalizeHexColor(musicalShortsHexInput);
+
+    if (normalized) {
+      applyMusicalShortsColor(normalized);
+      return;
+    }
+
+    setMusicalShortsHexInput(character.musicalShortsColor);
+    setMusicalShortsHexError("");
+  }
+
   function applyBackgroundColor(value: string) {
     const normalized = normalizeHexColor(value);
 
@@ -532,6 +785,15 @@ export default function AdminCharacterCreatorPage() {
     setOutfitHexInput(DEFAULT_CHARACTER.outfitColor);
     setOutfitHexError("");
 
+    setMusicalJacketHexInput(DEFAULT_CHARACTER.musicalJacketColor);
+    setMusicalJacketHexError("");
+
+    setMusicalInnerHexInput(DEFAULT_CHARACTER.musicalInnerColor);
+    setMusicalInnerHexError("");
+
+    setMusicalShortsHexInput(DEFAULT_CHARACTER.musicalShortsColor);
+    setMusicalShortsHexError("");
+
     setBackgroundHexInput(DEFAULT_CHARACTER.background);
     setBackgroundHexError("");
   }
@@ -551,9 +813,42 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
-    if (!normalizeHexColor(outfitHexInput)) {
+    if (
+      !isMusicalOutfit &&
+      !normalizeHexColor(outfitHexInput)
+    ) {
       setOutfitHexError(
         "의상 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalJacketHexInput)
+    ) {
+      setMusicalJacketHexError(
+        "자켓 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalInnerHexInput)
+    ) {
+      setMusicalInnerHexError(
+        "이너 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalShortsHexInput)
+    ) {
+      setMusicalShortsHexError(
+        "반바지 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
       );
       return;
     }
@@ -565,7 +860,10 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
-    localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(character));
+    localStorage.setItem(
+      CHARACTER_STORAGE_KEY,
+      JSON.stringify(character),
+    );
 
     const returnTo = resolveAdminReturnTo(searchParams.get("returnTo"));
     navigate(returnTo);
@@ -591,7 +889,9 @@ export default function AdminCharacterCreatorPage() {
               3D CHARACTER CREATOR
             </span>
 
-            <h1 className="mt-3 text-3xl font-bold">3D 캐릭터 제작소</h1>
+            <h1 className="mt-3 text-3xl font-bold">
+              3D 캐릭터 제작소
+            </h1>
 
             <p className="mt-2 text-sm text-slate-400">
               귀여운 치비 스타일 캐릭터를 만들어보세요.
@@ -743,7 +1043,9 @@ export default function AdminCharacterCreatorPage() {
                   <OptionCard
                     key={hairStyle.value}
                     selected={character.hairStyle === hairStyle.value}
-                    onClick={() => update("hairStyle", hairStyle.value)}
+                    onClick={() =>
+                      update("hairStyle", hairStyle.value)
+                    }
                   >
                     <div className="text-2xl">{hairStyle.icon}</div>
 
@@ -763,7 +1065,10 @@ export default function AdminCharacterCreatorPage() {
                   <ColorButton
                     key={color}
                     color={color}
-                    selected={isSameHexColor(character.hairColor, color)}
+                    selected={isSameHexColor(
+                      character.hairColor,
+                      color,
+                    )}
                     onClick={() => applyHairColor(color)}
                   />
                 ))}
@@ -879,7 +1184,9 @@ export default function AdminCharacterCreatorPage() {
                 {OUTFIT_OPTIONS.map((outfit) => (
                   <OptionCard
                     key={outfit.id}
-                    selected={character.outfitModelId === outfit.id}
+                    selected={
+                      character.outfitModelId === outfit.id
+                    }
                     onClick={() => selectOutfit(outfit.id)}
                   >
                     <div className="flex items-start gap-3 text-left">
@@ -899,124 +1206,73 @@ export default function AdminCharacterCreatorPage() {
                 ))}
               </div>
 
-              <p className="mt-5 text-sm font-bold text-slate-800">
-                의상 컬러
-              </p>
-
-              <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
-                {OUTFIT_COLORS.map((color) => (
-                  <ColorButton
-                    key={color}
-                    color={color}
-                    selected={isSameHexColor(character.outfitColor, color)}
-                    onClick={() => applyOutfitColor(color)}
+              {isMusicalOutfit ? (
+                <>
+                  <OutfitColorControl
+                    title="자켓 컬러"
+                    customTitle="사용자 지정 자켓 컬러"
+                    idPrefix="musical-jacket"
+                    currentColor={character.musicalJacketColor}
+                    hexInput={musicalJacketHexInput}
+                    hexError={musicalJacketHexError}
+                    presets={MUSICAL_JACKET_COLORS}
+                    isCustom={isCustomMusicalJacketColor}
+                    placeholder={DEFAULT_MUSICAL_JACKET_COLOR}
+                    onPresetClick={applyMusicalJacketColor}
+                    onColorPickerChange={applyMusicalJacketColor}
+                    onHexChange={handleMusicalJacketHexChange}
+                    onHexBlur={handleMusicalJacketHexBlur}
                   />
-                ))}
-              </div>
 
-              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">
-                      사용자 지정 의상 컬러
-                    </h3>
+                  <OutfitColorControl
+                    title="이너 컬러"
+                    customTitle="사용자 지정 이너 컬러"
+                    idPrefix="musical-inner"
+                    currentColor={character.musicalInnerColor}
+                    hexInput={musicalInnerHexInput}
+                    hexError={musicalInnerHexError}
+                    presets={MUSICAL_INNER_COLORS}
+                    isCustom={isCustomMusicalInnerColor}
+                    placeholder={DEFAULT_MUSICAL_INNER_COLOR}
+                    onPresetClick={applyMusicalInnerColor}
+                    onColorPickerChange={applyMusicalInnerColor}
+                    onHexChange={handleMusicalInnerHexChange}
+                    onHexBlur={handleMusicalInnerHexBlur}
+                  />
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
-                    </p>
-                  </div>
-
-                  {isCustomOutfitColor && (
-                    <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
-                      CUSTOM 선택됨
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
-                  <div>
-                    <label
-                      htmlFor="custom-outfit-color-picker"
-                      className="mb-2 block text-xs font-bold text-slate-700"
-                    >
-                      컬러 피커
-                    </label>
-
-                    <input
-                      id="custom-outfit-color-picker"
-                      type="color"
-                      value={character.outfitColor}
-                      onChange={(event) =>
-                        applyOutfitColor(event.target.value)
-                      }
-                      className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
-                      aria-label="사용자 지정 의상 컬러 선택"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="custom-outfit-hex"
-                      className="mb-2 block text-xs font-bold text-slate-700"
-                    >
-                      HEX 색상 코드
-                    </label>
-
-                    <input
-                      id="custom-outfit-hex"
-                      type="text"
-                      value={outfitHexInput}
-                      onChange={(event) =>
-                        handleOutfitHexChange(event.target.value)
-                      }
-                      onBlur={handleOutfitHexBlur}
-                      placeholder="#60A5FA"
-                      maxLength={7}
-                      spellCheck={false}
-                      aria-invalid={Boolean(outfitHexError)}
-                      aria-describedby="custom-outfit-hex-help custom-outfit-hex-error"
-                      className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
-                        outfitHexError
-                          ? "border-red-500 focus:border-red-500"
-                          : "border-slate-300 focus:border-primary"
-                      }`}
-                    />
-
-                    <p
-                      id="custom-outfit-hex-help"
-                      className="mt-1 text-[11px] text-slate-500"
-                    >
-                      # 없이 6자리만 입력해도 자동으로 적용됩니다.
-                    </p>
-
-                    {outfitHexError && (
-                      <p
-                        id="custom-outfit-hex-error"
-                        className="mt-1 text-xs font-medium text-red-600"
-                      >
-                        {outfitHexError}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-bold text-slate-700">
-                      현재 적용 색상
-                    </p>
-
-                    <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
-                      <span
-                        className="h-7 w-7 shrink-0 rounded border border-slate-200"
-                        style={{ backgroundColor: character.outfitColor }}
-                      />
-
-                      <code className="text-xs font-bold text-slate-700">
-                        {character.outfitColor.toUpperCase()}
-                      </code>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                  <OutfitColorControl
+                    title="반바지 컬러"
+                    customTitle="사용자 지정 반바지 컬러"
+                    idPrefix="musical-shorts"
+                    currentColor={character.musicalShortsColor}
+                    hexInput={musicalShortsHexInput}
+                    hexError={musicalShortsHexError}
+                    presets={MUSICAL_SHORTS_COLORS}
+                    isCustom={isCustomMusicalShortsColor}
+                    placeholder={DEFAULT_MUSICAL_SHORTS_COLOR}
+                    onPresetClick={applyMusicalShortsColor}
+                    onColorPickerChange={applyMusicalShortsColor}
+                    onHexChange={handleMusicalShortsHexChange}
+                    onHexBlur={handleMusicalShortsHexBlur}
+                  />
+                </>
+              ) : (
+                <OutfitColorControl
+                  title="의상 컬러"
+                  customTitle="사용자 지정 의상 컬러"
+                  idPrefix="outfit"
+                  currentColor={character.outfitColor}
+                  hexInput={outfitHexInput}
+                  hexError={outfitHexError}
+                  presets={OUTFIT_COLORS}
+                  isCustom={isCustomOutfitColor}
+                  placeholder={DEFAULT_OUTFIT_COLOR}
+                  onPresetClick={applyOutfitColor}
+                  onColorPickerChange={applyOutfitColor}
+                  onHexChange={handleOutfitHexChange}
+                  onHexBlur={handleOutfitHexBlur}
+                />
+              )}
             </CreatorSection>
 
             <CreatorSection title="액세서리">
@@ -1024,8 +1280,12 @@ export default function AdminCharacterCreatorPage() {
                 {ACCESSORIES.map((accessory) => (
                   <OptionCard
                     key={accessory.value}
-                    selected={character.accessory === accessory.value}
-                    onClick={() => update("accessory", accessory.value)}
+                    selected={
+                      character.accessory === accessory.value
+                    }
+                    onClick={() =>
+                      update("accessory", accessory.value)
+                    }
                   >
                     <div className="text-2xl">{accessory.icon}</div>
 
@@ -1064,12 +1324,16 @@ export default function AdminCharacterCreatorPage() {
                       character.background,
                       background.color,
                     )}
-                    onClick={() => applyBackgroundColor(background.color)}
+                    onClick={() =>
+                      applyBackgroundColor(background.color)
+                    }
                     ariaLabel={`${background.label} 배경 선택`}
                   >
                     <div
                       className="mx-auto h-10 w-16 rounded border border-slate-200"
-                      style={{ backgroundColor: background.color }}
+                      style={{
+                        backgroundColor: background.color,
+                      }}
                     />
 
                     <p className="mt-2 text-xs font-bold text-slate-800">
@@ -1172,7 +1436,9 @@ export default function AdminCharacterCreatorPage() {
                     <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
                       <span
                         className="h-7 w-7 shrink-0 rounded border border-slate-200"
-                        style={{ backgroundColor: character.background }}
+                        style={{
+                          backgroundColor: character.background,
+                        }}
                       />
 
                       <code className="text-xs font-bold text-slate-700">
@@ -1190,7 +1456,9 @@ export default function AdminCharacterCreatorPage() {
               PREVIEW
             </span>
 
-            <h2 className="mt-4 text-sm font-bold">미리보기</h2>
+            <h2 className="mt-4 text-sm font-bold">
+              미리보기
+            </h2>
 
             <div
               className="mt-4 h-72 overflow-hidden rounded-lg border border-slate-200"
@@ -1201,6 +1469,9 @@ export default function AdminCharacterCreatorPage() {
                 skinColor={character.skinColor}
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
+                musicalJacketColor={character.musicalJacketColor}
+                musicalInnerColor={character.musicalInnerColor}
+                musicalShortsColor={character.musicalShortsColor}
                 outfitName={character.outfitName}
                 outfitModelId={character.outfitModelId}
                 hairStyle={character.hairStyle}
@@ -1209,14 +1480,38 @@ export default function AdminCharacterCreatorPage() {
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
               <p>피부: {character.skinTone}</p>
-              <p>피부색: {character.skinColor.toUpperCase()}</p>
+              <p>
+                피부색: {character.skinColor.toUpperCase()}
+              </p>
               <p>헤어: {character.hairStyle}</p>
-              <p>헤어 컬러: {character.hairColor.toUpperCase()}</p>
+              <p>
+                헤어 컬러: {character.hairColor.toUpperCase()}
+              </p>
               <p>의상: {character.outfitName}</p>
-              <p>의상 컬러: {character.outfitColor.toUpperCase()}</p>
+
+              {isMusicalOutfit ? (
+                <>
+                  <p>
+                    자켓: {character.musicalJacketColor.toUpperCase()}
+                  </p>
+                  <p>
+                    이너: {character.musicalInnerColor.toUpperCase()}
+                  </p>
+                  <p>
+                    반바지: {character.musicalShortsColor.toUpperCase()}
+                  </p>
+                </>
+              ) : (
+                <p>
+                  의상 컬러: {character.outfitColor.toUpperCase()}
+                </p>
+              )}
+
               <p>액세서리: {character.accessory}</p>
               <p>포즈: {character.pose}</p>
-              <p>배경: {character.background.toUpperCase()}</p>
+              <p>
+                배경: {character.background.toUpperCase()}
+              </p>
             </div>
 
             <button
@@ -1236,8 +1531,8 @@ export default function AdminCharacterCreatorPage() {
             </button>
 
             <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 p-3 text-xs text-blue-700">
-              적용 버튼을 누르면 공연 등록 화면으로 돌아가고, 선택한 캐릭터
-              설정이 임시 저장됩니다.
+              적용 버튼을 누르면 공연 등록 화면으로 돌아가고, 선택한
+              캐릭터 설정이 임시 저장됩니다.
             </div>
           </aside>
         </div>
@@ -1262,6 +1557,164 @@ function CreatorSection({
       <h2 className="mb-4 text-sm font-bold">{title}</h2>
       {children}
     </section>
+  );
+}
+
+function OutfitColorControl({
+  title,
+  customTitle,
+  idPrefix,
+  currentColor,
+  hexInput,
+  hexError,
+  presets,
+  isCustom,
+  placeholder,
+  onPresetClick,
+  onColorPickerChange,
+  onHexChange,
+  onHexBlur,
+}: {
+  title: string;
+  customTitle: string;
+  idPrefix: string;
+  currentColor: string;
+  hexInput: string;
+  hexError: string;
+  presets: string[];
+  isCustom: boolean;
+  placeholder: string;
+  onPresetClick: (color: string) => unknown;
+  onColorPickerChange: (color: string) => unknown;
+  onHexChange: (value: string) => void;
+  onHexBlur: () => void;
+}) {
+  const pickerId = `${idPrefix}-color-picker`;
+  const hexId = `${idPrefix}-hex`;
+  const helpId = `${idPrefix}-hex-help`;
+  const errorId = `${idPrefix}-hex-error`;
+
+  return (
+    <div className="mt-5">
+      <p className="text-sm font-bold text-slate-800">
+        {title}
+      </p>
+
+      <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
+        {presets.map((color) => (
+          <ColorButton
+            key={color}
+            color={color}
+            selected={isSameHexColor(currentColor, color)}
+            onClick={() => onPresetClick(color)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">
+              {customTitle}
+            </h3>
+
+            <p className="mt-1 text-xs text-slate-500">
+              컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
+            </p>
+          </div>
+
+          {isCustom && (
+            <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+              CUSTOM 선택됨
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+          <div>
+            <label
+              htmlFor={pickerId}
+              className="mb-2 block text-xs font-bold text-slate-700"
+            >
+              컬러 피커
+            </label>
+
+            <input
+              id={pickerId}
+              type="color"
+              value={currentColor}
+              onChange={(event) =>
+                onColorPickerChange(event.target.value)
+              }
+              className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+              aria-label={`${title} 사용자 지정 컬러 선택`}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor={hexId}
+              className="mb-2 block text-xs font-bold text-slate-700"
+            >
+              HEX 색상 코드
+            </label>
+
+            <input
+              id={hexId}
+              type="text"
+              value={hexInput}
+              onChange={(event) =>
+                onHexChange(event.target.value)
+              }
+              onBlur={onHexBlur}
+              placeholder={placeholder}
+              maxLength={7}
+              spellCheck={false}
+              aria-invalid={Boolean(hexError)}
+              aria-describedby={`${helpId} ${errorId}`}
+              className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                hexError
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-slate-300 focus:border-primary"
+              }`}
+            />
+
+            <p
+              id={helpId}
+              className="mt-1 text-[11px] text-slate-500"
+            >
+              # 없이 6자리만 입력해도 자동으로 적용됩니다.
+            </p>
+
+            {hexError && (
+              <p
+                id={errorId}
+                className="mt-1 text-xs font-medium text-red-600"
+              >
+                {hexError}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-bold text-slate-700">
+              현재 적용 색상
+            </p>
+
+            <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+              <span
+                className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                style={{ backgroundColor: currentColor }}
+              />
+
+              <code className="text-xs font-bold text-slate-700">
+                {currentColor.toUpperCase()}
+              </code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

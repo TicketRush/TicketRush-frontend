@@ -29,6 +29,9 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   getOutfitOption,
   resolveStoredOutfitModelId,
   type OutfitModelId,
@@ -79,6 +82,9 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   accessory: string;
   pose: CharacterPose;
   background: string;
@@ -102,6 +108,9 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "musicalJacketColor"
+        | "musicalInnerColor"
+        | "musicalShortsColor"
       >
     > & {
       skinTone?: unknown;
@@ -111,6 +120,9 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      musicalJacketColor?: unknown;
+      musicalInnerColor?: unknown;
+      musicalShortsColor?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -128,10 +140,26 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedMusicalJacketColor =
+      typeof parsed.musicalJacketColor === "string"
+        ? normalizeHexColor(parsed.musicalJacketColor)
+        : null;
+
+    const resolvedMusicalInnerColor =
+      typeof parsed.musicalInnerColor === "string"
+        ? normalizeHexColor(parsed.musicalInnerColor)
+        : null;
+
+    const resolvedMusicalShortsColor =
+      typeof parsed.musicalShortsColor === "string"
+        ? normalizeHexColor(parsed.musicalShortsColor)
+        : null;
+
     const resolvedOutfitModelId = resolveStoredOutfitModelId(
       parsed.outfitModelId,
       parsed.outfitName,
     );
+
     const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
 
     return {
@@ -142,6 +170,12 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      musicalJacketColor:
+        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
+      musicalInnerColor:
+        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
+      musicalShortsColor:
+        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -453,7 +487,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
                     ? ""
                     : String(form.durationMinutes)
                 }
-                onChange={(v) => update("durationMinutes", Number(v || 0))}
+                onChange={(v) =>
+                  update("durationMinutes", Number(v || 0))
+                }
                 onKeyDown={handleEnterMoveNext}
                 placeholder="예: 120"
               />
@@ -487,7 +523,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
               <FormInput
                 type="number"
                 value={form.price === 0 ? "" : String(form.price)}
-                onChange={(v) => update("price", Number(v || 0))}
+                onChange={(v) =>
+                  update("price", Number(v || 0))
+                }
                 onKeyDown={handleEnterMoveNext}
                 placeholder="예: 88000"
               />
@@ -497,7 +535,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
               <FormInput
                 type="number"
                 value={totalSeats === 0 ? "" : String(totalSeats)}
-                onChange={(v) => setTotalSeats(Number(v || 0))}
+                onChange={(v) =>
+                  setTotalSeats(Number(v || 0))
+                }
                 onKeyDown={handleEnterMoveNext}
                 placeholder="예: 120"
               />
@@ -509,7 +549,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
           <Field label="공연 상세 설명" required>
             <textarea
               value={form.description}
-              onChange={(e) => update("description", e.target.value)}
+              onChange={(e) =>
+                update("description", e.target.value)
+              }
               rows={8}
               placeholder="공연 소개, 공연 특징, 관람 안내를 입력하세요."
               className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
@@ -554,7 +596,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
               <div key={index} className="flex gap-2">
                 <FormInput
                   value={facility.label}
-                  onChange={(v) => updateFacility(index, v)}
+                  onChange={(v) =>
+                    updateFacility(index, v)
+                  }
                   onKeyDown={handleEnterMoveNext}
                   placeholder="예: 최신 음향 시스템"
                 />
@@ -589,7 +633,11 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
           <Field label="대표 이미지" required>
             <UploadBox
-              text={mainImage ? mainImage.name : "대표 이미지 업로드"}
+              text={
+                mainImage
+                  ? mainImage.name
+                  : "대표 이미지 업로드"
+              }
               description="클릭하거나 파일을 끌어다 놓으세요."
               accept="image/*"
               onFilesSelected={handleMainImageFiles}
@@ -623,7 +671,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
                       <button
                         type="button"
-                        onClick={() => removeGalleryImage(index)}
+                        onClick={() =>
+                          removeGalleryImage(index)
+                        }
                         className="mt-2 text-xs text-red-400"
                       >
                         삭제
@@ -743,14 +793,18 @@ function UploadBox({
   multiple?: boolean;
   onFilesSelected: (files: File[]) => void;
 }) {
-  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleInputChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
     const files = Array.from(event.target.files ?? []);
 
     onFilesSelected(files);
     event.target.value = "";
   }
 
-  function handleDrop(event: React.DragEvent<HTMLLabelElement>) {
+  function handleDrop(
+    event: React.DragEvent<HTMLLabelElement>,
+  ) {
     event.preventDefault();
 
     const files = Array.from(event.dataTransfer.files ?? []);
@@ -792,7 +846,9 @@ function EditableDateInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => void;
   placeholder?: string;
 }) {
   function formatDateInput(input: string) {
@@ -814,7 +870,9 @@ function EditableDateInput({
       data-form-focus="true"
       type="text"
       value={value}
-      onChange={(e) => onChange(formatDateInput(e.target.value))}
+      onChange={(e) =>
+        onChange(formatDateInput(e.target.value))
+      }
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       maxLength={10}
@@ -832,7 +890,9 @@ function EditableTimeInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => void;
   placeholder?: string;
 }) {
   function formatTimeInput(input: string) {
@@ -850,7 +910,9 @@ function EditableTimeInput({
       data-form-focus="true"
       type="text"
       value={value}
-      onChange={(e) => onChange(formatTimeInput(e.target.value))}
+      onChange={(e) =>
+        onChange(formatTimeInput(e.target.value))
+      }
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       maxLength={5}
@@ -889,6 +951,9 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isMusicalOutfit =
+    character.outfitModelId === "musical";
+
   return (
     <div className="overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
       <div
@@ -900,6 +965,9 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          musicalJacketColor={character.musicalJacketColor}
+          musicalInnerColor={character.musicalInnerColor}
+          musicalShortsColor={character.musicalShortsColor}
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
@@ -912,13 +980,23 @@ function CharacterCreatorLinkBox({
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
-          헤어: {character.hairStyle} / 포즈: {character.pose}
+          피부: {character.skinTone} (
+          {character.skinColor.toUpperCase()}) / 헤어:{" "}
+          {character.hairStyle} / 포즈: {character.pose}
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          의상: {character.outfitName} / 액세서리: {character.accessory}
+          의상: {character.outfitName} / 액세서리:{" "}
+          {character.accessory}
         </p>
+
+        {isMusicalOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            자켓: {character.musicalJacketColor.toUpperCase()} / 이너:{" "}
+            {character.musicalInnerColor.toUpperCase()} / 반바지:{" "}
+            {character.musicalShortsColor.toUpperCase()}
+          </p>
+        )}
 
         <button
           type="button"

@@ -15,6 +15,16 @@ interface OutfitOption {
   modelUrl: string | null;
 }
 
+export const DEFAULT_MUSICAL_JACKET_COLOR = "#7B61FF";
+export const DEFAULT_MUSICAL_INNER_COLOR = "#F8FAFC";
+export const DEFAULT_MUSICAL_SHORTS_COLOR = "#2F3338";
+
+export const MUSICAL_OUTFIT_PART_NAMES = {
+  jacket: "musical_jacket",
+  inner: "musical_inner",
+  shorts: "musical_shorts",
+} as const;
+
 export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
   {
     id: "rainbow-blouse",
