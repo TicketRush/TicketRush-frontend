@@ -87,6 +87,12 @@ export const ERROR_CODES = {
   SEAT_NOT_FOUND: "SEAT_404_001",
   SEAT_NOT_AVAILABLE: "SEAT_409_001",
   SEAT_ALREADY_LOCKED: "SEAT_409_002",
+  /** 이미 해제됨 — 맵 재조회 */
+  SEAT_NOT_HELD: "SEAT_409_004",
+  /** 판매 완료 — 강제 해제 금지, 환불은 예매 내역 */
+  SEAT_SOLD_NOT_RELEASABLE: "SEAT_409_005",
+  /** 선점이 바뀜 — 재조회 후 재시도 */
+  SEAT_RELEASE_CONFLICT: "SEAT_409_006",
 
   // Performance 400 / 404 / 409
   PERFORMANCE_MAIN_IMAGE_MISSING: "PERFORMANCE_400_001",

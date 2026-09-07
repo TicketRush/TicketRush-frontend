@@ -28,6 +28,11 @@ import {
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
+import {
+  getOutfitOption,
+  resolveStoredOutfitModelId,
+  type OutfitModelId,
+} from "@/components/admin/character/characterOutfit";
 
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
@@ -72,6 +77,7 @@ interface CharacterDraft {
   skinColor: string;
   hairStyle: HairStyle;
   hairColor: string;
+  outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
   accessory: string;
@@ -94,6 +100,8 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "skinColor"
         | "hairStyle"
         | "hairColor"
+        | "outfitModelId"
+        | "outfitName"
         | "outfitColor"
         | "background"
       >
@@ -102,6 +110,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       skinColor?: unknown;
       hairStyle?: unknown;
       hairColor?: unknown;
+      outfitModelId?: unknown;
+      outfitName?: unknown;
       outfitColor?: unknown;
       background?: unknown;
     };
@@ -126,11 +136,20 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.background)
         : null;
 
+    const resolvedOutfitModelId = resolveStoredOutfitModelId(
+      parsed.outfitModelId,
+      parsed.outfitName,
+    );
+
+    const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
+
     return {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
+      outfitModelId: resolvedOutfitModelId,
+      outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
       background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
     } as CharacterDraft;
@@ -891,6 +910,8 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          outfitName={character.outfitName}
+          outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
         />
       </div>
