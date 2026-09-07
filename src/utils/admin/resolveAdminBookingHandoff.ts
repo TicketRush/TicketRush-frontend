@@ -47,7 +47,16 @@ export function resolveAdminBookingHandoff(
     };
   }
 
-  if (status != null && status !== "CONFIRMED") {
+  // CONFIRMED가 확인된 경우에만 모달. 상태 미확인은 열지 않는다.
+  if (status === "CONFIRMED") {
+    return {
+      expandBookingNumber,
+      refundTarget: handoff.bookingNumber,
+      refundBlocked: false,
+    };
+  }
+
+  if (status != null) {
     return {
       expandBookingNumber,
       refundTarget: null,
@@ -57,7 +66,7 @@ export function resolveAdminBookingHandoff(
 
   return {
     expandBookingNumber,
-    refundTarget: handoff.bookingNumber,
+    refundTarget: null,
     refundBlocked: false,
   };
 }

@@ -111,7 +111,10 @@ export default function AdminBookingsPage() {
     const key = `${handoff.bookingNumber}:${handoff.intentRefund}`;
     if (appliedHandoffKey === key) return;
     if (isLoading && !data) return;
-    if (handoff.intentRefund && focusLoading) return;
+    const onCurrentPage = data?.items.some(
+      (item) => item.bookingNumber === handoff.bookingNumber,
+    );
+    if (handoff.intentRefund && !onCurrentPage && focusLoading) return;
 
     const result = resolveAdminBookingHandoff(
       handoff,
@@ -132,8 +135,8 @@ export default function AdminBookingsPage() {
     }
     if (result.refundTarget) {
       setRefundTarget(result.refundTarget);
-      stripHandoffIntent();
     }
+    stripHandoffIntent();
   }, [
     appliedHandoffKey,
     data,

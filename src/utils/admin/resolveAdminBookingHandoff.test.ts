@@ -98,21 +98,12 @@ describe("resolveAdminBookingHandoff", () => {
     });
   });
 
-  it("intent=refund이고 목록에 없으면 예매번호만으로 모달을 연다", () => {
+  it("현재 페이지에 없는 예매 + intent=refund + 단건 CONFIRMED면 모달을 연다", () => {
     expect(
       resolveAdminBookingHandoff(
         { bookingNumber: "OFF-PAGE", intentRefund: true },
         [confirmed],
-      ),
-    ).toEqual({
-      expandBookingNumber: null,
-      refundTarget: "OFF-PAGE",
-      refundBlocked: false,
-    });
-    expect(
-      resolveAdminBookingHandoff(
-        { bookingNumber: "OFF-PAGE", intentRefund: true },
-        undefined,
+        "CONFIRMED",
       ),
     ).toEqual({
       expandBookingNumber: null,
@@ -121,7 +112,18 @@ describe("resolveAdminBookingHandoff", () => {
     });
   });
 
-  it("intent=refund이고 단건 상태가 CONFIRMED가 아니면 모달을 막는다", () => {
+  it("현재 페이지에 없는 예매 + intent=refund + 단건 PENDING/REFUNDED면 모달을 막는다", () => {
+    expect(
+      resolveAdminBookingHandoff(
+        { bookingNumber: "OFF-PAGE", intentRefund: true },
+        [confirmed],
+        "PENDING",
+      ),
+    ).toEqual({
+      expandBookingNumber: null,
+      refundTarget: null,
+      refundBlocked: true,
+    });
     expect(
       resolveAdminBookingHandoff(
         { bookingNumber: "OFF-PAGE", intentRefund: true },
@@ -132,6 +134,29 @@ describe("resolveAdminBookingHandoff", () => {
       expandBookingNumber: null,
       refundTarget: null,
       refundBlocked: true,
+    });
+  });
+
+  it("현재 페이지에 없는 예매 + intent=refund + 단건 실패/상태 미확인이면 모달을 열지 않는다", () => {
+    expect(
+      resolveAdminBookingHandoff(
+        { bookingNumber: "OFF-PAGE", intentRefund: true },
+        [confirmed],
+      ),
+    ).toEqual({
+      expandBookingNumber: null,
+      refundTarget: null,
+      refundBlocked: false,
+    });
+    expect(
+      resolveAdminBookingHandoff(
+        { bookingNumber: "OFF-PAGE", intentRefund: true },
+        undefined,
+      ),
+    ).toEqual({
+      expandBookingNumber: null,
+      refundTarget: null,
+      refundBlocked: false,
     });
   });
 });
