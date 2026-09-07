@@ -1,20 +1,28 @@
 // AdminBookingTable
 //
-// 백엔드 스펙 반영 변경:
-//   - booking.seatNumbers → booking.seatNumbers
-import { useEffect, useState } from "react";
+// 백엔드 BookingAdminSummaryResponse (#174 / BE #561):
+//   보강 필드·paymentAmount는 생략/null 가능. 결제 수단은 BE 미제공.
+import { Fragment } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, User, Mail, CreditCard } from "lucide-react";
+import { ChevronDown, ChevronUp, User, Mail } from "lucide-react";
 import type { AdminBookingItem } from "@/types/domain/admin";
+import {
+  formatAdminDateTime,
+  formatAdminText,
+  formatAdminWon,
+  UNAVAILABLE_METRIC,
+} from "@/utils/admin/formatAdminMetric";
 
 interface AdminBookingTableProps {
   data: AdminBookingItem[];
   onRefund: (bookingNumber: string) => void;
+  expandedId: string | null;
+  onExpandedIdChange: (bookingNumber: string | null) => void;
   focusedBookingNumber?: string | null;
 }
 
@@ -23,18 +31,17 @@ const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
   CANCELED: { label: "취소", bg: "#FB2C36" },
   PENDING: { label: "대기", bg: "#FBBF24" },
   EXPIRED: { label: "만료", bg: "#9CA3AF" },
+  REFUNDING: { label: "환불 중", bg: "#2B7FFF" },
+  REFUNDED: { label: "환불 완료", bg: "#6B7280" },
 };
 
 export default function AdminBookingTable({
   data,
   onRefund,
+  expandedId,
+  onExpandedIdChange,
   focusedBookingNumber,
 }: AdminBookingTableProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (focusedBookingNumber) setExpandedId(focusedBookingNumber);
-  }, [focusedBookingNumber]);
 
   const columns: ColumnDef<AdminBookingItem>[] = [
     {
@@ -50,29 +57,34 @@ export default function AdminBookingTable({
       accessorKey: "concertTitle",
       header: "공연명",
       cell: ({ getValue }) => (
-        <span className="font-bold text-sm">{getValue() as string}</span>
+        <span className="font-bold text-sm">
+          {formatAdminText(getValue() as string | null)}
+        </span>
       ),
     },
-    { accessorKey: "concertDate", header: "공연날짜" },
+    {
+      accessorKey: "concertDate",
+      header: "공연날짜",
+      cell: ({ getValue }) => formatAdminText(getValue() as string | null),
+    },
     {
       accessorKey: "bookedAt",
       header: "예매일시",
-      cell: ({ getValue }) => {
-        const d = new Date(getValue() as string);
-        return `${d.toISOString().split("T")[0]} ${d.toTimeString().slice(0, 5)}`;
-      },
+      cell: ({ getValue }) => formatAdminDateTime(getValue() as string),
     },
     {
       accessorKey: "userName",
       header: "예매자",
       cell: ({ getValue }) => (
-        <span className="font-semibold">{getValue() as string}</span>
+        <span className="font-semibold">
+          {formatAdminText(getValue() as string | null)}
+        </span>
       ),
     },
     {
       accessorKey: "totalAmount",
       header: "금액",
-      cell: ({ getValue }) => `₩${(getValue() as number).toLocaleString()}`,
+      cell: ({ getValue }) => formatAdminWon(getValue() as number | null),
     },
     {
       accessorKey: "status",
@@ -98,7 +110,7 @@ export default function AdminBookingTable({
           <button
             type="button"
             onClick={() =>
-              setExpandedId(isOpen ? null : row.original.bookingNumber)
+              onExpandedIdChange(isOpen ? null : row.original.bookingNumber)
             }
             className="p-1.5 rounded bg-admin-border hover:bg-admin-border/80"
           >
@@ -137,9 +149,8 @@ export default function AdminBookingTable({
             const b = row.original;
             const isOpen = expandedId === b.bookingNumber;
             return (
-              <>
+              <Fragment key={row.id}>
                 <tr
-                  key={row.id}
                   className={`border-b border-admin-border/50 hover:bg-admin-border/30 ${
                     focusedBookingNumber === b.bookingNumber
                       ? "bg-primary/10"
@@ -162,7 +173,7 @@ export default function AdminBookingTable({
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>
@@ -180,7 +191,6 @@ function BookingDetail({
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* 좌측: 예매자 정보 */}
       <div>
         <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-3">
           예매자 정보
@@ -189,43 +199,43 @@ function BookingDetail({
           <Field
             icon={<User size={14} />}
             label="이름"
-            value={booking.userName}
+            value={formatAdminText(booking.userName)}
           />
           <Field
             icon={<Mail size={14} />}
             label="이메일"
-            value={booking.userEmail}
-          />
-          <Field
-            icon={<CreditCard size={14} />}
-            label="결제 수단"
-            value={booking.paymentMethod}
+            value={formatAdminText(booking.userEmail)}
           />
         </div>
       </div>
 
-      {/* 우측: 좌석 정보 + 금액 + 환불 */}
       <div>
         <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-3">
           좌석 정보
         </p>
         <div className="flex gap-2 mb-3 flex-wrap">
-          {booking.seatNumbers.map((s) => (
-            <span
-              key={s}
-              className="px-3 py-1.5 rounded text-white text-sm font-bold"
-              style={{ backgroundColor: "#1D7DFF" }}
-            >
-              {s}
+          {booking.seatNumbers.length === 0 ? (
+            <span className="text-sm text-admin-text-secondary">
+              {UNAVAILABLE_METRIC}
             </span>
-          ))}
+          ) : (
+            booking.seatNumbers.map((s) => (
+              <span
+                key={s}
+                className="px-3 py-1.5 rounded text-white text-sm font-bold"
+                style={{ backgroundColor: "#1D7DFF" }}
+              >
+                {s}
+              </span>
+            ))
+          )}
         </div>
         <div className="bg-admin-bg/70 rounded p-4 space-y-2 text-sm">
-          <Row label="좌석 수" value={`${booking.seatNumbers.length}석`} />
-          <Row label="단가" value={`₩${booking.unitPrice.toLocaleString()}`} />
+          <Row label="좌석 수" value={`${booking.seatCount}석`} />
+          <Row label="단가" value={formatAdminWon(booking.unitPrice)} />
           <Row
             label="총 금액"
-            value={`₩${booking.totalAmount.toLocaleString()}`}
+            value={formatAdminWon(booking.totalAmount)}
             emphasized
           />
         </div>
@@ -236,7 +246,7 @@ function BookingDetail({
             className="w-full mt-3 py-3 rounded font-bold text-white"
             style={{ backgroundColor: "#931818" }}
           >
-            환불 처리
+            환불 요청
           </button>
         )}
       </div>

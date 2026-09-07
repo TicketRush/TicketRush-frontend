@@ -116,6 +116,10 @@ const ERROR_MESSAGE_OVERRIDES: Partial<Record<ErrorCode | string, string>> = {
     "조회 시작일은 종료일보다 늦을 수 없습니다.",
   [ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG]:
     "조회 기간은 최대 92일까지 지정할 수 있습니다.",
+  [ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED]:
+    "현재 상태에서는 취소하거나 환불할 수 없습니다.",
+  [ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED_TICKET_USED]:
+    "이미 입장한 예매는 환불할 수 없습니다.",
 
   [ERROR_CODES.SEAT_NOT_HELD]:
     "이미 해제된 좌석입니다. 좌석 현황을 다시 확인하세요.",
@@ -123,8 +127,6 @@ const ERROR_MESSAGE_OVERRIDES: Partial<Record<ErrorCode | string, string>> = {
     "판매 완료된 좌석은 강제 해제할 수 없습니다. 예매 내역에서 환불하세요.",
   [ERROR_CODES.SEAT_RELEASE_CONFLICT]:
     "선점 상태가 바뀌었습니다. 다시 조회한 뒤 시도하세요.",
-  [ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED_TICKET_USED]:
-    "이미 입장한 예매는 환불할 수 없습니다.",
 
   // 예시: 백엔드 에러 코드가 확정되는 대로 여기에 추가
   // [ERROR_CODES.UNAUTHORIZED]: "로그인이 필요합니다.",

@@ -26,11 +26,18 @@ describe("formatAdminMetric", () => {
     expect(formatAdminSeats(38, 120)).toBe("38/120");
   });
 
-  it("빈 문자열과 예매자 조합을 화면 형식으로 돌린다", () => {
+  it("빈 문자열과 보강 실패 값은 - 로 둔다", () => {
+    expect(formatAdminText(undefined)).toBe(UNAVAILABLE_METRIC);
     expect(formatAdminText("  ")).toBe(UNAVAILABLE_METRIC);
-    expect(formatAdminDateTime("2026-05-22 10:30:00")).toBe(
-      "2026-05-22 10:30",
-    );
+    expect(formatAdminText("김소희")).toBe("김소희");
+  });
+
+  it("백엔드 예매 일시를 로컬 YYYY-MM-DD HH:mm으로 돌린다", () => {
+    expect(formatAdminDateTime(null)).toBe(UNAVAILABLE_METRIC);
+    expect(formatAdminDateTime("2026-05-22 10:30:00")).toBe("2026-05-22 10:30");
+  });
+
+  it("예매자 이름·이메일을 조합한다", () => {
     expect(formatAdminBooker("김철수", "a@b.com")).toBe("김철수 (a@b.com)");
     expect(formatAdminBooker(null, "a@b.com")).toBe("a@b.com");
     expect(formatAdminBooker(undefined, undefined)).toBeUndefined();

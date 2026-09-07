@@ -387,36 +387,49 @@ export async function mockRetryRefund(bookingNumber: string): Promise<void> {
   await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
 }
 
-/** GET /api/v1/booking/admin/bookings/{bookingNumber} (#169) */
+/** 사용자 예매 스토어에 없는 관리자 목록 mock을 단건 GET에 붙인다. */
+let adminBookerFallback:
+  | ((bookingNumber: string) => AdminBookingBookerResponse | undefined)
+  | null = null;
+
+export function registerAdminBookerFallback(
+  lookup: (bookingNumber: string) => AdminBookingBookerResponse | undefined,
+) {
+  adminBookerFallback = lookup;
+}
+
 export async function mockGetAdminBookingByNumber(
   bookingNumber: string,
 ): Promise<AdminBookingBookerResponse> {
   await mockDelay(150);
   const booking = _findMockBooking(bookingNumber);
-  if (!booking) {
-    await mockError(
-      ERROR_CODES.BOOKING_NOT_FOUND,
-      "예매 정보를 찾을 수 없습니다.",
-      0,
-      404,
-    );
+  if (booking) {
+    const paid =
+      booking.status === "CONFIRMED" ||
+      booking.status === "REFUNDED" ||
+      booking.status === "REFUNDING";
+
+    return {
+      bookingNumber: booking.bookingNumber,
+      bookerName: booking.status === "PENDING" ? "예매 진행자" : "김철수",
+      bookerEmail: "user@example.com",
+      bookedAt: booking.paidAt ?? booking.createdAt,
+      bookingStatus: booking.status,
+      performanceTitle: booking.performanceTitle,
+      performanceDate: booking.performanceDate,
+      seatNumber: booking.seatNumber,
+      seatCount: 1,
+      paymentAmount: paid ? booking.price : null,
+    };
   }
 
-  const paid =
-    booking!.status === "CONFIRMED" ||
-    booking!.status === "REFUNDED" ||
-    booking!.status === "REFUNDING";
+  const fromAdminList = adminBookerFallback?.(bookingNumber);
+  if (fromAdminList) return fromAdminList;
 
-  return {
-    bookingNumber: booking!.bookingNumber,
-    bookerName: booking!.status === "PENDING" ? "예매 진행자" : "김철수",
-    bookerEmail: "user@example.com",
-    bookedAt: booking!.paidAt ?? booking!.createdAt,
-    bookingStatus: booking!.status,
-    performanceTitle: booking!.performanceTitle,
-    performanceDate: booking!.performanceDate,
-    seatNumber: booking!.seatNumber,
-    seatCount: 1,
-    paymentAmount: paid ? booking!.price : null,
-  };
+  return await mockError(
+    ERROR_CODES.BOOKING_NOT_FOUND,
+    "예매 정보를 찾을 수 없습니다.",
+    0,
+    404,
+  );
 }

@@ -1,9 +1,9 @@
-// 관리자: 환불 모니터링 hooks — booking-service 실 API (2026-07-18 확인)
+// 관리자: 환불 모니터링 hooks — booking-service 실 API
 //
-// AdminBookingsPage/AdminRefundsPage가 기존에 쓰던 useAdmin.ts의
-// useAdminBookings/useAdminRefundBooking(전부 mock-only "가상 admin API")과는
-// 별개다. 이 파일은 실제로 존재하는 booking-service admin 엔드포인트
-// (refund-failed / refunding-stuck / refund-retry)만 다룬다.
+// 예매 내역(#174)의 목록·stats·환불(POST .../refund)과 분리한다.
+// 이 파일은 환불 실패·고착 복구(#135)만 다룬다:
+//   GET  .../refund-failed, .../refunding-stuck
+//   POST .../refund-retry
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getRefundFailedBookingsApi,
