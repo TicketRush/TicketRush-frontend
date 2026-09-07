@@ -185,6 +185,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
     if (!savedScroll) return;
 
+    let firstFrameId: number | null = null;
+    let secondFrameId: number | null = null;
+
     try {
       const parsed = JSON.parse(savedScroll) as {
         pathname?: unknown;
@@ -203,18 +206,26 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
       const scrollY = parsed.scrollY as number;
 
-      const frameId = window.requestAnimationFrame(() => {
-        window.scrollTo({
-          top: scrollY,
-          left: 0,
-          behavior: "auto",
-        });
+      firstFrameId = window.requestAnimationFrame(() => {
+        secondFrameId = window.requestAnimationFrame(() => {
+          window.scrollTo({
+            top: scrollY,
+            left: 0,
+            behavior: "auto",
+          });
 
-        sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+          sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+        });
       });
 
       return () => {
-        window.cancelAnimationFrame(frameId);
+        if (firstFrameId !== null) {
+          window.cancelAnimationFrame(firstFrameId);
+        }
+
+        if (secondFrameId !== null) {
+          window.cancelAnimationFrame(secondFrameId);
+        }
       };
     } catch {
       sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
