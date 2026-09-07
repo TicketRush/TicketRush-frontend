@@ -294,8 +294,7 @@ export default function AdminBookingsPage() {
           ))}
         </div>
         <p className="text-[11px] text-admin-text-secondary mt-2">
-          상태 탭은 지금 보고 있는 페이지에만 적용됩니다. 서버 상태 필터는
-          없습니다.
+          이 탭은 지금 보고 있는 페이지의 예매만 걸러 보여 줍니다.
         </p>
       </div>
 
