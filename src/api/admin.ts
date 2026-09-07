@@ -1,7 +1,5 @@
 // 관리자 API
 //
-// 관리자 API
-//
 // 대시보드·관리자 공연 목록 (#191 / BE #563):
 //   GET /api/v1/performance/admin/dashboard
 //   GET /api/v1/performance/admin

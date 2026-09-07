@@ -47,16 +47,28 @@ function matchesTab(status: BookingStatus, tab: Tab): boolean {
   return status === tab;
 }
 
+function overlayRequestedRefundStatus(
+  status: BookingStatus | undefined,
+  bookingNumber: string,
+  requested: ReadonlySet<string>,
+): BookingStatus | undefined {
+  if (status === "CONFIRMED" && requested.has(bookingNumber)) return "REFUNDING";
+  return status;
+}
+
 function withRequestedRefunds(
   items: AdminBookingItem[],
   requested: ReadonlySet<string>,
 ): AdminBookingItem[] {
   if (requested.size === 0) return items;
-  return items.map((item) =>
-    requested.has(item.bookingNumber) && item.status === "CONFIRMED"
-      ? { ...item, status: "REFUNDING" }
-      : item,
-  );
+  return items.map((item) => {
+    const status = overlayRequestedRefundStatus(
+      item.status,
+      item.bookingNumber,
+      requested,
+    );
+    return status === item.status ? item : { ...item, status: status! };
+  });
 }
 
 export default function AdminBookingsPage() {
@@ -293,6 +305,7 @@ export default function AdminBookingsPage() {
           booking={focusBooking}
           isLoading={focusLoading}
           isError={focusError}
+          requestedRefunds={requestedRefunds}
           onRefund={handleRefund}
         />
       ) : null}
@@ -433,14 +446,21 @@ function FocusBookingCard({
   booking,
   isLoading,
   isError,
+  requestedRefunds,
   onRefund,
 }: {
   bookingNumber: string;
   booking: AdminBookingBookerResponse | undefined;
   isLoading: boolean;
   isError: boolean;
+  requestedRefunds: ReadonlySet<string>;
   onRefund: (bookingNumber: string) => void;
 }) {
+  const status = overlayRequestedRefundStatus(
+    booking?.bookingStatus,
+    booking?.bookingNumber ?? bookingNumber,
+    requestedRefunds,
+  );
   return (
     <div className="bg-admin-card border border-admin-border rounded-xl p-6">
       <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
@@ -470,9 +490,8 @@ function FocusBookingCard({
             <FocusField
               label="상태"
               value={
-                booking.bookingStatus
-                  ? (FOCUS_STATUS_LABEL[booking.bookingStatus] ??
-                    booking.bookingStatus)
+                status
+                  ? (FOCUS_STATUS_LABEL[status] ?? status)
                   : formatAdminText(undefined)
               }
             />
@@ -494,7 +513,7 @@ function FocusBookingCard({
               label="결제 금액"
               value={formatAdminWon(booking.paymentAmount)}
             />
-            {booking.bookingStatus === "CONFIRMED" && (
+            {status === "CONFIRMED" && (
               <button
                 type="button"
                 onClick={() => onRefund(booking.bookingNumber)}

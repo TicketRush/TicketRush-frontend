@@ -20,8 +20,10 @@ import {
   _findMockBookingBySeat,
   _findMockBooking,
   _updateMockBookingStatus,
+  registerAdminBookerFallback,
 } from "./bookings";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
+import type { AdminBookingBookerResponse } from "../adminSeatMapper";
 import type {
   AdminConcertItem,
   AdminConcertListParams,
@@ -277,6 +279,27 @@ const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
   }
   return items;
 })();
+
+registerAdminBookerFallback((bookingNumber) => {
+  const item = ADMIN_BOOKINGS.find((b) => b.bookingNumber === bookingNumber);
+  if (!item) return undefined;
+  const paid =
+    item.status === "CONFIRMED" ||
+    item.status === "REFUNDED" ||
+    item.status === "REFUNDING";
+  return {
+    bookingNumber: item.bookingNumber,
+    bookerName: item.userName,
+    bookerEmail: item.userEmail,
+    bookedAt: item.bookedAt,
+    bookingStatus: item.status,
+    performanceTitle: item.concertTitle,
+    performanceDate: item.concertDate,
+    seatNumber: item.seatNumbers[0] ?? null,
+    seatCount: item.seatCount,
+    paymentAmount: paid ? item.totalAmount : null,
+  } satisfies AdminBookingBookerResponse;
+});
 
 export async function mockGetAdminBookings(
   params: AdminBookingListParams,
