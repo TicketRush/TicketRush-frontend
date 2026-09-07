@@ -10,7 +10,7 @@
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
-import { CheckCircle, Calendar, Clock, Music, Download } from "lucide-react";
+import { CheckCircle, Calendar, Clock, Music, Download, AlertCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useBookingDetail } from "@/hooks/queries/useBookingDetail";
 import { useTicketQr } from "@/hooks/queries/useTicketQr";
@@ -19,7 +19,13 @@ import useSeatStore from "@/stores/reservation/seatStore";
 import usePaymentStore from "@/stores/reservation/paymentStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { downloadTicket } from "@/utils/ticket/downloadTicket";
-import { displayBookingText, formatPaymentAmount, canFetchTicketQr, bookingQrPlaceholder } from "@/utils/booking";
+import {
+  displayBookingText,
+  formatPaymentAmount,
+  canFetchTicketQr,
+  bookingQrPlaceholder,
+  paymentCompleteHeading,
+} from "@/utils/booking";
 import { formatBackendDateTimeLabel } from "@/utils/booking/parseBackendDateTime";
 
 export default function PaymentCompletePage() {
@@ -72,6 +78,7 @@ export default function PaymentCompletePage() {
   }
 
   const isConfirmed = canFetchTicketQr(data.status);
+  const heading = paymentCompleteHeading(data.status);
   const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
   const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
   const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
@@ -87,13 +94,23 @@ export default function PaymentCompletePage() {
     <div className="max-w-2xl mx-auto px-6 py-12">
       {/* ─── 다운로드 캡처 영역 시작 ─── */}
       <div ref={ticketRef} className="bg-white">
-        {/* 성공 헤더 */}
+        {/* 상태별 헤더 — PENDING·취소 건을 결제 완료로 표시하지 않는다 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
-            <CheckCircle size={48} className="text-green-600" />
-          </div>
-          <h1 className="text-3xl font-bold mb-1">결제 완료!</h1>
-          <p className="text-text-secondary">디지털 티켓이 발급되었습니다</p>
+          {isConfirmed ? (
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
+              <CheckCircle size={48} className="text-green-600" />
+            </div>
+          ) : data.status === "PENDING" ? (
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-100 mb-4">
+              <Clock size={48} className="text-amber-700" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
+              <AlertCircle size={48} className="text-text-secondary" />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold mb-1">{heading.title}</h1>
+          <p className="text-text-secondary">{heading.subtitle}</p>
         </div>
 
         {/* 티켓 카드 */}

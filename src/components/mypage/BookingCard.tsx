@@ -10,7 +10,12 @@ import type {
   BookingStatus,
   BookingTab,
 } from "@/types/domain/booking";
-import { toShowDateTime, formatPaymentAmount, displayBookingText } from "@/utils/booking";
+import {
+  toShowDateTime,
+  formatPaymentAmount,
+  displayBookingText,
+  isRefundableBooking,
+} from "@/utils/booking";
 import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
 
@@ -66,6 +71,7 @@ const STATUS_BADGE: Record<
  * [환불 정책]
  *  - 공연 7일 전까지: [환불 신청] 활성화
  *  - 공연 7일 미만: "환불 불가 (D-7 미만)" 비활성화
+ *  - 목록에 공연 시각이 없으면 날짜(자정 00:00이 아닌 달력 일수)로 계산
  *
  * [표시 기능 — 지난 공연(past 탭)]
  *  - 환불 신청 버튼 미노출 (지난 공연은 환불 기능 제공하지 않음)
@@ -83,11 +89,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
     booking.performanceTime,
   );
 
-  // ─ 환불 가능 여부 계산 (D-7 기준) ─
-  const now = new Date();
-  const msUntilShow = showDateTime.getTime() - now.getTime();
-  const daysUntilShow = msUntilShow / (1000 * 60 * 60 * 24);
-  const isRefundable = daysUntilShow >= 7 && booking.status === "CONFIRMED";
+  const isRefundable = isRefundableBooking(booking);
 
   // ─ 지난 공연 여부 ─
   const isPastTab = tab === "past";
@@ -283,7 +285,9 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
                     ? "환불 완료"
                     : booking.status === "EXPIRED"
                       ? "만료된 예매"
-                      : "환불 불가 (D-7 미만)"}
+                      : booking.performanceDate?.trim()
+                        ? "환불 불가 (D-7 미만)"
+                        : "환불 불가"}
             </button>
           )}
         </div>
