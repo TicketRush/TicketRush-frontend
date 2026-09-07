@@ -445,9 +445,9 @@ export async function mockGetAdminSeatDetail(
       const remainingSec = Math.max(0, 300 - Math.floor(elapsedMs / 1000));
       return {
         seatId,
-        seatNumber, // ← 변경
+        seatNumber,
         status: "HOLD",
-        reservedBy: "예매 진행자",
+        bookingNumber: booking.bookingNumber,
         reservedAt: booking.createdAt,
         holdRemainingSec: remainingSec,
       };
@@ -455,9 +455,9 @@ export async function mockGetAdminSeatDetail(
     if (booking.status === "CONFIRMED") {
       return {
         seatId,
-        seatNumber, // ← 변경
+        seatNumber,
         status: "SOLD",
-        reservedBy: "김철수",
+        bookingNumber: booking.bookingNumber,
         reservedAt: booking.paidAt ?? booking.createdAt,
       };
     }
@@ -473,9 +473,17 @@ export async function mockGetAdminSeatDetail(
 export async function mockAdminReleaseSeat(
   _performanceId: number,
   _seatId: number,
+  bookingNumber: string,
 ): Promise<void> {
   await mockDelay(300);
-  // 강제 해제 — mock에선 noop
+  if (!bookingNumber.trim()) {
+    await mockError(
+      ERROR_CODES.VALIDATION_ERROR,
+      "예매 번호가 필요합니다.",
+      0,
+      400,
+    );
+  }
 }
 
 // ── 공연 CRUD ────────────────────────────────────────

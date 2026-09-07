@@ -173,11 +173,18 @@ export interface AdminSeatDetail {
   seatId: number;
   seatNumber: string;
   status: SeatStatus;
-  /** SOLD or HOLD 상태일 때만 존재 */
+  /**
+   * 좌석 상세의 bookingNumber. NON_NULL이라 없으면 키 생략.
+   * 예매자 이름은 이 값으로 예매 단건을 조합한다. 강제 해제 쿼리에도 쓴다.
+   */
+  bookingNumber?: string;
+  /** 예매 단건의 bookerName + bookerEmail 조합. 조회 실패·생략 시 없음 */
   reservedBy?: string;
-  /** ISO datetime — SOLD or HOLD 시 */
+  /** 예매 단건 GET 실패. `-`와 구분한다 */
+  bookerLoadFailed?: boolean;
+  /** HOLD: holdStartedAt. SOLD: 예매 단건 bookedAt. BE `yyyy-MM-dd HH:mm:ss` */
   reservedAt?: string;
-  /** HOLD 상태일 때 남은 임시 예약 시간(초) */
+  /** HOLD일 때 remainingSeconds. 비HOLD는 없음 */
   holdRemainingSec?: number;
 }
 

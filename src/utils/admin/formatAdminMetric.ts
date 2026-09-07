@@ -17,6 +17,19 @@ export function formatAdminDateTime(value: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** 예매자 이름·이메일 조합. 둘 다 없으면 undefined(화면에서 "-"). */
+export function formatAdminBooker(
+  name?: string | null,
+  email?: string | null,
+): string | undefined {
+  const n = name?.trim();
+  const e = email?.trim();
+  if (n && e) return `${n} (${e})`;
+  if (n) return n;
+  if (e) return e;
+  return undefined;
+}
+
 export function formatAdminCount(value: number | null | undefined): string {
   return value == null ? UNAVAILABLE_METRIC : value.toLocaleString();
 }

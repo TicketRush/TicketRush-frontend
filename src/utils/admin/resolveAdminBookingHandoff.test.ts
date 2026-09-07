@@ -120,4 +120,18 @@ describe("resolveAdminBookingHandoff", () => {
       refundBlocked: false,
     });
   });
+
+  it("intent=refund이고 단건 상태가 CONFIRMED가 아니면 모달을 막는다", () => {
+    expect(
+      resolveAdminBookingHandoff(
+        { bookingNumber: "OFF-PAGE", intentRefund: true },
+        [confirmed],
+        "REFUNDED",
+      ),
+    ).toEqual({
+      expandBookingNumber: null,
+      refundTarget: null,
+      refundBlocked: true,
+    });
+  });
 });

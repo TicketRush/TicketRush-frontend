@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   UNAVAILABLE_METRIC,
+  formatAdminBooker,
   formatAdminCount,
   formatAdminDateTime,
   formatAdminOccupancy,
@@ -34,6 +35,12 @@ describe("formatAdminMetric", () => {
   it("백엔드 예매 일시를 로컬 YYYY-MM-DD HH:mm으로 돌린다", () => {
     expect(formatAdminDateTime(null)).toBe(UNAVAILABLE_METRIC);
     expect(formatAdminDateTime("2026-05-22 10:30:00")).toBe("2026-05-22 10:30");
+  });
+
+  it("예매자 이름·이메일을 조합한다", () => {
+    expect(formatAdminBooker("김철수", "a@b.com")).toBe("김철수 (a@b.com)");
+    expect(formatAdminBooker(null, "a@b.com")).toBe("a@b.com");
+    expect(formatAdminBooker(undefined, undefined)).toBeUndefined();
   });
 
   it("공연 시각이 있으면 날짜 뒤에 HH:mm만 붙인다", () => {

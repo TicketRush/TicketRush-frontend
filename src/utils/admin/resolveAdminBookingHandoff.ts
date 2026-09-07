@@ -31,11 +31,13 @@ export function parseAdminBookingHandoff(
 export function resolveAdminBookingHandoff(
   handoff: AdminBookingHandoff,
   items: readonly HandoffBooking[] | undefined,
+  knownStatus?: BookingStatus,
 ): AdminBookingHandoffResult {
   const match = items?.find(
     (item) => item.bookingNumber === handoff.bookingNumber,
   );
   const expandBookingNumber = match?.bookingNumber ?? null;
+  const status = match?.status ?? knownStatus;
 
   if (!handoff.intentRefund) {
     return {
@@ -45,7 +47,7 @@ export function resolveAdminBookingHandoff(
     };
   }
 
-  if (match && match.status !== "CONFIRMED") {
+  if (status != null && status !== "CONFIRMED") {
     return {
       expandBookingNumber,
       refundTarget: null,

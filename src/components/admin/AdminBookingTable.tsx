@@ -23,6 +23,7 @@ interface AdminBookingTableProps {
   onRefund: (bookingNumber: string) => void;
   expandedId: string | null;
   onExpandedIdChange: (bookingNumber: string | null) => void;
+  focusedBookingNumber?: string | null;
 }
 
 const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
@@ -39,6 +40,7 @@ export default function AdminBookingTable({
   onRefund,
   expandedId,
   onExpandedIdChange,
+  focusedBookingNumber,
 }: AdminBookingTableProps) {
 
   const columns: ColumnDef<AdminBookingItem>[] = [
@@ -148,7 +150,13 @@ export default function AdminBookingTable({
             const isOpen = expandedId === b.bookingNumber;
             return (
               <Fragment key={row.id}>
-                <tr className="border-b border-admin-border/50 hover:bg-admin-border/30">
+                <tr
+                  className={`border-b border-admin-border/50 hover:bg-admin-border/30 ${
+                    focusedBookingNumber === b.bookingNumber
+                      ? "bg-primary/10"
+                      : ""
+                  }`}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="py-3 px-3 text-admin-text">
                       {flexRender(

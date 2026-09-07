@@ -12,6 +12,8 @@ interface UseSeatCountsOptions {
    * seats 진입 가드(#181)처럼 최신 잔여 좌석이 필요할 때 사용.
    */
   fresh?: boolean;
+  /** 관리자 모니터링처럼 창 포커스 자동 갱신을 끌 때 */
+  refetchOnWindowFocus?: boolean;
 }
 
 export function useSeats(
@@ -46,5 +48,6 @@ export function useSeatCounts(
     enabled: !!performanceId && enabled,
     staleTime: fresh ? 0 : 5_000,
     refetchOnMount: fresh ? "always" : true,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus,
   });
 }

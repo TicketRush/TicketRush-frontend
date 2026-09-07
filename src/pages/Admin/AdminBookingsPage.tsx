@@ -7,15 +7,19 @@ import {
   DollarSign,
   UserMinus,
   ArrowLeft,
+  Mail,
+  User,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { ApiError, mapErrorToMessage } from "@/api/errors/errorMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
+import type { AdminBookingBookerResponse } from "@/api/adminSeatMapper";
 import StatCard from "@/components/admin/StatCard";
 import AdminBookingTable from "@/components/admin/AdminBookingTable";
 import Pagination from "@/components/admin/Pagination";
 import {
   useAdminBookings,
+  useAdminBookingByNumber,
   useAdminBookingStats,
   useAdminRefundBooking,
 } from "@/hooks/admin/useAdmin";
@@ -23,6 +27,8 @@ import type { BookingStatus } from "@/types/domain/booking";
 import type { AdminBookingItem } from "@/types/domain/admin";
 import {
   formatAdminCount,
+  formatAdminDateTime,
+  formatAdminText,
   formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
 import {
@@ -67,6 +73,7 @@ export default function AdminBookingsPage() {
     () => new Set(),
   );
 
+  const focusBookingNumber = searchParams.get("bookingNumber")?.trim() || null;
   const { data, isLoading, isError, isPlaceholderData } = useAdminBookings({
     page,
     size: PAGE_SIZE,
@@ -81,6 +88,11 @@ export default function AdminBookingsPage() {
     isLoading: isStatsLoading,
     isError: isStatsError,
   } = useAdminBookingStats();
+  const {
+    data: focusBooking,
+    isLoading: focusLoading,
+    isError: focusError,
+  } = useAdminBookingByNumber(focusBookingNumber);
   const refundMutation = useAdminRefundBooking();
 
   const visibleItems = useMemo(() => {
@@ -99,8 +111,13 @@ export default function AdminBookingsPage() {
     const key = `${handoff.bookingNumber}:${handoff.intentRefund}`;
     if (appliedHandoffKey === key) return;
     if (isLoading && !data) return;
+    if (handoff.intentRefund && focusLoading) return;
 
-    const result = resolveAdminBookingHandoff(handoff, data?.items);
+    const result = resolveAdminBookingHandoff(
+      handoff,
+      data?.items,
+      focusBooking?.bookingStatus,
+    );
     if (result.expandBookingNumber) {
       setTab("ALL");
       setExpandedId(result.expandBookingNumber);
@@ -110,25 +127,28 @@ export default function AdminBookingsPage() {
       toast.error(
         mapErrorToMessage(ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED, ""),
       );
-      setSearchParams({}, { replace: true });
+      stripHandoffIntent();
       return;
     }
     if (result.refundTarget) {
       setRefundTarget(result.refundTarget);
-      return;
+      stripHandoffIntent();
     }
-    setSearchParams({}, { replace: true });
   }, [
     appliedHandoffKey,
     data,
+    focusBooking?.bookingStatus,
+    focusLoading,
     isLoading,
     searchParams,
     setSearchParams,
   ]);
 
-  function clearBookingHandoffQuery() {
-    if (searchParams.get("bookingNumber") == null) return;
-    setSearchParams({}, { replace: true });
+  function stripHandoffIntent() {
+    if (searchParams.get("intent") == null) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("intent");
+    setSearchParams(next, { replace: true });
   }
 
   function handleRefund(bookingNumber: string) {
@@ -137,7 +157,7 @@ export default function AdminBookingsPage() {
 
   function handleCloseRefundModal() {
     setRefundTarget(null);
-    clearBookingHandoffQuery();
+    stripHandoffIntent();
   }
 
   async function handleConfirmRefund() {
@@ -150,7 +170,7 @@ export default function AdminBookingsPage() {
         "환불을 요청했습니다. 목록이 환불 중으로 바뀌면 처리가 시작된 것입니다.",
       );
       setRefundTarget(null);
-      clearBookingHandoffQuery();
+      stripHandoffIntent();
     } catch (error: unknown) {
       setRequestedRefunds((prev) => {
         const next = new Set(prev);
@@ -264,6 +284,16 @@ export default function AdminBookingsPage() {
         </p>
       </div>
 
+      {focusBookingNumber ? (
+        <FocusBookingCard
+          bookingNumber={focusBookingNumber}
+          booking={focusBooking}
+          isLoading={focusLoading}
+          isError={focusError}
+          onRefund={handleRefund}
+        />
+      ) : null}
+
       <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
         <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
           ORDERS LIST
@@ -327,6 +357,7 @@ export default function AdminBookingsPage() {
                 onRefund={handleRefund}
                 expandedId={expandedId}
                 onExpandedIdChange={setExpandedId}
+                focusedBookingNumber={focusBookingNumber}
               />
             )}
             <Pagination
@@ -383,6 +414,122 @@ function listHeading(
     return `${totalElements}개의 예매 (${visibleCount}개 중)`;
   }
   return `${totalElements}개의 예매 · 이 페이지 ${visibleCount}건`;
+}
+
+const FOCUS_STATUS_LABEL: Record<string, string> = {
+  CONFIRMED: "완료",
+  CANCELED: "취소",
+  PENDING: "대기",
+  EXPIRED: "만료",
+  REFUNDING: "환불 중",
+  REFUNDED: "환불 완료",
+};
+
+function FocusBookingCard({
+  bookingNumber,
+  booking,
+  isLoading,
+  isError,
+  onRefund,
+}: {
+  bookingNumber: string;
+  booking: AdminBookingBookerResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  onRefund: (bookingNumber: string) => void;
+}) {
+  return (
+    <div className="bg-admin-card border border-admin-border rounded-xl p-6">
+      <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+        FOCUSED BOOKING
+      </span>
+      <h3 className="text-base font-bold mb-4">선택한 예매</h3>
+      {isLoading ? (
+        <p className="text-sm text-admin-text-secondary">불러오는 중...</p>
+      ) : isError || !booking ? (
+        <p className="text-sm text-red-400">
+          예매번호 {bookingNumber} 를 찾을 수 없습니다.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3 text-sm">
+            <FocusField label="예매번호" value={booking.bookingNumber} mono />
+            <FocusField
+              icon={<User size={14} />}
+              label="이름"
+              value={formatAdminText(booking.bookerName)}
+            />
+            <FocusField
+              icon={<Mail size={14} />}
+              label="이메일"
+              value={formatAdminText(booking.bookerEmail)}
+            />
+            <FocusField
+              label="상태"
+              value={
+                booking.bookingStatus
+                  ? (FOCUS_STATUS_LABEL[booking.bookingStatus] ??
+                    booking.bookingStatus)
+                  : formatAdminText(undefined)
+              }
+            />
+          </div>
+          <div className="space-y-3 text-sm">
+            <FocusField
+              label="공연"
+              value={formatAdminText(booking.performanceTitle)}
+            />
+            <FocusField
+              label="좌석"
+              value={formatAdminText(booking.seatNumber)}
+            />
+            <FocusField
+              label="예매일시"
+              value={formatAdminDateTime(booking.bookedAt)}
+            />
+            <FocusField
+              label="결제 금액"
+              value={formatAdminWon(booking.paymentAmount)}
+            />
+            {booking.bookingStatus === "CONFIRMED" && (
+              <button
+                type="button"
+                onClick={() => onRefund(booking.bookingNumber)}
+                className="w-full mt-1 py-3 rounded font-bold text-white"
+                style={{ backgroundColor: "#931818" }}
+              >
+                환불 요청
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FocusField({
+  icon,
+  label,
+  value,
+  mono,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      {icon && <div className="text-admin-text-secondary">{icon}</div>}
+      <div>
+        <p className="text-[10px] text-admin-text-secondary">{label}</p>
+        <p className={`font-semibold ${mono ? "font-mono text-blue-400" : ""}`}>
+          {value}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function labelFor(t: Tab) {
