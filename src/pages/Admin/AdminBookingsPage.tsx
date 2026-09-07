@@ -1,6 +1,6 @@
 // 예매 내역 관리 — 이미지 4
-import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Ticket,
   CheckSquare,
@@ -9,6 +9,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { ApiError, mapErrorToMessage } from "@/api/errors/errorMapper";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
 import StatCard from "@/components/admin/StatCard";
 import AdminBookingTable from "@/components/admin/AdminBookingTable";
 import Pagination from "@/components/admin/Pagination";
@@ -23,6 +25,10 @@ import {
   formatAdminCount,
   formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
+import {
+  parseAdminBookingHandoff,
+  resolveAdminBookingHandoff,
+} from "@/utils/admin/resolveAdminBookingHandoff";
 
 type Tab = "ALL" | "CONFIRMED" | "PENDING" | "CANCELED";
 
@@ -49,9 +55,14 @@ function withRequestedRefunds(
 
 export default function AdminBookingsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>("ALL");
   const [page, setPage] = useState(0);
   const [refundTarget, setRefundTarget] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [appliedHandoffKey, setAppliedHandoffKey] = useState<string | null>(
+    null,
+  );
   const [requestedRefunds, setRequestedRefunds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -82,8 +93,51 @@ export default function AdminBookingsPage() {
   const pageHasRows = (data?.items.length ?? 0) > 0;
   const filterEmpty = pageHasRows && visibleItems.length === 0;
 
+  useEffect(() => {
+    const handoff = parseAdminBookingHandoff(searchParams);
+    if (!handoff) return;
+    const key = `${handoff.bookingNumber}:${handoff.intentRefund}`;
+    if (appliedHandoffKey === key) return;
+    if (isLoading && !data) return;
+
+    const result = resolveAdminBookingHandoff(handoff, data?.items);
+    if (result.expandBookingNumber) {
+      setTab("ALL");
+      setExpandedId(result.expandBookingNumber);
+    }
+    setAppliedHandoffKey(key);
+    if (result.refundBlocked) {
+      toast.error(
+        mapErrorToMessage(ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED, ""),
+      );
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    if (result.refundTarget) {
+      setRefundTarget(result.refundTarget);
+      return;
+    }
+    setSearchParams({}, { replace: true });
+  }, [
+    appliedHandoffKey,
+    data,
+    isLoading,
+    searchParams,
+    setSearchParams,
+  ]);
+
+  function clearBookingHandoffQuery() {
+    if (searchParams.get("bookingNumber") == null) return;
+    setSearchParams({}, { replace: true });
+  }
+
   function handleRefund(bookingNumber: string) {
     setRefundTarget(bookingNumber);
+  }
+
+  function handleCloseRefundModal() {
+    setRefundTarget(null);
+    clearBookingHandoffQuery();
   }
 
   async function handleConfirmRefund() {
@@ -96,12 +150,14 @@ export default function AdminBookingsPage() {
         "환불을 요청했습니다. 목록이 환불 중으로 바뀌면 처리가 시작된 것입니다.",
       );
       setRefundTarget(null);
-    } catch {
+      clearBookingHandoffQuery();
+    } catch (error: unknown) {
       setRequestedRefunds((prev) => {
         const next = new Set(prev);
         next.delete(target);
         return next;
       });
+      toast.error(ApiError.fromUnknown(error).message);
     }
   }
 
@@ -266,7 +322,12 @@ export default function AdminBookingsPage() {
                 주세요.
               </div>
             ) : (
-              <AdminBookingTable data={visibleItems} onRefund={handleRefund} />
+              <AdminBookingTable
+                data={visibleItems}
+                onRefund={handleRefund}
+                expandedId={expandedId}
+                onExpandedIdChange={setExpandedId}
+              />
             )}
             <Pagination
               pageIndex={page}
@@ -289,7 +350,7 @@ export default function AdminBookingsPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setRefundTarget(null)}
+                onClick={handleCloseRefundModal}
                 disabled={refundMutation.isPending}
                 className="py-2 rounded bg-admin-border"
               >

@@ -2,7 +2,7 @@
 //
 // 백엔드 BookingAdminSummaryResponse (#174 / BE #561):
 //   보강 필드·paymentAmount는 생략/null 가능. 결제 수단은 BE 미제공.
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -21,6 +21,8 @@ import {
 interface AdminBookingTableProps {
   data: AdminBookingItem[];
   onRefund: (bookingNumber: string) => void;
+  expandedId: string | null;
+  onExpandedIdChange: (bookingNumber: string | null) => void;
 }
 
 const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
@@ -35,8 +37,9 @@ const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
 export default function AdminBookingTable({
   data,
   onRefund,
+  expandedId,
+  onExpandedIdChange,
 }: AdminBookingTableProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const columns: ColumnDef<AdminBookingItem>[] = [
     {
@@ -105,7 +108,7 @@ export default function AdminBookingTable({
           <button
             type="button"
             onClick={() =>
-              setExpandedId(isOpen ? null : row.original.bookingNumber)
+              onExpandedIdChange(isOpen ? null : row.original.bookingNumber)
             }
             className="p-1.5 rounded bg-admin-border hover:bg-admin-border/80"
           >
