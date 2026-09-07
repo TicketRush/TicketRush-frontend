@@ -2,7 +2,7 @@
 //
 // 백엔드 스펙 반영 변경:
 //   - booking.seatNumbers → booking.seatNumbers
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -15,6 +15,7 @@ import type { AdminBookingItem } from "@/types/domain/admin";
 interface AdminBookingTableProps {
   data: AdminBookingItem[];
   onRefund: (bookingNumber: string) => void;
+  focusedBookingNumber?: string | null;
 }
 
 const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
@@ -27,8 +28,13 @@ const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
 export default function AdminBookingTable({
   data,
   onRefund,
+  focusedBookingNumber,
 }: AdminBookingTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (focusedBookingNumber) setExpandedId(focusedBookingNumber);
+  }, [focusedBookingNumber]);
 
   const columns: ColumnDef<AdminBookingItem>[] = [
     {
@@ -134,7 +140,11 @@ export default function AdminBookingTable({
               <>
                 <tr
                   key={row.id}
-                  className="border-b border-admin-border/50 hover:bg-admin-border/30"
+                  className={`border-b border-admin-border/50 hover:bg-admin-border/30 ${
+                    focusedBookingNumber === b.bookingNumber
+                      ? "bg-primary/10"
+                      : ""
+                  }`}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="py-3 px-3 text-admin-text">

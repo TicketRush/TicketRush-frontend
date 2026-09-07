@@ -28,6 +28,7 @@ import type {
   AdminRefundBookingListParams,
   AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
+import type { AdminBookingBookerResponse } from "./adminSeatMapper";
 import {
   mockCreateBooking,
   mockGetBookingDetail,
@@ -37,6 +38,7 @@ import {
   mockGetRefundFailedBookings,
   mockGetRefundingStuckBookings,
   mockRetryRefund,
+  mockGetAdminBookingByNumber,
 } from "./mocks/bookings";
 import { fetchConcertDetail } from "./concerts";
 import { fetchSeatNumbers } from "./seats";
@@ -510,4 +512,22 @@ export async function retryRefundApi(bookingNumber: string): Promise<void> {
   if (USE_MOCK) return mockRetryRefund(bookingNumber);
 
   await apiClient.post(`/api/v1/booking/admin/${bookingNumber}/refund-retry`);
+}
+
+/**
+ * 관리자 예매 단건 — 좌석 상세의 bookingNumber로 예매자를 조합한다 (#169 / BE #562).
+ * GET /api/v1/booking/admin/bookings/{bookingNumber}
+ */
+export async function fetchAdminBookingByNumber(
+  bookingNumber: string,
+): Promise<AdminBookingBookerResponse> {
+  if (USE_MOCK) return mockGetAdminBookingByNumber(bookingNumber);
+
+  const res = await apiClient.get<AdminBookingBookerResponse>(
+    `/api/v1/booking/admin/bookings/${encodeURIComponent(bookingNumber)}`,
+  );
+  if (res.data == null) {
+    throw new Error("예매 정보를 불러올 수 없습니다.");
+  }
+  return res.data;
 }

@@ -302,16 +302,17 @@ export async function mockAdminRefundBooking(
 ): Promise<void> {
   await mockDelay(500);
   const booking = ADMIN_BOOKINGS.find((b) => b.bookingNumber === bookingNumber);
-  if (!booking) {
+  const userSide = _findMockBooking(bookingNumber);
+  if (!booking && !userSide) {
     await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
   }
-  if (booking!.status === "CANCELED") {
+  const currentStatus = booking?.status ?? userSide?.status;
+  if (currentStatus === "CANCELED" || currentStatus === "REFUNDED") {
     await mockError("ALREADY_CANCELLED", "이미 취소된 예매입니다.");
   }
-  booking!.status = "CANCELED";
-
-  // 사용자 mock bookings 저장소도 함께 동기화 (있다면)
-  const userSide = _findMockBooking(bookingNumber);
+  if (booking) {
+    booking.status = "CANCELED";
+  }
   if (userSide) {
     _updateMockBookingStatus(bookingNumber, "CANCELED");
   }
@@ -405,9 +406,9 @@ export async function mockGetAdminSeatDetail(
       const remainingSec = Math.max(0, 300 - Math.floor(elapsedMs / 1000));
       return {
         seatId,
-        seatNumber, // ← 변경
+        seatNumber,
         status: "HOLD",
-        reservedBy: "예매 진행자",
+        bookingNumber: booking.bookingNumber,
         reservedAt: booking.createdAt,
         holdRemainingSec: remainingSec,
       };
@@ -415,9 +416,9 @@ export async function mockGetAdminSeatDetail(
     if (booking.status === "CONFIRMED") {
       return {
         seatId,
-        seatNumber, // ← 변경
+        seatNumber,
         status: "SOLD",
-        reservedBy: "김철수",
+        bookingNumber: booking.bookingNumber,
         reservedAt: booking.paidAt ?? booking.createdAt,
       };
     }
@@ -433,9 +434,17 @@ export async function mockGetAdminSeatDetail(
 export async function mockAdminReleaseSeat(
   _performanceId: number,
   _seatId: number,
+  bookingNumber: string,
 ): Promise<void> {
   await mockDelay(300);
-  // 강제 해제 — mock에선 noop
+  if (!bookingNumber.trim()) {
+    await mockError(
+      ERROR_CODES.VALIDATION_ERROR,
+      "예매 번호가 필요합니다.",
+      0,
+      400,
+    );
+  }
 }
 
 // ── 공연 CRUD ────────────────────────────────────────

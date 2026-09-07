@@ -72,8 +72,7 @@ export function useAdminSeatMonitoring(performanceId: number | undefined) {
       : ["admin", "seat-monitoring", "invalid"],
     queryFn: () => api.fetchAdminSeatMonitoring(performanceId!),
     enabled: !!performanceId,
-    staleTime: 0, // 실시간
-    refetchInterval: 10_000, // 10초마다 자동 갱신
+    staleTime: 0,
   });
 }
 
@@ -85,15 +84,20 @@ export function useAdminSeatDetail(
     queryKey: adminKeys.seatDetail(performanceId ?? 0, seatId),
     queryFn: () => api.fetchAdminSeatDetail(performanceId!, seatId!),
     enabled: !!performanceId && !!seatId,
-    staleTime: 5_000,
+    staleTime: 0,
   });
 }
 
 export function useAdminReleaseSeat(performanceId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (seatId: number) =>
-      api.adminReleaseSeatApi(performanceId, seatId),
+    mutationFn: ({
+      seatId,
+      bookingNumber,
+    }: {
+      seatId: number;
+      bookingNumber: string;
+    }) => api.adminReleaseSeatApi(performanceId, seatId, bookingNumber),
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: adminKeys.seatMonitoring(performanceId),
