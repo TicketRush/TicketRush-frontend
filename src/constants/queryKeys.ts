@@ -8,6 +8,9 @@
 import type { ConcertListParams } from "@/types/domain/concert";
 import type { MyBookingsParams } from "@/types/domain/booking";
 
+/** infinite list 캐시 부분 매칭용. `list(params)`의 앞 두 칸과 같아야 한다 (#203). */
+const CONCERTS_LIST_PREFIX = ["concerts", "list"] as const;
+
 export const queryKeys = {
   auth: {
     all: ["auth"] as const,
@@ -16,9 +19,14 @@ export const queryKeys = {
   },
   concerts: {
     all: ["concerts"] as const,
+    listPrefix: CONCERTS_LIST_PREFIX,
     list: (params?: ConcertListParams) =>
-      ["concerts", "list", params] as const,
+      [CONCERTS_LIST_PREFIX[0], CONCERTS_LIST_PREFIX[1], params] as const,
     detail: (id: number) => ["concerts", "detail", id] as const,
+  },
+  banners: {
+    all: ["banners"] as const,
+    list: () => ["banners", "list"] as const,
   },
   seats: {
     all: ["seats"] as const,
@@ -31,15 +39,18 @@ export const queryKeys = {
   },
   bookings: {
     all: ["bookings"] as const,
-    mine: (params?: MyBookingsParams) =>
-      ["bookings", "mine", params] as const,
+    mine: (params?: MyBookingsParams) => ["bookings", "mine", params] as const,
     detail: (bookingNumber: string) =>
       ["bookings", "detail", bookingNumber] as const,
   },
   payments: {
     all: ["payments"] as const,
-    status: (paymentKey: string) =>
-      ["payments", "status", paymentKey] as const,
+    status: (paymentKey: string) => ["payments", "status", paymentKey] as const,
+  },
+  tickets: {
+    all: ["tickets"] as const,
+    // 입장권 QR payload — bookingId 기준
+    qr: (bookingId: number) => ["tickets", "qr", bookingId] as const,
   },
 } as const;
 

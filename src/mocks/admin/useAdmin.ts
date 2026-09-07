@@ -7,6 +7,7 @@ import {
 import * as api from "@/api/admin";
 import type {
   AdminBookingListParams,
+  AdminDashboardParams,
   ConcertFormData,
 } from "@/types/domain/admin";
 
@@ -14,7 +15,8 @@ import type {
 // 임시로 여기서 인라인 정의. 머지 시 queryKeys.ts에 통합 권장.
 const adminKeys = {
   all: ["admin"] as const,
-  dashboard: () => ["admin", "dashboard"] as const,
+  dashboard: (params?: AdminDashboardParams) =>
+    ["admin", "dashboard", params] as const,
   bookings: (params?: AdminBookingListParams) =>
     ["admin", "bookings", params] as const,
   bookingStats: () => ["admin", "bookings", "stats"] as const,
@@ -26,10 +28,10 @@ const adminKeys = {
 };
 
 // ── 대시보드 ───────────────────────────────────────────
-export function useAdminDashboard() {
+export function useAdminDashboard(params: AdminDashboardParams) {
   return useQuery({
-    queryKey: adminKeys.dashboard(),
-    queryFn: api.fetchAdminDashboard,
+    queryKey: adminKeys.dashboard(params),
+    queryFn: () => api.fetchAdminDashboard(params),
     staleTime: 30_000,
   });
 }
@@ -70,8 +72,7 @@ export function useAdminSeatMonitoring(performanceId: number | undefined) {
       : ["admin", "seat-monitoring", "invalid"],
     queryFn: () => api.fetchAdminSeatMonitoring(performanceId!),
     enabled: !!performanceId,
-    staleTime: 0, // 실시간
-    refetchInterval: 10_000, // 10초마다 자동 갱신
+    staleTime: 0,
   });
 }
 
@@ -83,15 +84,20 @@ export function useAdminSeatDetail(
     queryKey: adminKeys.seatDetail(performanceId ?? 0, seatId),
     queryFn: () => api.fetchAdminSeatDetail(performanceId!, seatId!),
     enabled: !!performanceId && !!seatId,
-    staleTime: 5_000,
+    staleTime: 0,
   });
 }
 
 export function useAdminReleaseSeat(performanceId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (seatId: number) =>
-      api.adminReleaseSeatApi(performanceId, seatId),
+    mutationFn: ({
+      seatId,
+      bookingNumber,
+    }: {
+      seatId: number;
+      bookingNumber: string;
+    }) => api.adminReleaseSeatApi(performanceId, seatId, bookingNumber),
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: adminKeys.seatMonitoring(performanceId),
@@ -114,7 +120,7 @@ export function useCreateConcert() {
   return useMutation({
     mutationFn: (data: ConcertFormData) => api.createConcertApi(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.dashboard() });
+      qc.invalidateQueries({ queryKey: adminKeys.all });
     },
   });
 }

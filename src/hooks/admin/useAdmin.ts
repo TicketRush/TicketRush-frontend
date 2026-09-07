@@ -1,16 +1,34 @@
 // 관리자 hooks — 도메인별로 작아서 한 파일로 통합
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/admin";
+import { fetchAdminBookingByNumber } from "@/api/bookings";
+import {
+  markAdminSeatBookerLoadFailed,
+  mergeAdminSeatDetailWithBooker,
+} from "@/api/adminSeatMapper";
+import { ApiError } from "@/api/errors/errorMapper";
+import { queryKeys } from "@/constants/queryKeys";
 import type {
   AdminBookingListParams,
+  AdminConcertListParams,
+  AdminDashboardParams,
   ConcertFormData,
 } from "@/types/domain/admin";
+import {
+  isDashboardPeriodWithinLimit,
+  parseLocalDateKey,
+} from "@/utils/admin/dashboardPeriod";
 
 const adminKeys = {
   all: ["admin"] as const,
-  dashboard: () => ["admin", "dashboard"] as const,
+  dashboard: (params?: AdminDashboardParams) =>
+    ["admin", "dashboard", params] as const,
+  concerts: (params?: AdminConcertListParams) =>
+    ["admin", "concerts", params] as const,
   bookings: (params?: AdminBookingListParams) =>
     ["admin", "bookings", params] as const,
+  bookingByNumber: (bookingNumber: string) =>
+    ["admin", "booking", bookingNumber] as const,
   bookingStats: () => ["admin", "bookings", "stats"] as const,
   seatMonitoring: (performanceId: number) =>
     ["admin", "seat-monitoring", performanceId] as const,
@@ -19,12 +37,42 @@ const adminKeys = {
   concertEdit: (id: number) => ["admin", "concert-edit", id] as const,
 };
 
+function retryUnlessClientError(failureCount: number, error: Error) {
+  if (
+    error instanceof ApiError &&
+    error.httpStatus != null &&
+    error.httpStatus >= 400 &&
+    error.httpStatus < 500
+  ) {
+    return false;
+  }
+  return failureCount < 2;
+}
+
 // ── 대시보드 ──────────────────────────────────────────
-export function useAdminDashboard() {
+export function useAdminDashboard(params: AdminDashboardParams) {
+  const enabled = isDashboardPeriodWithinLimit(
+    parseLocalDateKey(params.from),
+    parseLocalDateKey(params.to),
+  );
+
   return useQuery({
-    queryKey: adminKeys.dashboard(),
-    queryFn: api.fetchAdminDashboard,
+    queryKey: adminKeys.dashboard(params),
+    queryFn: () => api.fetchAdminDashboard(params),
     staleTime: 30_000,
+    enabled,
+    placeholderData: (prev) => prev,
+    retry: retryUnlessClientError,
+  });
+}
+
+export function useAdminConcerts(params: AdminConcertListParams = {}) {
+  return useQuery({
+    queryKey: adminKeys.concerts(params),
+    queryFn: () => api.fetchAdminConcerts(params),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+    retry: retryUnlessClientError,
   });
 }
 
@@ -43,6 +91,16 @@ export function useAdminBookingStats() {
     queryKey: adminKeys.bookingStats(),
     queryFn: api.fetchAdminBookingStats,
     staleTime: 30_000,
+  });
+}
+
+export function useAdminBookingByNumber(bookingNumber: string | null) {
+  return useQuery({
+    queryKey: adminKeys.bookingByNumber(bookingNumber ?? ""),
+    queryFn: () => fetchAdminBookingByNumber(bookingNumber!),
+    enabled: !!bookingNumber,
+    staleTime: 0,
+    retry: retryUnlessClientError,
   });
 }
 
@@ -65,7 +123,8 @@ export function useAdminSeatMonitoring(performanceId: number | undefined) {
     queryFn: () => api.fetchAdminSeatMonitoring(performanceId!),
     enabled: !!performanceId,
     staleTime: 0,
-    refetchInterval: 10_000,
+    refetchOnWindowFocus: false,
+    retry: retryUnlessClientError,
   });
 }
 
@@ -75,20 +134,44 @@ export function useAdminSeatDetail(
 ) {
   return useQuery({
     queryKey: adminKeys.seatDetail(performanceId ?? 0, seatId),
-    queryFn: () => api.fetchAdminSeatDetail(performanceId!, seatId!),
+    queryFn: async () => {
+      const seat = await api.fetchAdminSeatDetail(performanceId!, seatId!);
+      const bookingNumber = seat.bookingNumber?.trim();
+      if (!bookingNumber) return seat;
+
+      try {
+        const booker = await fetchAdminBookingByNumber(bookingNumber);
+        return mergeAdminSeatDetailWithBooker(seat, booker);
+      } catch {
+        return markAdminSeatBookerLoadFailed(seat);
+      }
+    },
     enabled: !!performanceId && !!seatId,
-    staleTime: 5_000,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    retry: retryUnlessClientError,
   });
 }
 
 export function useAdminReleaseSeat(performanceId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (seatId: number) =>
-      api.adminReleaseSeatApi(performanceId, seatId),
+    mutationFn: ({
+      seatId,
+      bookingNumber,
+    }: {
+      seatId: number;
+      bookingNumber: string;
+    }) => api.adminReleaseSeatApi(performanceId, seatId, bookingNumber),
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: adminKeys.seatMonitoring(performanceId),
+      });
+      qc.invalidateQueries({
+        queryKey: ["admin", "seat-detail", performanceId],
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.seats.counts(performanceId),
       });
     },
   });
@@ -110,7 +193,7 @@ export function useCreateConcert() {
   return useMutation({
     mutationFn: (data: ConcertFormData) => api.createConcertApi(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.dashboard() });
+      qc.invalidateQueries({ queryKey: adminKeys.all });
     },
   });
 }

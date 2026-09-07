@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { Compass, Home, ArrowLeft } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
+import Button from "@/components/common/Button/Button";
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
@@ -20,20 +21,23 @@ export default function NotFoundPage() {
         </p>
 
         <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
+            fullWidth
+            icon={<ArrowLeft size={14} />}
             onClick={() => navigate(-1)}
-            className="px-4 py-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-semibold flex items-center justify-center gap-1"
           >
-            <ArrowLeft size={14} /> 뒤로가기
-          </button>
-          <button
-            type="button"
+            뒤로가기
+          </Button>
+          <Button
+            size="sm"
+            fullWidth
+            icon={<Home size={14} />}
             onClick={() => navigate("/")}
-            className="px-4 py-3 rounded-lg bg-primary text-white text-sm font-semibold flex items-center justify-center gap-1"
           >
-            <Home size={14} /> 홈으로
-          </button>
+            홈으로
+          </Button>
         </div>
       </div>
     </div>

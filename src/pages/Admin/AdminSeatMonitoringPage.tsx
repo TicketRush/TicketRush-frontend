@@ -1,4 +1,8 @@
-import { useState } from "react";
+// 관리자 좌석 모니터링 (#169)
+//
+// KPI: GET /api/v1/seat/{id}/seat-counts (useSeatCounts). 맵은 admin monitoring.
+// 상세 bookingNumber로 예매 단건을 조합. SSE·폴링 없음 — 새로고침/작업/좌석 선택만.
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { toast } from "react-toastify";
@@ -9,59 +13,166 @@ import {
   useAdminSeatMonitoring,
   useAdminSeatDetail,
   useAdminReleaseSeat,
-  useAdminDashboard,
+  useAdminConcerts,
 } from "@/hooks/admin/useAdmin";
+import { useSeatCounts } from "@/hooks/queries/useSeats";
+import { LEGACY_HOLD_BOOKING_NUMBER } from "@/api/admin";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
+import { ApiError } from "@/api/errors/errorMapper";
 import type { SeatWithStatus } from "@/types/domain/seat";
+import type { AdminConcertItem } from "@/types/domain/admin";
+import type { ConcertStatus, Genre } from "@/types/domain/concert";
+import Pagination from "@/components/admin/Pagination";
+import {
+  formatAdminCount,
+  formatAdminOccupancy,
+  formatAdminSeats,
+  formatAdminShowSchedule,
+  formatAdminWon,
+} from "@/utils/admin/formatAdminMetric";
+
+const MONITORING_PAGE_SIZE = 50;
+
+const STATUS_LABELS: Record<ConcertStatus, string> = {
+  UPCOMING: "예정",
+  ON_SALE: "판매중",
+  CLOSED: "종료",
+  CANCELED: "취소",
+};
+
+const GENRE_LABELS: Record<Genre, string> = {
+  CONCERT: "콘서트",
+  MUSICAL: "뮤지컬",
+  CLASSIC: "클래식",
+  JAZZ: "재즈",
+  FESTIVAL: "페스티벌",
+  FANMEETING: "팬미팅",
+  BALLET: "발레",
+};
 
 export default function AdminSeatMonitoringPage() {
   const navigate = useNavigate();
   const [selectedConcertId, setSelectedConcertId] = useState<number | null>(
     null,
   );
+  const [selectedConcert, setSelectedConcert] =
+    useState<AdminConcertItem | null>(null);
   const [selectedSeatId, setSelectedSeatId] = useState<number | null>(null);
+  const [listPage, setListPage] = useState(0);
 
-  // 대시보드 데이터에서 공연 목록 활용
-  const { data: dashboard } = useAdminDashboard();
-  const concertList = dashboard?.concertList ?? [];
+  const {
+    data: concerts,
+    isLoading: concertsLoading,
+    isError: concertsError,
+    isPlaceholderData: concertsPlaceholder,
+  } = useAdminConcerts({
+    page: listPage,
+    size: MONITORING_PAGE_SIZE,
+  });
+  const concertList = concerts?.items ?? [];
 
-  const { data, isLoading, refetch, isFetching } = useAdminSeatMonitoring(
-    selectedConcertId ?? undefined,
-  );
-  const { data: seatDetail, isLoading: detailLoading } = useAdminSeatDetail(
-    selectedConcertId ?? undefined,
-    selectedSeatId,
-  );
+  const {
+    data: monitoring,
+    isLoading,
+    isError: monitoringError,
+    refetch: refetchMonitoring,
+    isFetching: monitoringFetching,
+  } = useAdminSeatMonitoring(selectedConcertId ?? undefined);
+  const {
+    data: seatCounts,
+    isError: countsError,
+    refetch: refetchCounts,
+    isFetching: countsFetching,
+  } = useSeatCounts(selectedConcertId ?? undefined, !!selectedConcertId, {
+    fresh: true,
+    refetchOnWindowFocus: false,
+  });
+  const {
+    data: seatDetail,
+    isLoading: detailLoading,
+    isError: detailError,
+    refetch: refetchDetail,
+  } = useAdminSeatDetail(selectedConcertId ?? undefined, selectedSeatId);
 
   const releaseMutation = useAdminReleaseSeat(selectedConcertId ?? 0);
+  const isFetching = monitoringFetching || countsFetching;
+
+  const handleRefresh = useCallback(() => {
+    void refetchCounts();
+    void refetchMonitoring();
+    if (selectedSeatId) void refetchDetail();
+  }, [refetchCounts, refetchMonitoring, refetchDetail, selectedSeatId]);
 
   function handleSeatClick(seat: SeatWithStatus) {
     if (seat.status === "AVAILABLE") {
       setSelectedSeatId(null);
       return;
     }
+    const reselected = selectedSeatId === seat.id;
     setSelectedSeatId(seat.id);
+    void refetchCounts();
+    void refetchMonitoring();
+    if (reselected) void refetchDetail();
   }
 
-  async function handleRelease(seatId: number) {
+  async function handleRelease(seatId: number, bookingNumber?: string) {
+    const trimmed = bookingNumber?.trim();
+    const releaseBookingNumber = trimmed || LEGACY_HOLD_BOOKING_NUMBER;
+
     try {
-      await releaseMutation.mutateAsync(seatId);
+      await releaseMutation.mutateAsync({
+        seatId,
+        bookingNumber: releaseBookingNumber,
+      });
       toast.success("예약이 해제되었습니다.");
       setSelectedSeatId(null);
     } catch (error: unknown) {
-      const err =
-        error instanceof Error ? error : new Error("예약 해제에 실패했습니다.");
+      const err = ApiError.fromUnknown(error);
       toast.error(err.message);
+
+      if (err.code === ERROR_CODES.SEAT_NOT_HELD) {
+        handleRefresh();
+        setSelectedSeatId(null);
+        return;
+      }
+      if (err.code === ERROR_CODES.SEAT_SOLD_NOT_RELEASABLE) {
+        handleRefresh();
+        if (trimmed) goToBookings(trimmed, "refund");
+        return;
+      }
+      if (err.code === ERROR_CODES.SEAT_RELEASE_CONFLICT) {
+        handleRefresh();
+      }
     }
   }
 
-  function handleRefund() {
-    toast.info("예매 내역 페이지로 이동합니다.");
-    navigate("/admin/bookings");
+  function goToBookings(
+    bookingNumber: string | undefined,
+    intent: "refund" | "reserver",
+  ) {
+    const number = bookingNumber?.trim();
+    if (!number) {
+      toast.info("예매 번호가 없어 예매 내역에서 찾을 수 없습니다.");
+      navigate("/admin/bookings");
+      return;
+    }
+
+    const params = new URLSearchParams({ bookingNumber: number });
+    if (intent === "refund") params.set("intent", "refund");
+    toast.info(
+      intent === "refund"
+        ? "예매 내역에서 환불할 예매를 엽니다."
+        : "예매자 정보를 확인합니다.",
+    );
+    navigate(`/admin/bookings?${params}`);
   }
 
-  function handleShowReserver() {
-    toast.info("예매자 정보 페이지로 이동합니다.");
-    navigate("/admin/bookings");
+  function handleRefund(bookingNumber?: string) {
+    goToBookings(bookingNumber, "refund");
+  }
+
+  function handleShowReserver(bookingNumber?: string) {
+    goToBookings(bookingNumber, "reserver");
   }
 
   // ── 1단계: 공연 목록 화면 ────────────────────────
@@ -84,7 +195,7 @@ export default function AdminSeatMonitoringPage() {
           <button
             type="button"
             onClick={() => navigate("/admin")}
-            className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
           >
             <ArrowLeft size={16} /> 대시보드
           </button>
@@ -99,11 +210,21 @@ export default function AdminSeatMonitoringPage() {
             전체 공연 목록
           </h3>
 
-          {concertList.length === 0 ? (
+          {concertsError && concertList.length === 0 ? (
+            <div className="text-center py-12 text-red-400">
+              공연 목록을 불러올 수 없습니다.
+            </div>
+          ) : (concertsLoading && concertList.length === 0) ||
+            concertsPlaceholder ? (
             <div className="text-center py-12 text-admin-text-secondary">
               공연 정보를 불러오는 중...
             </div>
+          ) : concertList.length === 0 ? (
+            <div className="text-center py-12 text-admin-text-secondary">
+              등록된 공연이 없습니다.
+            </div>
           ) : (
+            <>
             <table className="w-full text-sm text-left admin-table">
               <thead className="border-b border-admin-border">
                 <tr className="text-xs text-admin-text-secondary">
@@ -119,45 +240,71 @@ export default function AdminSeatMonitoringPage() {
               </thead>
               <tbody>
                 {concertList.map((c) => {
-                  const rate = c.occupancyRate * 100;
+                  const rate =
+                    c.occupancyRate == null ? null : c.occupancyRate * 100;
                   const rateColor =
-                    rate >= 100
-                      ? "text-[#00C950]"
-                      : rate >= 80
-                        ? "text-[#1D7DFF]"
-                        : "text-admin-text";
+                    rate == null
+                      ? "text-admin-text-secondary"
+                      : rate >= 100
+                        ? "text-[#00C950]"
+                        : rate >= 80
+                          ? "text-[#1D7DFF]"
+                          : "text-admin-text";
                   const isSoldOut =
-                    c.status === "CLOSED" ||
-                    c.totalSeats - c.soldSeats <= 0;
+                    c.soldOut === true ||
+                    (c.totalSeats != null &&
+                      c.soldSeats != null &&
+                      c.totalSeats > 0 &&
+                      c.soldSeats >= c.totalSeats);
+                  const isCanceled = c.status === "CANCELED";
+                  const statusLabel = isCanceled
+                    ? "취소"
+                    : isSoldOut
+                      ? "매진"
+                      : (STATUS_LABELS[c.status] ?? "판매중");
+                  const statusColor = isCanceled
+                    ? "#FB2C36"
+                    : isSoldOut
+                      ? "#FB2C36"
+                      : c.status === "ON_SALE"
+                        ? "#00C950"
+                        : "#6B7280";
                   return (
                     <tr
                       key={c.id}
-                      onClick={() => setSelectedConcertId(c.id)}
+                      onClick={() => {
+                        setSelectedConcert(c);
+                        setSelectedConcertId(c.id);
+                      }}
                       className="border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
                     >
                       <td className="py-3 px-3 font-mono text-xs">
                         E{String(c.id).padStart(3, "0")}
                       </td>
                       <td className="py-3 px-3 font-bold">{c.title}</td>
-                      <td className="py-3 px-3">{c.genre}</td>
-                      <td className="py-3 px-3">{c.date}</td>
                       <td className="py-3 px-3">
-                        {c.soldSeats}/{c.totalSeats}
+                        {c.genreName ?? GENRE_LABELS[c.genre] ?? c.genre}
+                      </td>
+                      <td className="py-3 px-3">
+                        {formatAdminShowSchedule(c.date, c.showTime)}
+                      </td>
+                      <td className="py-3 px-3">
+                        {formatAdminSeats(c.soldSeats, c.totalSeats)}
                       </td>
                       <td className={`py-3 px-3 font-bold ${rateColor}`}>
-                        {rate.toFixed(0)}%
+                        {formatAdminOccupancy(c.occupancyRate)}
                       </td>
                       <td className="py-3 px-3">
-                        ₩{c.revenue.toLocaleString()}
+                        {formatAdminWon(c.revenue)}
                       </td>
                       <td className="py-3 px-3">
                         <span
                           className="px-3 py-1 rounded-md text-xs font-bold text-white"
                           style={{
-                            backgroundColor: isSoldOut ? "#FB2C36" : "#00C950",
+                            backgroundColor: statusColor,
                           }}
                         >
-                          {isSoldOut ? "매진" : "판매중"}
+                          {statusLabel}
                         </span>
                       </td>
                     </tr>
@@ -165,6 +312,14 @@ export default function AdminSeatMonitoringPage() {
                 })}
               </tbody>
             </table>
+            {concerts?.pagination ? (
+              <Pagination
+                pageIndex={listPage}
+                totalPages={concerts.pagination.totalPages}
+                onChange={setListPage}
+              />
+            ) : null}
+            </>
           )}
         </div>
       </div>
@@ -172,7 +327,9 @@ export default function AdminSeatMonitoringPage() {
   }
 
   // ── 2단계: 좌석 맵 화면 ─────────────────────────
-  const selectedConcert = concertList.find((c) => c.id === selectedConcertId);
+  const selected =
+    selectedConcert ??
+    concertList.find((c) => c.id === selectedConcertId);
 
   return (
     <div className="p-8 space-y-6">
@@ -189,7 +346,7 @@ export default function AdminSeatMonitoringPage() {
         <button
           type="button"
           onClick={() => navigate("/admin")}
-          className="px-4 py-2 rounded-lg bg-admin-card border border-admin-border flex items-center gap-2"
+          className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
         >
           <ArrowLeft size={16} /> 대시보드
         </button>
@@ -202,16 +359,17 @@ export default function AdminSeatMonitoringPage() {
           <input
             type="text"
             readOnly
-            value={selectedConcert?.title ?? ""}
+            value={selected?.title ?? ""}
             onClick={() => {
               setSelectedConcertId(null);
+              setSelectedConcert(null);
               setSelectedSeatId(null);
             }}
             className="flex-1 bg-admin-bg border border-admin-border rounded-lg px-3 py-2 text-sm cursor-pointer"
           />
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             disabled={isFetching}
             className="px-4 py-2 rounded-lg bg-primary text-white font-semibold flex items-center gap-2 disabled:opacity-50"
           >
@@ -230,7 +388,7 @@ export default function AdminSeatMonitoringPage() {
           icon={<Users size={24} />}
           badge="TOTAL"
           badgeColor="purple"
-          value={data?.stats.totalSeats ?? 0}
+          value={formatAdminCount(seatCounts?.totalCount)}
           label="전체 좌석"
         />
         <StatCard
@@ -243,7 +401,7 @@ export default function AdminSeatMonitoringPage() {
           }
           badge="AVAILABLE"
           badgeColor="green"
-          value={data?.stats.availableSeats ?? 0}
+          value={formatAdminCount(seatCounts?.availableCount)}
           label="예매 가능"
         />
         <StatCard
@@ -256,17 +414,28 @@ export default function AdminSeatMonitoringPage() {
           }
           badge="SOLD"
           badgeColor="blue"
-          value={data?.stats.soldSeats ?? 0}
+          value={formatAdminCount(seatCounts?.soldCount)}
           label="판매 완료"
         />
         <StatCard
           icon={<Clock size={24} />}
           badge="HOLDING"
           badgeColor="yellow"
-          value={data?.stats.holdingSeats ?? 0}
+          value={formatAdminCount(seatCounts?.holdCount)}
           label="임시 예매 (타이머)"
         />
       </div>
+
+      {countsError ? (
+        <p className="text-sm text-red-400">
+          좌석 요약(seat-counts)을 불러올 수 없습니다.
+        </p>
+      ) : null}
+      {monitoringError && monitoring ? (
+        <p className="text-sm text-red-400">
+          좌석 맵을 다시 불러오지 못했습니다. 새로고침 후 다시 시도하세요.
+        </p>
+      ) : null}
 
       {/* 좌석 맵 + 상세 패널 */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
@@ -275,14 +444,14 @@ export default function AdminSeatMonitoringPage() {
             SEAT MAP
           </span>
 
-          {isLoading ? (
+          {isLoading && !monitoring ? (
             <div className="text-center py-20 text-admin-text-secondary">
               좌석 정보 불러오는 중...
             </div>
-          ) : data ? (
+          ) : monitoring ? (
             <>
               <AdminSeatMap
-                seats={data.seats}
+                seats={monitoring.seats}
                 selectedSeatId={selectedSeatId}
                 onSeatClick={handleSeatClick}
                 scale={0.7}
@@ -310,9 +479,12 @@ export default function AdminSeatMonitoringPage() {
           <AdminSeatDetailPanel
             detail={seatDetail}
             isLoading={detailLoading}
+            isError={detailError}
+            isReleasing={releaseMutation.isPending}
             onRelease={handleRelease}
             onRefund={handleRefund}
             onShowReserver={handleShowReserver}
+            onHoldExpired={handleRefresh}
           />
         </div>
       </div>

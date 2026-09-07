@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useBookingDetail } from "@/hooks/queries/useBookingDetail";
+import { useTicketQr } from "@/hooks/queries/useTicketQr";
+import { useCountdownTo } from "@/hooks/useCountdownTo";
 import useAuthStore from "@/stores/global/authStore";
 import { downloadTicket } from "@/utils/ticket/downloadTicket";
 
@@ -30,6 +32,8 @@ export default function TicketDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
+  const { data: qrData, isLoading: isQrLoading } = useTicketQr(data?.bookingId);
+  const remainingMs = useCountdownTo(qrData?.expiresAt);
 
   // 다운로드 영역 ref
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -72,12 +76,11 @@ export default function TicketDetailPage() {
     );
   }
 
-  // QR 페이로드 — 티켓마다 고유. 백엔드 qrToken 응답 시 그걸 우선.
-  const qrPayload = JSON.stringify({
-    reservationId: data.bookingNumber,
-    seatLabel: data.seatNumber,
-    issuedAt: new Date().toISOString(),
-  });
+  const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
+  const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
+  const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
+    Math.floor((remainingMs % 60000) / 1000),
+  ).padStart(2, "0")}`;
 
   // ── 다운로드 (#91) — 공통 유틸 사용 ─────────────────
   function handleDownload() {
@@ -199,19 +202,49 @@ export default function TicketDetailPage() {
         <div className="bg-white border-2 border-border rounded-2xl p-6 mb-6">
           <p className="text-center text-sm font-semibold mb-4">입장 QR 코드</p>
           <div className="flex items-center justify-center mb-4">
-            <div className="w-44 h-44 bg-white border-2 border-primary rounded-xl flex items-center justify-center p-3">
-              <QRCodeSVG
-                value={qrPayload}
-                size={152}
-                level="M"
-                bgColor="#FFFFFF"
-                fgColor="#6C5CE7"
-              />
+            <div className="w-44 h-44 bg-white border-2 border-primary rounded-xl flex items-center justify-center p-3 relative">
+              {isQrLoading && !qrData ? (
+                <span className="text-xs text-text-secondary">QR 발급 중...</span>
+              ) : qrData ? (
+                <QRCodeSVG
+                  value={qrData.payload}
+                  size={152}
+                  level="M"
+                  bgColor="#FFFFFF"
+                  fgColor="#6C5CE7"
+                />
+              ) : (
+                <span className="text-xs text-error">
+                  QR 코드를 불러올 수 없습니다.
+                </span>
+              )}
+              {!isTicketUsable && (
+                <div className="absolute inset-0 bg-white/85 rounded-xl flex items-center justify-center">
+                  <span className="text-sm font-bold text-text-secondary">
+                    {qrData?.ticketStatus === "USED"
+                      ? "입장 완료된 티켓"
+                      : "취소된 티켓"}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <p className="text-center text-xs text-text-secondary mb-3">
             공연장 입장 시 스캔하세요
           </p>
+          {qrData && isTicketUsable && (
+            <p
+              className={`text-center text-xs mb-3 ${
+                isExpiringSoon
+                  ? "text-red-500 font-semibold"
+                  : "text-text-secondary"
+              }`}
+            >
+              {remainingMs > 0
+                ? `QR 만료까지 ${remainingLabel}`
+                : "QR 코드 갱신 중..."}
+            </p>
+          )}
           <div className="text-center">
             <p className="text-xs text-text-secondary">예매 번호</p>
             <p className="text-sm font-bold font-mono text-primary">

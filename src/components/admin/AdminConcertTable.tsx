@@ -7,6 +7,13 @@ import {
 } from "@tanstack/react-table";
 import { Edit, Trash2 } from "lucide-react";
 import type { AdminConcertItem } from "@/types/domain/admin";
+import type { ConcertStatus, Genre } from "@/types/domain/concert";
+import {
+  formatAdminOccupancy,
+  formatAdminSeats,
+  formatAdminShowSchedule,
+  formatAdminWon,
+} from "@/utils/admin/formatAdminMetric";
 
 interface AdminConcertTableProps {
   data: AdminConcertItem[];
@@ -14,12 +21,47 @@ interface AdminConcertTableProps {
   onDelete: (id: number) => void;
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  ON_SALE: { label: "판매중", color: "bg-green-500/20 text-green-300" },
-  SOLD_OUT: { label: "매진", color: "bg-red-500/20 text-red-300" },
-  ENDED: { label: "종료", color: "bg-gray-500/20 text-gray-300" },
-  UPCOMING: { label: "예정", color: "bg-blue-500/20 text-blue-300" },
+const GENRE_LABELS: Record<Genre, string> = {
+  MUSICAL: "뮤지컬",
+  CONCERT: "콘서트",
+  CLASSIC: "클래식",
+  JAZZ: "재즈",
+  FESTIVAL: "페스티벌",
+  FANMEETING: "팬미팅",
+  BALLET: "발레",
 };
+
+const STATUS_STYLES: Record<string, string> = {
+  판매중: "bg-green-100 text-green-700",
+  매진: "bg-red-100 text-red-700",
+  예정: "bg-blue-100 text-blue-700",
+  종료: "bg-gray-100 text-gray-600",
+  취소: "bg-red-100 text-red-700",
+};
+
+/** Figma: 초록 판매중 / 빨강 매진. 매진은 enum이 아니라 잔여 0. */
+function statusBadge(row: AdminConcertItem): { label: string; color: string } {
+  if (row.status === "CANCELED") {
+    return { label: "취소", color: STATUS_STYLES.취소 };
+  }
+  const soldOut =
+    row.soldOut === true ||
+    (row.totalSeats != null &&
+      row.soldSeats != null &&
+      row.totalSeats > 0 &&
+      row.soldSeats >= row.totalSeats);
+  if (soldOut) {
+    return { label: "매진", color: STATUS_STYLES.매진 };
+  }
+  const byStatus: Record<ConcertStatus, string> = {
+    UPCOMING: "예정",
+    ON_SALE: "판매중",
+    CLOSED: "종료",
+    CANCELED: "취소",
+  };
+  const label = byStatus[row.status] ?? "판매중";
+  return { label, color: STATUS_STYLES[label] ?? STATUS_STYLES.판매중 };
+}
 
 export default function AdminConcertTable({
   data,
@@ -43,41 +85,61 @@ export default function AdminConcertTable({
         <span className="font-bold text-sm">{getValue() as string}</span>
       ),
     },
-    { accessorKey: "genre", header: "장르" },
-    { accessorKey: "date", header: "날짜" },
+    {
+      accessorKey: "genre",
+      header: "장르",
+      cell: ({ row }) =>
+        row.original.genreName ??
+        GENRE_LABELS[row.original.genre] ??
+        row.original.genre,
+    },
+    {
+      accessorKey: "date",
+      header: "날짜",
+      cell: ({ row }) =>
+        formatAdminShowSchedule(row.original.date, row.original.showTime),
+    },
     {
       id: "sales",
       header: "판매/총",
       cell: ({ row }) => (
         <span>
-          {row.original.soldSeats}/{row.original.totalSeats}
+          {formatAdminSeats(row.original.soldSeats, row.original.totalSeats)}
         </span>
       ),
     },
     {
       accessorKey: "occupancyRate",
       header: "점유율",
-      cell: ({ getValue }) => {
-        const rate = (getValue() as number) * 100;
+      cell: ({ row }) => {
+        const rate = row.original.occupancyRate;
+        if (rate == null) {
+          return <span className="text-gray-400">-</span>;
+        }
+        const pct = rate * 100;
         const color =
-          rate >= 90
-            ? "text-green-400"
-            : rate >= 50
-              ? "text-blue-400"
-              : "text-gray-400";
-        return <span className={`font-bold ${color}`}>{rate.toFixed(0)}%</span>;
+          pct >= 90
+            ? "text-green-600"
+            : pct >= 50
+              ? "text-blue-600"
+              : "text-gray-500";
+        return (
+          <span className={`font-bold ${color}`}>
+            {formatAdminOccupancy(rate)}
+          </span>
+        );
       },
     },
     {
       accessorKey: "revenue",
       header: "매출",
-      cell: ({ getValue }) => `₩${(getValue() as number).toLocaleString()}`,
+      cell: ({ row }) => formatAdminWon(row.original.revenue),
     },
     {
       accessorKey: "status",
       header: "상태",
-      cell: ({ getValue }) => {
-        const s = STATUS_LABELS[getValue() as string] ?? STATUS_LABELS.ON_SALE;
+      cell: ({ row }) => {
+        const s = statusBadge(row.original);
         return (
           <span
             className={`px-2 py-1 rounded text-xs font-semibold ${s.color}`}
@@ -95,14 +157,14 @@ export default function AdminConcertTable({
           <button
             type="button"
             onClick={() => onEdit(row.original.id)}
-            className="px-2 py-1 rounded bg-admin-border hover:bg-admin-border/80 text-xs flex items-center gap-1"
+            className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 text-xs flex items-center gap-1"
           >
             <Edit size={12} /> 수정
           </button>
           <button
             type="button"
             onClick={() => onDelete(row.original.id)}
-            className="px-2 py-1 rounded bg-admin-border hover:bg-red-500/30 text-xs flex items-center gap-1"
+            className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-red-50 text-xs flex items-center gap-1"
           >
             <Trash2 size={12} /> 삭제
           </button>
@@ -117,16 +179,24 @@ export default function AdminConcertTable({
     getCoreRowModel: getCoreRowModel(),
   });
 
+  if (data.length === 0) {
+    return (
+      <div className="py-12 text-center text-sm text-gray-500">
+        등록된 공연이 없습니다.
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left admin-table">
+      <table className="w-full text-sm text-left">
         <thead>
           {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-admin-border">
+            <tr key={hg.id} className="border-b border-gray-200 bg-gray-50">
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
-                  className="py-3 px-3 text-xs font-semibold text-admin-text-secondary"
+                  className="py-3 px-3 text-xs font-semibold text-gray-500"
                 >
                   {flexRender(h.column.columnDef.header, h.getContext())}
                 </th>
@@ -138,10 +208,10 @@ export default function AdminConcertTable({
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              className="border-b border-admin-border/50 hover:bg-admin-border/30"
+              className="border-b border-gray-100 hover:bg-gray-50"
             >
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="py-3 px-3 text-admin-text">
+                <td key={cell.id} className="py-3 px-3 text-gray-800">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}

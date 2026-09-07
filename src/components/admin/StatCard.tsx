@@ -10,6 +10,9 @@ interface StatCardProps {
   badgeColor: "purple" | "green" | "orange" | "red" | "blue" | "yellow";
   value: string | number;
   label: string;
+  hint?: string;
+  /** KPI 아이콘 색. 없으면 기본 보조 텍스트 색 */
+  iconClassName?: string;
 }
 
 const BADGE_COLORS = {
@@ -27,11 +30,15 @@ export default function StatCard({
   badgeColor,
   value,
   label,
+  hint,
+  iconClassName,
 }: StatCardProps) {
   return (
     <div className="bg-admin-card border border-admin-border rounded-xl p-6">
       <div className="flex items-start justify-between mb-4">
-        <div className="text-admin-text-secondary">{icon}</div>
+        <div className={iconClassName ?? "text-admin-text-secondary"}>
+          {icon}
+        </div>
         <span
           className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${BADGE_COLORS[badgeColor]}`}
         >
@@ -40,6 +47,9 @@ export default function StatCard({
       </div>
       <p className="text-3xl font-bold text-admin-text mb-1">{value}</p>
       <p className="text-xs text-admin-text-secondary">{label}</p>
+      {hint ? (
+        <p className="text-[10px] text-admin-text-secondary/80 mt-1">{hint}</p>
+      ) : null}
     </div>
   );
 }

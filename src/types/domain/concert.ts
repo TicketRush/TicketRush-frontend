@@ -61,13 +61,15 @@ export interface ConcertSummary {
   price: number;
   imageMainUrl: string;
   /**
-   * ⚠️ 목록 응답에는 없음 (상세에만 있음).
-   * 목록에서 잔여 좌석 표시가 필요하면 useSeatCounts로 별도 조회.
+   * 목록: seat-service 실측 `total_seats` (키 생략 가능).
+   * 상세: 공연 등록 입력값. 이름이 같아도 같은 값이 아니다 (#203).
+   * 목록 게이지 분모는 이 목록 필드만 쓰고, 상세 등록값을 폴백하지 않는다.
+   * 상세 게이지는 목록 캐시 → 없으면 seat-counts(totalCount - soldCount).
    */
   totalSeats?: number;
   /**
-   * ⚠️ 백엔드 응답에 없음. 필요 시 useSeatCounts 훅으로 별도 조회.
-   * mock 호환 및 상위에서 주입 목적으로 optional 유지.
+   * 목록 전용. `totalCount - soldCount` (HOLD 포함). 키 생략 가능 (#203).
+   * 상세 API에는 없다. 상세 게이지는 목록 infinite query 캐시를 조회한다.
    */
   remainingSeats?: number;
   status: ConcertStatus;
@@ -85,8 +87,11 @@ export interface ConcertFacility {
   label: string;
 }
 
-/** 공연 상세 — 백엔드 PerformanceDetailResponse 대응 */
-export interface ConcertDetail extends ConcertSummary {
+/**
+ * 공연 상세 — 백엔드 PerformanceDetailResponse 대응.
+ * 목록 전용 `remainingSeats`는 없다. 상세 게이지는 목록 캐시를 조회한다 (#203).
+ */
+export interface ConcertDetail extends Omit<ConcertSummary, "remainingSeats"> {
   description: string;
   /** 공연 시간 (분) */
   durationMinutes: number;
@@ -101,7 +106,7 @@ export interface ConcertDetail extends ConcertSummary {
   bookingOpenAt?: string | null;
   /** ⚠️ 백엔드 응답에 없음. 프론트 임시 상수 fallback */
   notices?: string[];
-  /** 상세는 totalSeats 필수 */
+  /** 공연 등록 시 입력한 총 좌석. 목록 게이지 분모로 쓰지 않는다 (#203). */
   totalSeats: number;
 }
 
