@@ -29,6 +29,8 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FESTIVAL_TOP_COLOR,
   getOutfitOption,
   resolveStoredOutfitModelId,
   type OutfitModelId,
@@ -79,6 +81,8 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  festivalTopColor: string;
+  festivalBottomColor: string;
   accessory: string;
   pose: CharacterPose;
   background: string;
@@ -102,6 +106,8 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "festivalTopColor"
+        | "festivalBottomColor"
       >
     > & {
       skinTone?: unknown;
@@ -111,6 +117,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      festivalTopColor?: unknown;
+      festivalBottomColor?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -128,10 +136,21 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedFestivalTopColor =
+      typeof parsed.festivalTopColor === "string"
+        ? normalizeHexColor(parsed.festivalTopColor)
+        : null;
+
+    const resolvedFestivalBottomColor =
+      typeof parsed.festivalBottomColor === "string"
+        ? normalizeHexColor(parsed.festivalBottomColor)
+        : null;
+
     const resolvedOutfitModelId = resolveStoredOutfitModelId(
       parsed.outfitModelId,
       parsed.outfitName,
     );
+
     const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
 
     return {
@@ -142,6 +161,10 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      festivalTopColor:
+        resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
+      festivalBottomColor:
+        resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -236,6 +259,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   function updateNotice(index: number, value: string) {
     const next = [...form.notices];
+
     next[index] = value;
 
     update("notices", next);
@@ -889,6 +913,8 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isFestivalOutfit = character.outfitModelId === "festival";
+
   return (
     <div className="overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
       <div
@@ -900,6 +926,8 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          festivalTopColor={character.festivalTopColor}
+          festivalBottomColor={character.festivalBottomColor}
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
@@ -919,6 +947,13 @@ function CharacterCreatorLinkBox({
         <p className="mt-1 text-xs text-admin-text-secondary">
           의상: {character.outfitName} / 액세서리: {character.accessory}
         </p>
+
+        {isFestivalOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            상의: {character.festivalTopColor.toUpperCase()} / 하의:{" "}
+            {character.festivalBottomColor.toUpperCase()}
+          </p>
+        )}
 
         <button
           type="button"

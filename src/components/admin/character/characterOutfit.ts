@@ -14,6 +14,14 @@ interface OutfitOption {
   modelUrl: string | null;
 }
 
+export const DEFAULT_FESTIVAL_TOP_COLOR = "#FFF526";
+export const DEFAULT_FESTIVAL_BOTTOM_COLOR = "#53CBFF";
+
+export const FESTIVAL_OUTFIT_PART_NAMES = {
+  top: "festival_windbreak",
+  bottom: "festival_pants",
+} as const;
+
 export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
   {
     id: "rainbow-blouse",
