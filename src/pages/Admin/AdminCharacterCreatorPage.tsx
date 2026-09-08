@@ -155,6 +155,7 @@ function loadSavedCharacter(): CharacterConfig {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "background"
       >
     > & {
       skinTone?: unknown;
@@ -164,6 +165,7 @@ function loadSavedCharacter(): CharacterConfig {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      background?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -181,10 +183,16 @@ function loadSavedCharacter(): CharacterConfig {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const resolvedBackground =
+      typeof parsed.background === "string"
+        ? normalizeHexColor(parsed.background)
+        : null;
+
     const resolvedOutfitModelId = resolveStoredOutfitModelId(
       parsed.outfitModelId,
       parsed.outfitName,
     );
+
     const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
 
     return {
@@ -196,6 +204,7 @@ function loadSavedCharacter(): CharacterConfig {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      background: resolvedBackground ?? DEFAULT_CHARACTER.background,
     } as CharacterConfig;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
