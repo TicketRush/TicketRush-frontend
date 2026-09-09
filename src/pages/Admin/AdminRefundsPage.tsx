@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock3, RefreshCw, RotateCcw, ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
+import { ApiError } from "@/api/errors/errorMapper";
 import {
   useRefundFailedBookings,
   useRefundingStuckBookings,
@@ -49,9 +50,7 @@ export default function AdminRefundsPage() {
       await retryMutation.mutateAsync(bookingNumber);
       toast.success(`${bookingNumber} 환불 재시도를 요청했습니다.`);
     } catch (error: unknown) {
-      const err =
-        error instanceof Error ? error : new Error("재시도 요청에 실패했습니다.");
-      toast.error(err.message);
+      toast.error(ApiError.fromUnknown(error).message);
     }
   }
 
@@ -187,14 +186,11 @@ function RefundTable({
         </div>
       ) : isError ? (
         <div className="text-center py-12 space-y-3">
-          <p className="text-admin-text-secondary">
-            목록을 불러오지 못했습니다.
-          </p>
+          <p className="text-red-400">목록을 불러오지 못했습니다.</p>
           <button
             type="button"
             onClick={onReload}
-            className="px-4 py-2 rounded-md text-xs font-bold text-white inline-flex items-center gap-1"
-            style={{ backgroundColor: "#2563EB" }}
+            className="px-4 py-2 rounded-md text-xs font-bold text-white inline-flex items-center gap-1 bg-admin-register"
           >
             <RotateCcw size={12} /> 다시 시도
           </button>
@@ -283,7 +279,7 @@ function RefundTable({
               type="button"
               onClick={() => onPageChange(Math.max(0, page - 1))}
               disabled={page === 0}
-              className="px-3 py-1.5 rounded-md text-xs bg-admin-border disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md text-xs text-admin-text bg-admin-border disabled:opacity-40"
             >
               이전
             </button>
@@ -291,7 +287,7 @@ function RefundTable({
               type="button"
               onClick={() => onPageChange(page + 1)}
               disabled={!hasNext}
-              className="px-3 py-1.5 rounded-md text-xs bg-admin-border disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md text-xs text-admin-text bg-admin-border disabled:opacity-40"
             >
               다음
             </button>
