@@ -41,7 +41,7 @@ export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
     name: "DJ / 페스티벌",
     description: "EDM 페스티벌룩",
     icon: "🎸",
-    modelUrl: null,
+    modelUrl: "/models/outfits/festival_outfit.glb",
   },
   {
     id: "ballet",
