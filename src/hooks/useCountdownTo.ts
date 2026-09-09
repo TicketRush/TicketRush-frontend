@@ -1,26 +1,25 @@
-// 특정 ISO 시각까지 남은 시간을 1초 주기로 계산.
+// 특정 시각까지 남은 시간을 1초 주기로 계산.
 //
 // QR payload 만료(expiresAt) 근접 여부를 표시하기 위해 사용.
-// 전역 상태가 필요 없는 순수 표시용 로컬 카운트다운이라 timerStore와는 분리.
+// BE는 `yyyy-MM-dd HH:mm:ss` (오프셋 없음)라 Date.parse만 쓰면 브라우저마다
+// NaN이 될 수 있다. parseBackendDateTime / remainingMsUntil을 쓴다.
 import { useEffect, useState } from "react";
+import { remainingMsUntil } from "@/utils/booking/parseBackendDateTime";
 
-// targetIso까지 남은 시간(ms). 값이 없거나 이미 지났으면 0.
-export function useCountdownTo(targetIso: string | undefined): number {
+export function useCountdownTo(target: string | undefined): number {
   const [remainingMs, setRemainingMs] = useState(0);
 
   useEffect(() => {
-    if (!targetIso) {
+    if (!target) {
       setRemainingMs(0);
       return;
     }
 
-    const targetMs = new Date(targetIso).getTime();
-    const tick = () => setRemainingMs(Math.max(0, targetMs - Date.now()));
-
+    const tick = () => setRemainingMs(remainingMsUntil(target));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [targetIso]);
+  }, [target]);
 
   return remainingMs;
 }
