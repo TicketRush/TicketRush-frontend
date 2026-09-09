@@ -61,6 +61,7 @@ const INITIAL_FORM: ConcertFormData = {
 };
 
 const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
+const CONCERT_FORM_SCROLL_KEY = "ticketRush:admin-concert-form-scroll";
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_HAIR_COLOR = "#151515";
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
@@ -208,6 +209,58 @@ export default function AdminConcertFormPage({ mode }: Props) {
   }, []);
 
   useEffect(() => {
+    const savedScroll = sessionStorage.getItem(CONCERT_FORM_SCROLL_KEY);
+
+    if (!savedScroll) return;
+
+    let firstFrameId: number | null = null;
+    let secondFrameId: number | null = null;
+
+    try {
+      const parsed = JSON.parse(savedScroll) as {
+        pathname?: unknown;
+        scrollY?: unknown;
+      };
+
+      const isValidScroll =
+        parsed.pathname === location.pathname &&
+        typeof parsed.scrollY === "number" &&
+        Number.isFinite(parsed.scrollY);
+
+      if (!isValidScroll) {
+        sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+        return;
+      }
+
+      const scrollY = parsed.scrollY as number;
+
+      firstFrameId = window.requestAnimationFrame(() => {
+        secondFrameId = window.requestAnimationFrame(() => {
+          window.scrollTo({
+            top: scrollY,
+            left: 0,
+            behavior: "auto",
+          });
+
+          sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+        });
+      });
+
+      return () => {
+        if (firstFrameId !== null) {
+          window.cancelAnimationFrame(firstFrameId);
+        }
+
+        if (secondFrameId !== null) {
+          window.cancelAnimationFrame(secondFrameId);
+        }
+      };
+    } catch {
+      sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     setSelectedCharacter(loadSavedCharacter());
   }, [location.key]);
 
@@ -283,9 +336,17 @@ export default function AdminConcertFormPage({ mode }: Props) {
       }),
     );
 
+    sessionStorage.setItem(
+      CONCERT_FORM_SCROLL_KEY,
+      JSON.stringify({
+        pathname: location.pathname,
+        scrollY: window.scrollY,
+      }),
+    );
+
     navigate(
       `/admin/character-creator?returnTo=${encodeURIComponent(
-        window.location.pathname,
+        location.pathname,
       )}`,
     );
   }
