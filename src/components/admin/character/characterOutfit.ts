@@ -48,7 +48,7 @@ export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
     name: "발레 / 무용 공연",
     description: "무용 공연 의상",
     icon: "🩰",
-    modelUrl: null,
+    modelUrl: "/models/outfits/ballet_outfit.glb",
   },
   {
     id: "theater",
