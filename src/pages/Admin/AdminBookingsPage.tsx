@@ -555,7 +555,7 @@ function FocusField({
       {icon && <div className="text-admin-text-secondary">{icon}</div>}
       <div>
         <p className="text-[10px] text-admin-text-secondary">{label}</p>
-        <p className={`font-semibold ${mono ? "font-mono text-blue-400" : ""}`}>
+        <p className={`font-semibold text-admin-text ${mono ? "font-mono text-blue-400" : ""}`}>
           {value}
         </p>
       </div>
