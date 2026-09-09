@@ -4,6 +4,7 @@ export type OutfitModelId =
   | "classic"
   | "festival"
   | "ballet"
+  | "musical"
   | "theater";
 
 interface OutfitOption {
@@ -51,6 +52,13 @@ export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
     modelUrl: "/models/outfits/ballet_outfit.glb",
   },
   {
+    id: "musical",
+    name: "뮤지컬 공연",
+    description: "뮤지컬 무대 의상",
+    icon: "🎭",
+    modelUrl: "/models/outfits/musical_outfit.glb",
+  },
+  {
     id: "theater",
     name: "연극 / 극장",
     description: "무대 의상",
@@ -84,6 +92,7 @@ const LEGACY_OUTFIT_NAME_TO_ID: Record<string, OutfitModelId> = {
   "클래식 공연": "classic",
   "DJ / 페스티벌": "festival",
   "발레 / 무용 공연": "ballet",
+  "뮤지컬 공연": "musical",
   "연극 / 극장": "theater",
 };
 
