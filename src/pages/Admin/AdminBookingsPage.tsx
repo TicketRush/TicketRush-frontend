@@ -166,6 +166,16 @@ export default function AdminBookingsPage() {
     setSearchParams(next, { replace: true });
   }
 
+  function handleTabChange(next: Tab) {
+    setTab(next);
+    setExpandedId(null);
+  }
+
+  function handlePageChange(next: number) {
+    setPage(next);
+    setExpandedId(null);
+  }
+
   function handleRefund(bookingNumber: string) {
     setRefundTarget(bookingNumber);
   }
@@ -202,7 +212,7 @@ export default function AdminBookingsPage() {
     <div className="p-8 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
+          <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-1 rounded">
             ORDER MANAGEMENT
           </span>
           <h1 className="text-3xl font-bold mt-2">예매 내역 관리</h1>
@@ -228,6 +238,7 @@ export default function AdminBookingsPage() {
           icon={<Ticket size={24} />}
           badge="TOTAL"
           badgeColor="purple"
+          iconClassName="text-admin-kpi-events"
           value={
             statsPending ? "..." : formatAdminCount(stats?.totalBookings)
           }
@@ -238,6 +249,7 @@ export default function AdminBookingsPage() {
           icon={<CheckSquare size={24} />}
           badge="COMPLETED"
           badgeColor="green"
+          iconClassName="text-admin-kpi-tickets"
           value={
             statsPending ? "..." : formatAdminCount(stats?.completedBookings)
           }
@@ -248,6 +260,7 @@ export default function AdminBookingsPage() {
           icon={<DollarSign size={24} />}
           badge="REVENUE"
           badgeColor="orange"
+          iconClassName="text-admin-kpi-revenue"
           value={statsPending ? "..." : formatAdminWon(stats?.totalRevenue)}
           label="총 매출"
           hint="결제 완료 금액 합"
@@ -256,6 +269,7 @@ export default function AdminBookingsPage() {
           icon={<UserMinus size={24} />}
           badge="CANCELED"
           badgeColor="red"
+          iconClassName="text-admin-status-cancelled"
           value={
             statsPending ? "..." : formatAdminCount(stats?.canceledBookings)
           }
@@ -280,9 +294,7 @@ export default function AdminBookingsPage() {
             <button
               key={t}
               type="button"
-              onClick={() => {
-                setTab(t);
-              }}
+              onClick={() => handleTabChange(t)}
               className={`px-4 py-2 text-sm rounded-lg transition ${
                 tab === t
                   ? "bg-primary text-white font-semibold"
@@ -309,11 +321,11 @@ export default function AdminBookingsPage() {
         />
       ) : null}
 
-      <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
-        <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+      <div className="bg-admin-card border-2 border-admin-dark-border rounded-xl p-6">
+        <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-0.5 rounded inline-block mb-2">
           ORDERS LIST
         </span>
-        <h3 className="text-base font-bold mb-4 text-gray-900">
+        <h3 className="text-base font-bold mb-4 text-admin-text">
           {isPlaceholderData
             ? `${data?.pagination.totalElements ?? 0}개의 예매`
             : listHeading(
@@ -336,7 +348,7 @@ export default function AdminBookingsPage() {
               <Pagination
                 pageIndex={page}
                 totalPages={lastTotalPages.current}
-                onChange={setPage}
+                onChange={handlePageChange}
               />
             </>
           ) : (
@@ -352,7 +364,7 @@ export default function AdminBookingsPage() {
             <Pagination
               pageIndex={page}
               totalPages={totalPages}
-              onChange={setPage}
+              onChange={handlePageChange}
             />
           </>
         ) : !pageHasRows ? (
@@ -378,7 +390,7 @@ export default function AdminBookingsPage() {
             <Pagination
               pageIndex={page}
               totalPages={totalPages}
-              onChange={setPage}
+              onChange={handlePageChange}
             />
           </>
         )}
@@ -406,8 +418,7 @@ export default function AdminBookingsPage() {
                 type="button"
                 onClick={handleConfirmRefund}
                 disabled={refundMutation.isPending}
-                className="py-2 rounded text-white font-bold"
-                style={{ backgroundColor: "#931818" }}
+                className="py-2 rounded text-white font-bold bg-admin-refund"
               >
                 {refundMutation.isPending ? "처리 중..." : "환불 요청"}
               </button>
@@ -462,7 +473,7 @@ function FocusBookingCard({
   );
   return (
     <div className="bg-admin-card border border-admin-border rounded-xl p-6">
-      <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+      <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-0.5 rounded inline-block mb-2">
         FOCUSED BOOKING
       </span>
       <h3 className="text-base font-bold mb-4">선택한 예매</h3>
@@ -516,8 +527,7 @@ function FocusBookingCard({
               <button
                 type="button"
                 onClick={() => onRefund(booking.bookingNumber)}
-                className="w-full mt-1 py-3 rounded font-bold text-white"
-                style={{ backgroundColor: "#931818" }}
+                className="w-full mt-1 py-3 rounded font-bold text-white bg-admin-refund"
               >
                 환불 요청
               </button>

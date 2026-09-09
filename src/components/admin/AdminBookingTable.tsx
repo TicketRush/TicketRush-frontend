@@ -35,6 +35,9 @@ const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
   REFUNDED: { label: "환불 완료", bg: "#6B7280" },
 };
 
+const SECTION_BADGE =
+  "text-[10px] font-bold tracking-wider bg-admin-dark-border text-admin-text px-2 py-0.5 rounded inline-block mb-3";
+
 export default function AdminBookingTable({
   data,
   onRefund,
@@ -42,7 +45,6 @@ export default function AdminBookingTable({
   onExpandedIdChange,
   focusedBookingNumber,
 }: AdminBookingTableProps) {
-
   const columns: ColumnDef<AdminBookingItem>[] = [
     {
       accessorKey: "bookingNumber",
@@ -93,7 +95,7 @@ export default function AdminBookingTable({
         const s = STATUS_STYLES[getValue() as string] ?? STATUS_STYLES.PENDING;
         return (
           <span
-            className="px-3 py-1 rounded-md text-xs font-bold text-white"
+            className="inline-block px-3 py-1 rounded-md text-xs font-bold text-white"
             style={{ backgroundColor: s.bg }}
           >
             {s.label}
@@ -109,10 +111,12 @@ export default function AdminBookingTable({
         return (
           <button
             type="button"
+            aria-expanded={isOpen}
+            aria-label={isOpen ? "상세 접기" : "상세 펼치기"}
             onClick={() =>
               onExpandedIdChange(isOpen ? null : row.original.bookingNumber)
             }
-            className="p-1.5 rounded bg-admin-border hover:bg-admin-border/80"
+            className="inline-flex items-center justify-center p-1.5 rounded text-admin-text bg-admin-dark-bg border border-admin-dark-border hover:bg-admin-dark-border/40"
           >
             {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
@@ -129,14 +133,14 @@ export default function AdminBookingTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left admin-table">
+      <table className="w-full text-sm text-center">
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-admin-border">
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
-                  className="py-3 px-3 text-xs font-semibold text-admin-text-secondary"
+                  className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center"
                 >
                   {flexRender(h.column.columnDef.header, h.getContext())}
                 </th>
@@ -158,7 +162,10 @@ export default function AdminBookingTable({
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="py-3 px-3 text-admin-text">
+                    <td
+                      key={cell.id}
+                      className="py-3 px-3 text-admin-text text-center"
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),
@@ -168,7 +175,7 @@ export default function AdminBookingTable({
                 </tr>
                 {isOpen && (
                   <tr className="bg-admin-bg/50">
-                    <td colSpan={columns.length} className="p-6">
+                    <td colSpan={columns.length} className="p-4 text-left">
                       <BookingDetail booking={b} onRefund={onRefund} />
                     </td>
                   </tr>
@@ -190,11 +197,9 @@ function BookingDetail({
   onRefund: (bookingNumber: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-admin-dark-bg border-2 border-admin-dark-border rounded-[10px] p-6">
       <div>
-        <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-3">
-          예매자 정보
-        </p>
+        <p className={SECTION_BADGE}>예매자 정보</p>
         <div className="space-y-3 text-sm">
           <Field
             icon={<User size={14} />}
@@ -210,9 +215,7 @@ function BookingDetail({
       </div>
 
       <div>
-        <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-3">
-          좌석 정보
-        </p>
+        <p className={SECTION_BADGE}>좌석 정보</p>
         <div className="flex gap-2 mb-3 flex-wrap">
           {booking.seatNumbers.length === 0 ? (
             <span className="text-sm text-admin-text-secondary">
@@ -222,16 +225,22 @@ function BookingDetail({
             booking.seatNumbers.map((s) => (
               <span
                 key={s}
-                className="px-3 py-1.5 rounded text-white text-sm font-bold"
-                style={{ backgroundColor: "#1D7DFF" }}
+                className="px-4 py-2 rounded text-white text-sm font-bold bg-admin-register"
               >
                 {s}
               </span>
             ))
           )}
         </div>
-        <div className="bg-admin-bg/70 rounded p-4 space-y-2 text-sm">
-          <Row label="좌석 수" value={`${booking.seatCount}석`} />
+        <div className="bg-admin-bg border-2 border-admin-dark-border rounded p-4 space-y-2 text-sm">
+          <Row
+            label="좌석 수"
+            value={
+              booking.seatNumbers.length === 0
+                ? UNAVAILABLE_METRIC
+                : `${booking.seatCount}석`
+            }
+          />
           <Row label="단가" value={formatAdminWon(booking.unitPrice)} />
           <Row
             label="총 금액"
@@ -243,8 +252,7 @@ function BookingDetail({
           <button
             type="button"
             onClick={() => onRefund(booking.bookingNumber)}
-            className="w-full mt-3 py-3 rounded font-bold text-white"
-            style={{ backgroundColor: "#931818" }}
+            className="w-full mt-3 py-3 rounded font-bold text-white bg-admin-refund"
           >
             환불 요청
           </button>
@@ -268,7 +276,7 @@ function Field({
       <div className="text-admin-text-secondary">{icon}</div>
       <div>
         <p className="text-[10px] text-admin-text-secondary">{label}</p>
-        <p className="font-semibold">{value}</p>
+        <p className="font-semibold text-admin-text">{value}</p>
       </div>
     </div>
   );
@@ -284,9 +292,25 @@ function Row({
   emphasized?: boolean;
 }) {
   return (
-    <div className="flex justify-between">
-      <span className="text-admin-text-secondary">{label}</span>
-      <span className={emphasized ? "font-bold text-base" : ""}>{value}</span>
+    <div
+      className={`flex justify-between ${
+        emphasized ? "border-t-2 border-admin-dark-border pt-2.5" : ""
+      }`}
+    >
+      <span
+        className={
+          emphasized
+            ? "font-bold text-admin-text"
+            : "text-admin-text-secondary"
+        }
+      >
+        {label}
+      </span>
+      <span
+        className={`font-bold text-admin-text ${emphasized ? "text-base" : ""}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
