@@ -7,12 +7,14 @@
 //   GET /api/v1/ticket/bookings/{bookingId}/qr 실 API(useTicketQr)로 교체.
 // - 이슈 #168: 예매 상세는 GET /api/v1/booking/{bookingNumber} 단건 조회.
 //   응답 bookingId로 QR을 조회한다 (딥링크/새로고침에서도 /booking/me 스캔 불필요).
+// - 이슈 #105: Figma 결제 완료 레이아웃(포스터·정보 그리드·QR 카드·CTA) 반영.
+//   PENDING·취소 헤더는 #168 분기를 유지한다.
 
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
-import { CheckCircle, Calendar, Clock, Music, Download, AlertCircle } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { CheckCircle, Calendar, Clock, MapPin, AlertCircle } from "lucide-react";
 import { useBookingDetail } from "@/hooks/queries/useBookingDetail";
+import { useBookingPoster } from "@/hooks/queries/useBookingPoster";
 import { useTicketQr } from "@/hooks/queries/useTicketQr";
 import { useCountdownTo } from "@/hooks/useCountdownTo";
 import useSeatStore from "@/stores/reservation/seatStore";
@@ -21,12 +23,16 @@ import { useTimerStore } from "@/stores/reservation/timerStore";
 import { downloadTicket } from "@/utils/ticket/downloadTicket";
 import {
   displayBookingText,
-  formatPaymentAmount,
   canFetchTicketQr,
   bookingQrPlaceholder,
   paymentCompleteHeading,
 } from "@/utils/booking";
-import { formatBackendDateTimeLabel } from "@/utils/booking/parseBackendDateTime";
+import {
+  TicketDownloadActions,
+  TicketInfoBox,
+  TicketPoster,
+  TicketQrCard,
+} from "@/components/ticket/TicketUi";
 
 export default function PaymentCompletePage() {
   // App.tsx: path="/reservations/:reservationId"
@@ -36,6 +42,10 @@ export default function PaymentCompletePage() {
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
+  const posterUrl = useBookingPoster(
+    data?.performanceId,
+    data?.performanceImageMainUrl,
+  );
   const { data: qrData, isLoading: isQrLoading } = useTicketQr(
     data && canFetchTicketQr(data.status) ? data.bookingId : undefined,
   );
@@ -45,10 +55,9 @@ export default function PaymentCompletePage() {
   const resetPayment = usePaymentStore((s) => s.reset);
   const stopTimer = useTimerStore((s) => s.stopTimer);
 
-  // 다운로드 캡처 영역 ref (#91)
+  // 다운로드 캡처 영역 — Figma 정책상 입장 QR은 포함하지 않는다
   const ticketRef = useRef<HTMLDivElement>(null);
 
-  // 진입 시 예매 플로우 상태 클리어
   useEffect(() => {
     stopTimer();
     resetSeat();
@@ -79,212 +88,84 @@ export default function PaymentCompletePage() {
 
   const isConfirmed = canFetchTicketQr(data.status);
   const heading = paymentCompleteHeading(data.status);
-  const isTicketUsable = !qrData || qrData.ticketStatus === "UNUSED";
-  const isExpiringSoon = !!qrData && remainingMs > 0 && remainingMs < 30_000;
-  const remainingLabel = `${Math.floor(remainingMs / 60000)}:${String(
-    Math.floor((remainingMs % 60000) / 1000),
-  ).padStart(2, "0")}`;
 
-  // ── 다운로드 (#91) — 공통 유틸 사용 ─────────────────
   function handleDownload() {
     downloadTicket(ticketRef.current, `ticket-${data!.bookingNumber}.png`);
   }
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
-      {/* ─── 다운로드 캡처 영역 시작 ─── */}
       <div ref={ticketRef} className="bg-white">
-        {/* 상태별 헤더 — PENDING·취소 건을 결제 완료로 표시하지 않는다 */}
         <div className="text-center mb-8">
           {isConfirmed ? (
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
-              <CheckCircle size={48} className="text-green-600" />
+            <div className="inline-flex items-center justify-center size-24 rounded-full bg-green-100 mb-4">
+              <CheckCircle size={64} className="text-green-600" />
             </div>
           ) : data.status === "PENDING" ? (
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-100 mb-4">
-              <Clock size={48} className="text-amber-700" />
+            <div className="inline-flex items-center justify-center size-24 rounded-full bg-amber-100 mb-4">
+              <Clock size={64} className="text-amber-700" />
             </div>
           ) : (
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
-              <AlertCircle size={48} className="text-text-secondary" />
+            <div className="inline-flex items-center justify-center size-24 rounded-full bg-gray-100 mb-4">
+              <AlertCircle size={64} className="text-text-secondary" />
             </div>
           )}
           <h1 className="text-3xl font-bold mb-1">{heading.title}</h1>
-          <p className="text-text-secondary">{heading.subtitle}</p>
+          <p className="text-text-secondary text-lg">{heading.subtitle}</p>
         </div>
 
-        {/* 티켓 카드 */}
-        <div className="bg-white border-2 border-border rounded-2xl overflow-hidden mb-6">
-          {/* 공연 정보 헤더 */}
-          <div className="bg-primary/5 p-6 flex items-center gap-4">
-            {data.performanceImageMainUrl ? (
-              <img
-                src={data.performanceImageMainUrl}
-                alt={data.performanceTitle}
-                className="w-14 h-14 rounded-xl object-cover shrink-0"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
-                <Music size={28} className="text-primary" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold truncate">
-                {displayBookingText(data.performanceTitle)}
-              </h2>
-              <p className="text-sm text-text-secondary mt-0.5 truncate">
-                {displayBookingText(data.performanceVenue)}
-              </p>
-            </div>
-          </div>
-
-          {/* 디테일 박스 4개 */}
-          <div className="p-6 grid grid-cols-2 gap-3">
-            <InfoBox
-              icon={<Calendar size={14} />}
-              label="공연일"
+        <div className="bg-white rounded-xl shadow-card overflow-hidden mb-6 p-8 space-y-6">
+          <TicketPoster
+            src={posterUrl}
+            alt={displayBookingText(data.performanceTitle)}
+          />
+          <h2 className="text-3xl font-bold truncate">
+            {displayBookingText(data.performanceTitle)}
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <TicketInfoBox
+              icon={<Calendar size={16} className="text-primary" />}
+              label="날짜"
               value={displayBookingText(data.performanceDate)}
             />
-            <InfoBox
-              icon={<Clock size={14} />}
+            <TicketInfoBox
+              icon={<Clock size={16} className="text-primary" />}
               label="시간"
               value={displayBookingText(data.performanceTime)}
             />
-            <InfoBox
-              icon={null}
+            <TicketInfoBox
+              className="col-span-2"
+              icon={<MapPin size={16} className="text-primary" />}
+              label="장소"
+              value={displayBookingText(data.performanceVenue)}
+            />
+            <TicketInfoBox
+              icon={<MapPin size={16} className="text-primary" />}
               label="좌석"
               value={displayBookingText(data.seatNumber)}
             />
-            <InfoBox
-              icon={null}
+            <TicketInfoBox
               label="예매 번호"
               value={data.bookingNumber}
               mono
             />
           </div>
-
-          {/* 결제 정보 */}
-          <div className="px-6 pb-6 pt-2 border-t border-border space-y-2">
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm text-text-secondary">결제 금액</span>
-              <span className="text-xl font-bold text-primary">
-                {formatPaymentAmount(data.price)}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs text-text-secondary">
-              <span>결제일</span>
-              <span>{formatBackendDateTimeLabel(data.paidAt)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* QR 코드 */}
-        <div className="bg-white border-2 border-primary rounded-2xl p-6 mb-6">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-48 h-48 bg-white border-4 border-primary rounded-xl flex items-center justify-center p-3 relative">
-              {isConfirmed ? (
-                isQrLoading && !qrData ? (
-                <span className="text-xs text-text-secondary">QR 발급 중...</span>
-              ) : qrData ? (
-                <QRCodeSVG
-                  value={qrData.payload}
-                  size={168}
-                  level="M"
-                  bgColor="#FFFFFF"
-                  fgColor="#1F2937"
-                />
-              ) : (
-                <span className="text-xs text-error">
-                  QR 코드를 불러올 수 없습니다.
-                </span>
-              )
-              ) : (
-                <span className="text-xs text-text-secondary text-center px-2">
-                  {bookingQrPlaceholder(data.status)}
-                </span>
-              )}
-              {!isTicketUsable && isConfirmed && (
-                <div className="absolute inset-0 bg-white/85 rounded-xl flex items-center justify-center">
-                  <span className="text-sm font-bold text-text-secondary">
-                    {qrData?.ticketStatus === "USED"
-                      ? "입장 완료된 티켓"
-                      : "취소된 티켓"}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-          {isConfirmed && (
-          <p className="text-center text-sm text-text-secondary">
-            공연장 입장 시 스캔하세요
-          </p>
-          )}
-          {isConfirmed && qrData && isTicketUsable && (
-            <p
-              className={`text-center text-xs mt-2 ${
-                isExpiringSoon
-                  ? "text-red-500 font-semibold"
-                  : "text-text-secondary"
-              }`}
-            >
-              {remainingMs > 0
-                ? `QR 만료까지 ${remainingLabel}`
-                : "QR 코드 갱신 중..."}
-            </p>
-          )}
         </div>
       </div>
-      {/* ─── 다운로드 캡처 영역 끝 ─── */}
 
-      {/* 버튼들 (다운로드 영역 밖) */}
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="w-full py-3 rounded-lg bg-gray-100 text-text font-semibold hover:bg-gray-200 inline-flex items-center justify-center gap-2"
-        >
-          <Download size={16} />
-          다운로드
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          className="w-full py-3 rounded-lg bg-primary text-white font-bold hover:opacity-90"
-        >
-          새 공연 예매하기
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate("/reservations/mypage")}
-          className="w-full py-2.5 rounded-lg bg-white border border-border text-text-secondary text-sm hover:bg-gray-50"
-        >
-          내 예매 보기
-        </button>
-      </div>
-    </div>
-  );
-}
+      <TicketQrCard
+        isConfirmed={isConfirmed}
+        isQrLoading={isQrLoading}
+        qrData={qrData}
+        placeholder={bookingQrPlaceholder(data.status)}
+        remainingMs={remainingMs}
+      />
 
-function InfoBox({
-  icon,
-  label,
-  value,
-  mono,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="bg-gray-50 rounded-lg p-3">
-      <div className="flex items-center gap-1 text-xs text-text-secondary mb-1">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <p className={`text-sm font-bold truncate ${mono ? "font-mono" : ""}`}>
-        {value}
-      </p>
+      <TicketDownloadActions
+        onDownload={handleDownload}
+        primaryLabel="새 공연 예매하기"
+        onPrimary={() => navigate("/")}
+      />
     </div>
   );
 }

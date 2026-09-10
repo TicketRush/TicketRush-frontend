@@ -7,6 +7,7 @@ import {
   getBookingTab,
   isRefundableBooking,
   paymentCompleteHeading,
+  ticketDetailHeading,
   toShowDateTime,
 } from "./booking";
 
@@ -139,6 +140,15 @@ describe("paymentCompleteHeading", () => {
     expect(paymentCompleteHeading("CONFIRMED").title).toBe("결제 완료!");
     expect(paymentCompleteHeading("PENDING").title).toBe("결제 대기 중");
     expect(paymentCompleteHeading("CANCELED").title).toContain("확인할 수 없습니다");
+  });
+});
+
+describe("ticketDetailHeading", () => {
+  it("CONFIRMED만 티켓 확인으로 표시한다", () => {
+    expect(ticketDetailHeading("CONFIRMED").title).toBe("티켓 확인");
+    expect(ticketDetailHeading("PENDING").title).toBe("결제 대기 중");
+    expect(ticketDetailHeading("CANCELED").title).toContain("입장할 수 없는");
+    expect(ticketDetailHeading("REFUNDED").title).toContain("입장할 수 없는");
   });
 });
 

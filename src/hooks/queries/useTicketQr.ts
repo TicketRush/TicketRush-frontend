@@ -6,6 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getTicketQr } from "@/api/tickets";
 import { queryKeys } from "@/constants/queryKeys";
+import { remainingMsUntil } from "@/utils/booking/parseBackendDateTime";
 
 const REFETCH_INTERVAL_MS = 4 * 60 * 1000;
 
@@ -19,7 +20,7 @@ export function useTicketQr(bookingId: number | undefined) {
     refetchInterval: (query) => {
       const expiresAt = query.state.data?.expiresAt;
       if (!expiresAt) return REFETCH_INTERVAL_MS;
-      const remaining = new Date(expiresAt).getTime() - Date.now();
+      const remaining = remainingMsUntil(expiresAt);
       if (remaining <= 0) return 1_000;
       return Math.min(REFETCH_INTERVAL_MS, Math.max(1_000, remaining));
     },
