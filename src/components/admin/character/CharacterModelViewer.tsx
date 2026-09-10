@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
+import type { EyeStyle } from "@/components/admin/character/characterEye";
 import {
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
@@ -10,31 +11,29 @@ import {
 } from "@/components/admin/character/characterOutfit";
 
 export type { HairStyle } from "@/components/admin/character/characterHair";
+export type { EyeStyle } from "@/components/admin/character/characterEye";
 export type { OutfitModelId } from "@/components/admin/character/characterOutfit";
 
 interface CharacterModelViewerProps {
   modelUrl?: string;
   skinColor: string;
   hairColor: string;
-
   /**
    * #194에서 파츠별 의상 색상 커스터마이징에 사용할 예정입니다.
    * 현재 #74에서는 기존 호출부 호환을 위해 유지합니다.
    */
   outfitColor: string;
-
   /**
    * 화면 표시용 의상 이름입니다.
    * 3D 모델 분기에는 사용하지 않습니다.
    */
   outfitName?: string;
-
   /**
    * 3D 의상 모델을 선택하기 위한 stable id입니다.
    */
   outfitModelId: OutfitModelId;
-
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
 }
 
 const HAIR_MODEL_URLS: Record<HairStyle, string> = {
@@ -57,6 +56,28 @@ function CharacterModelLoadingFallback() {
 }
 
 
+const EYE_MODEL_URLS: Record<EyeStyle, string> = {
+  default: "/models/eyes/eye_default.glb",
+  happy: "/models/eyes/eye_happy.glb",
+  wink: "/models/eyes/eye_wink.glb",
+  squeeze: "/models/eyes/eye_squeeze.glb",
+  angry: "/models/eyes/eye_angry.glb",
+  closed: "/models/eyes/eye_closed.glb",
+};
+
+function isBaseEyeObject(objectName: string) {
+  const name = objectName.toLowerCase();
+
+  return (
+    name === "eye" ||
+    name === "eyes" ||
+    name.startsWith("eye_") ||
+    name.startsWith("eyes_") ||
+    name.endsWith("_eye") ||
+    name.endsWith("_eyes")
+  );
+}
+
 function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
@@ -68,6 +89,11 @@ function CharacterBody({
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (isBaseEyeObject(object.name)) {
+        object.visible = false;
         return;
       }
 
@@ -110,11 +136,20 @@ function HairModel({
   return <primitive object={scene} />;
 }
 
-function OutfitModel({
-  modelUrl,
-}: {
-  modelUrl: string;
-}) {
+function EyeModel({
+  eyeStyle,
+}: Pick<CharacterModelViewerProps, "eyeStyle">) {
+  const eyeModelUrl = EYE_MODEL_URLS[eyeStyle];
+  const gltf = useGLTF(eyeModelUrl);
+
+  const scene = useMemo(() => {
+    return gltf.scene.clone(true);
+  }, [gltf.scene]);
+
+  return <primitive object={scene} />;
+}
+
+function OutfitModel({ modelUrl }: { modelUrl: string }) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
@@ -130,6 +165,7 @@ function CharacterModel({
   hairColor,
   outfitModelId,
   hairStyle,
+  eyeStyle,
 }: Pick<
   CharacterModelViewerProps,
   | "modelUrl"
@@ -137,6 +173,7 @@ function CharacterModel({
   | "hairColor"
   | "outfitModelId"
   | "hairStyle"
+  | "eyeStyle"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
 
@@ -147,15 +184,11 @@ function CharacterModel({
         position={[0, -0.4, 0]}
         rotation={[0, 0, 0]}
       >
-        <CharacterBody
-          modelUrl={modelUrl}
-          skinColor={skinColor}
-        />
+        <CharacterBody modelUrl={modelUrl} skinColor={skinColor} />
 
-        <HairModel
-          hairStyle={hairStyle}
-          hairColor={hairColor}
-        />
+        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+
+        <EyeModel eyeStyle={eyeStyle} />
 
         {outfitModelUrl && (
           <Suspense fallback={null}>
@@ -173,6 +206,7 @@ export default function CharacterModelViewer({
   hairColor,
   outfitModelId,
   hairStyle,
+  eyeStyle,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
@@ -188,6 +222,7 @@ export default function CharacterModelViewer({
             hairColor={hairColor}
             outfitModelId={outfitModelId}
             hairStyle={hairStyle}
+            eyeStyle={eyeStyle}
           />
         </Suspense>
 
@@ -208,6 +243,12 @@ useGLTF.preload("/models/hair/hair_long.glb");
 useGLTF.preload("/models/hair/hair_ponytail.glb");
 useGLTF.preload("/models/hair/hair_twintails.glb");
 useGLTF.preload("/models/hair/hair_wave.glb");
+useGLTF.preload("/models/eyes/eye_default.glb");
+useGLTF.preload("/models/eyes/eye_happy.glb");
+useGLTF.preload("/models/eyes/eye_wink.glb");
+useGLTF.preload("/models/eyes/eye_squeeze.glb");
+useGLTF.preload("/models/eyes/eye_angry.glb");
+useGLTF.preload("/models/eyes/eye_closed.glb");
 
 Object.values(OUTFIT_MODEL_URLS).forEach((modelUrl) => {
   if (modelUrl) {

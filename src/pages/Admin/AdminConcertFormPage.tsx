@@ -24,6 +24,10 @@ import {
   type HairStyle,
 } from "@/components/admin/character/characterHair";
 import {
+  resolveStoredEyeStyle,
+  type EyeStyle,
+} from "@/components/admin/character/characterEye";
+import {
   normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
@@ -33,6 +37,7 @@ import {
   resolveStoredOutfitModelId,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
+
 
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
@@ -77,6 +82,7 @@ interface CharacterDraft {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitName: string;
@@ -100,6 +106,7 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
         | "outfitName"
@@ -110,6 +117,7 @@ function loadSavedCharacter(): CharacterDraft | null {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
       outfitName?: unknown;
@@ -148,6 +156,7 @@ function loadSavedCharacter(): CharacterDraft | null {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
@@ -974,6 +983,7 @@ function CharacterCreatorLinkBox({
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
+          eyeStyle={character.eyeStyle}
         />
       </div>
 
@@ -984,11 +994,13 @@ function CharacterCreatorLinkBox({
 
         <p className="mt-1 text-xs text-admin-text-secondary">
           피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
-          헤어: {character.hairStyle} / 포즈: {character.pose}
+          헤어: {character.hairStyle} / 눈: {character.eyeStyle}
+
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          의상: {character.outfitName} / 액세서리: {character.accessory}
+          의상: {character.outfitName} / 액세서리: {character.accessory} /
+          포즈: {character.pose}
         </p>
 
         <button

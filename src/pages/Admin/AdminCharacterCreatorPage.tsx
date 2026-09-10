@@ -6,6 +6,10 @@ import {
   type HairStyle,
 } from "@/components/admin/character/characterHair";
 import {
+  resolveStoredEyeStyle,
+  type EyeStyle,
+} from "@/components/admin/character/characterEye";
+import {
   DEFAULT_SKIN_COLOR,
   DEFAULT_SKIN_TONE,
   SKIN_TONE_PRESETS,
@@ -28,6 +32,7 @@ interface CharacterConfig {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitName: string;
@@ -56,6 +61,19 @@ const HAIR_STYLES: {
   { value: "ponytail", label: "포니테일", icon: "🎀" },
   { value: "twintails", label: "양갈래", icon: "👧" },
   { value: "wave", label: "웨이브", icon: "🌀" },
+];
+
+const EYE_STYLES: {
+  value: EyeStyle;
+  label: string;
+  icon: string;
+}[] = [
+  { value: "default", label: "기본", icon: "👀" },
+  { value: "happy", label: "웃는 눈", icon: "^^" },
+  { value: "wink", label: "윙크", icon: "😉" },
+  { value: "squeeze", label: "찡긋", icon: "><" },
+  { value: "angry", label: "화난 눈", icon: "😠" },
+  { value: "closed", label: "감은 눈", icon: "—" },
 ];
 
 const DEFAULT_HAIR_COLOR = "#151515";
@@ -124,6 +142,7 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   skinTone: DEFAULT_SKIN_TONE,
   skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
+  eyeStyle: "default",
   hairColor: DEFAULT_HAIR_COLOR,
   outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
   outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
@@ -151,6 +170,7 @@ function loadSavedCharacter(): CharacterConfig {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
         | "outfitName"
@@ -161,6 +181,7 @@ function loadSavedCharacter(): CharacterConfig {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
       outfitName?: unknown;
@@ -200,6 +221,7 @@ function loadSavedCharacter(): CharacterConfig {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
@@ -891,6 +913,26 @@ export default function AdminCharacterCreatorPage() {
               </div>
             </CreatorSection>
 
+            <CreatorSection title="눈 모양">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                {EYE_STYLES.map((eyeStyle) => (
+                  <OptionCard
+                    key={eyeStyle.value}
+                    selected={character.eyeStyle === eyeStyle.value}
+                    onClick={() => update("eyeStyle", eyeStyle.value)}
+                  >
+                    <div className="text-2xl font-bold text-slate-800">
+                      {eyeStyle.icon}
+                    </div>
+
+                    <p className="mt-2 text-xs font-bold text-slate-800">
+                      {eyeStyle.label}
+                    </p>
+                  </OptionCard>
+                ))}
+              </div>
+            </CreatorSection>
+
             <CreatorSection title="의상 선택">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {OUTFIT_OPTIONS.map((outfit) => (
@@ -1221,6 +1263,7 @@ export default function AdminCharacterCreatorPage() {
                 outfitName={character.outfitName}
                 outfitModelId={character.outfitModelId}
                 hairStyle={character.hairStyle}
+                eyeStyle={character.eyeStyle}
               />
             </div>
 
@@ -1228,7 +1271,9 @@ export default function AdminCharacterCreatorPage() {
               <p>피부: {character.skinTone}</p>
               <p>피부색: {character.skinColor.toUpperCase()}</p>
               <p>헤어: {character.hairStyle}</p>
+              <p>눈: {character.eyeStyle}</p>
               <p>헤어 컬러: {character.hairColor.toUpperCase()}</p>
+
               <p>의상: {character.outfitName}</p>
               <p>의상 컬러: {character.outfitColor.toUpperCase()}</p>
               <p>액세서리: {character.accessory}</p>
