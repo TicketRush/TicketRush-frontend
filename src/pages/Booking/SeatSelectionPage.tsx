@@ -389,9 +389,11 @@ export default function SeatSelectionPage() {
           </div>
         </div>
 
-        {/* 좌석 그리드 — 범례는 우측. 넘치면 가로 스크롤, 툴팁·링은 패딩으로 확보 */}
+        {/* 좌석 그리드 — 범례는 우측.
+            w-max min-w-full: 넘치면 왼쪽부터 스크롤, 여유 있으면 가운데.
+            패딩은 툴팁·포커스 링이 overflow에 잘리지 않게 확보. */}
         <div className="overflow-x-auto pt-8 pb-3 px-2">
-          <div className="flex min-w-full justify-center">
+          <div className="w-max min-w-full mx-auto">
             <div className="flex flex-row items-center gap-6">
               {isLoading ? (
                 <div className="text-center text-text-secondary py-12">
