@@ -11,14 +11,28 @@
 // 공연명/좌석번호는 performance/seat 서비스에서 aggregation (api/bookings.ts).
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Clock3, RotateCcw, ArrowLeft } from "lucide-react";
+import { Clock3, RefreshCw, RotateCcw, ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
+import { ApiError } from "@/api/errors/errorMapper";
 import {
   useRefundFailedBookings,
   useRefundingStuckBookings,
   useRetryRefund,
 } from "@/hooks/admin/useAdminRefunds";
 import type { AdminRefundBookingListItem } from "@/types/domain/booking";
+import {
+  formatAdminDateTime,
+  formatAdminText,
+} from "@/utils/admin/formatAdminMetric";
+
+const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
+  CONFIRMED: { label: "완료", bg: "#00C950" },
+  CANCELED: { label: "취소", bg: "#FB2C36" },
+  PENDING: { label: "대기", bg: "#FBBF24" },
+  EXPIRED: { label: "만료", bg: "#9CA3AF" },
+  REFUNDING: { label: "환불 중", bg: "#2B7FFF" },
+  REFUNDED: { label: "환불 완료", bg: "#6B7280" },
+};
 
 const PAGE_SIZE = 10;
 
@@ -36,9 +50,7 @@ export default function AdminRefundsPage() {
       await retryMutation.mutateAsync(bookingNumber);
       toast.success(`${bookingNumber} 환불 재시도를 요청했습니다.`);
     } catch (error: unknown) {
-      const err =
-        error instanceof Error ? error : new Error("재시도 요청에 실패했습니다.");
-      toast.error(err.message);
+      toast.error(ApiError.fromUnknown(error).message);
     }
   }
 
@@ -46,7 +58,7 @@ export default function AdminRefundsPage() {
     <div className="p-8 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
+          <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-1 rounded">
             REFUND MONITORING
           </span>
           <h1 className="text-3xl font-bold mt-2">환불 모니터링</h1>
@@ -67,20 +79,12 @@ export default function AdminRefundsPage() {
       <div className="grid grid-cols-2 gap-4 max-w-2xl">
         <div className="bg-admin-card border border-admin-border rounded-xl p-6">
           <div className="flex items-start justify-between mb-4">
-            <div
-              className="w-10 h-10 rounded flex items-center justify-center"
-              style={{ backgroundColor: "#FB2C36" }}
-            >
-              <AlertTriangle size={20} className="text-white" />
-            </div>
-            <span
-              className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-white"
-              style={{ backgroundColor: "#FB2C36" }}
-            >
+            <RefreshCw size={24} className="text-admin-status-cancelled" />
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-red-500/20 text-red-300">
               FAILED
             </span>
           </div>
-          <p className="text-3xl font-bold mb-1" style={{ color: "#FB2C36" }}>
+          <p className="text-3xl font-bold mb-1 text-admin-status-cancelled">
             {failed.data?.items.length ?? 0}
           </p>
           <p className="text-xs text-admin-text-secondary">
@@ -90,20 +94,12 @@ export default function AdminRefundsPage() {
 
         <div className="bg-admin-card border border-admin-border rounded-xl p-6">
           <div className="flex items-start justify-between mb-4">
-            <div
-              className="w-10 h-10 rounded flex items-center justify-center"
-              style={{ backgroundColor: "#F59E0B" }}
-            >
-              <Clock3 size={20} className="text-white" />
-            </div>
-            <span
-              className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-white"
-              style={{ backgroundColor: "#F59E0B" }}
-            >
+            <Clock3 size={24} className="text-admin-kpi-revenue" />
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-orange-500/20 text-orange-300">
               STUCK
             </span>
           </div>
-          <p className="text-3xl font-bold mb-1" style={{ color: "#F59E0B" }}>
+          <p className="text-3xl font-bold mb-1 text-admin-kpi-revenue">
             {stuck.data?.items.length ?? 0}
           </p>
           <p className="text-xs text-admin-text-secondary">
@@ -177,11 +173,11 @@ function RefundTable({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <div className="bg-white border-2 border-[#D0D0D0] rounded-xl p-6">
-      <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+    <div className="bg-admin-card border-2 border-admin-dark-border rounded-xl p-6">
+      <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-0.5 rounded inline-block mb-2">
         {title}
       </span>
-      <h3 className="text-base font-bold text-gray-900">{title}</h3>
+      <h3 className="text-base font-bold text-admin-text">{title}</h3>
       <p className="text-xs text-admin-text-secondary mb-4">{subtitle}</p>
 
       {isLoading ? (
@@ -190,14 +186,11 @@ function RefundTable({
         </div>
       ) : isError ? (
         <div className="text-center py-12 space-y-3">
-          <p className="text-admin-text-secondary">
-            목록을 불러오지 못했습니다.
-          </p>
+          <p className="text-red-400">목록을 불러오지 못했습니다.</p>
           <button
             type="button"
             onClick={onReload}
-            className="px-4 py-2 rounded-md text-xs font-bold text-white inline-flex items-center gap-1"
-            style={{ backgroundColor: "#2563EB" }}
+            className="px-4 py-2 rounded-md text-xs font-bold text-white inline-flex items-center gap-1 bg-admin-register"
           >
             <RotateCcw size={12} /> 다시 시도
           </button>
@@ -208,56 +201,76 @@ function RefundTable({
         </div>
       ) : (
         <>
-          <table className="w-full text-sm text-left admin-table">
-            <thead className="border-b border-admin-border">
-              <tr className="text-xs text-admin-text-secondary">
-                <th className="py-3 px-3 text-left">예매번호</th>
-                <th className="py-3 px-3 text-left">공연명</th>
-                <th className="py-3 px-3 text-left">좌석</th>
-                <th className="py-3 px-3 text-left">사용자ID</th>
-                <th className="py-3 px-3 text-left">상태</th>
-                <th className="py-3 px-3 text-left">{dateColumnLabel}</th>
-                <th className="py-3 px-3 text-left">재시도</th>
+          <table className="w-full text-sm text-center">
+            <thead>
+              <tr className="border-b border-admin-border">
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  예매번호
+                </th>
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  공연명
+                </th>
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  좌석
+                </th>
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  사용자ID
+                </th>
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  상태
+                </th>
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  {dateColumnLabel}
+                </th>
+                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
+                  재시도
+                </th>
               </tr>
             </thead>
             <tbody>
-              {items.map((b) => (
-                <tr
-                  key={b.bookingNumber}
-                  className="border-b border-admin-border/50 hover:bg-admin-border/30"
-                >
-                  <td className="py-3 px-3 font-mono text-xs text-blue-400">
-                    {b.bookingNumber}
-                  </td>
-                  <td className="py-3 px-3 font-bold">{b.performanceTitle}</td>
-                  <td className="py-3 px-3">{b.seatNumber}</td>
-                  <td className="py-3 px-3 text-xs text-admin-text-secondary">
-                    #{b.userId}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="px-3 py-1 rounded-md text-xs font-bold text-white bg-gray-500">
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-xs text-admin-text-secondary">
-                    {(() => {
-                      const dt = dateAccessor(b);
-                      return dt ? new Date(dt).toLocaleString("ko-KR") : "-";
-                    })()}
-                  </td>
-                  <td className="py-3 px-3">
-                    <button
-                      type="button"
-                      onClick={() => onRetry(b.bookingNumber)}
-                      disabled={retryPending}
-                      className="px-3 py-1 rounded-md text-xs font-bold text-white flex items-center gap-1"
-                      style={{ backgroundColor: "#2563EB" }}
-                    >
-                      <RotateCcw size={12} /> 재시도
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {items.map((b) => {
+                const s = STATUS_STYLES[b.status] ?? STATUS_STYLES.PENDING;
+                return (
+                  <tr
+                    key={b.bookingNumber}
+                    className="border-b border-admin-border/50 hover:bg-admin-border/30"
+                  >
+                    <td className="py-3 px-3 font-mono text-xs text-blue-400">
+                      {b.bookingNumber}
+                    </td>
+                    <td className="py-3 px-3 font-bold text-admin-text">
+                      {formatAdminText(b.performanceTitle)}
+                    </td>
+                    <td className="py-3 px-3 text-admin-text">
+                      {formatAdminText(b.seatNumber)}
+                    </td>
+                    <td className="py-3 px-3 text-xs text-admin-text-secondary">
+                      #{b.userId}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span
+                        className="inline-block px-3 py-1 rounded-md text-xs font-bold text-white"
+                        style={{ backgroundColor: s.bg }}
+                      >
+                        {s.label}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-xs text-admin-text-secondary">
+                      {formatAdminDateTime(dateAccessor(b))}
+                    </td>
+                    <td className="py-3 px-3">
+                      <button
+                        type="button"
+                        onClick={() => onRetry(b.bookingNumber)}
+                        disabled={retryPending}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold text-white bg-admin-register disabled:opacity-40"
+                      >
+                        <RotateCcw size={12} /> 재시도
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
@@ -266,7 +279,7 @@ function RefundTable({
               type="button"
               onClick={() => onPageChange(Math.max(0, page - 1))}
               disabled={page === 0}
-              className="px-3 py-1.5 rounded-md text-xs bg-admin-border disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md text-xs text-admin-text bg-admin-border disabled:opacity-40"
             >
               이전
             </button>
@@ -274,7 +287,7 @@ function RefundTable({
               type="button"
               onClick={() => onPageChange(page + 1)}
               disabled={!hasNext}
-              className="px-3 py-1.5 rounded-md text-xs bg-admin-border disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md text-xs text-admin-text bg-admin-border disabled:opacity-40"
             >
               다음
             </button>
