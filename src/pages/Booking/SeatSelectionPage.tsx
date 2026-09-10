@@ -346,8 +346,9 @@ export default function SeatSelectionPage() {
         <div className="text-center">
           <h1 className="text-base font-bold text-text">좌석 선택</h1>
           <p className="text-xs text-text-secondary mt-0.5">
-            선택: {selectedSeatAvailable ? "1석" : "0석"} | 총 금액: ₩
-            {totalAmount.toLocaleString()}
+            {selectedSeatAvailable
+              ? `선택: 1석 | 총 금액: ₩${totalAmount.toLocaleString()}`
+              : "선택: 0석"}
           </p>
         </div>
         <button
@@ -379,12 +380,7 @@ export default function SeatSelectionPage() {
         </div>
       </div>
 
-      {/* 범례 */}
-      <div className="bg-white border border-border rounded-xl p-4 flex justify-center">
-        <SeatLegend />
-      </div>
-
-      {/* 좌석맵 (STAGE 통합) */}
+      {/* 좌석맵 (STAGE 통합) + 우측 범례 */}
       <div className="bg-white border border-border rounded-xl p-6">
         {/* STAGE */}
         <div className="flex justify-center mb-6">
@@ -393,32 +389,32 @@ export default function SeatSelectionPage() {
           </div>
         </div>
 
-        {/* 좌석 그리드 */}
-        {isLoading ? (
-          <div className="text-center text-text-secondary py-12">
-            좌석 정보 불러오는 중...
+        {/* 좌석 그리드 — 범례는 우측.
+            w-max min-w-full: 넘치면 왼쪽부터 스크롤, 여유 있으면 가운데.
+            패딩은 툴팁·포커스 링이 overflow에 잘리지 않게 확보. */}
+        <div className="overflow-x-auto pt-8 pb-3 px-2">
+          <div className="w-max min-w-full mx-auto">
+            <div className="flex flex-row items-center gap-6">
+              {isLoading ? (
+                <div className="text-center text-text-secondary py-12">
+                  좌석 정보 불러오는 중...
+                </div>
+              ) : isError ? (
+                <div className="flex items-center justify-center gap-2 text-error py-12">
+                  <AlertCircle size={20} />
+                  좌석 정보를 불러올 수 없습니다.
+                </div>
+              ) : (
+                <SeatMap
+                  seats={seats ?? []}
+                  selectedSeatId={selectedSeatAvailable ? (selectedSeat?.id ?? null) : null}
+                  onSeatClick={handleSeatClick}
+                />
+              )}
+              <SeatLegend />
+            </div>
           </div>
-        ) : isError ? (
-          <div className="flex items-center justify-center gap-2 text-error py-12">
-            <AlertCircle size={20} />
-            좌석 정보를 불러올 수 없습니다.
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <SeatMap
-              seats={seats ?? []}
-              selectedSeatId={selectedSeatAvailable ? (selectedSeat?.id ?? null) : null}
-              onSeatClick={handleSeatClick}
-            />
-          </div>
-        )}
-
-        {/* 좌석 그리드 정보 */}
-        {seats && seats.length > 0 && (
-          <p className="text-center text-[10px] text-text-secondary mt-4">
-            [Seat Grid: 10 rows × 12 columns]
-          </p>
-        )}
+        </div>
       </div>
 
       {/* 4개 통계 */}
@@ -427,10 +423,14 @@ export default function SeatSelectionPage() {
         <Stat
           label="예매 가능"
           value={stats.available}
-          colorClass="text-primary"
+          colorClass="text-seat-available"
         />
-        <Stat label="진행중" value={stats.holding} colorClass="text-red-500" />
-        <Stat label="판매 완료" value={stats.sold} colorClass="text-gray-400" />
+        <Stat
+          label="진행중"
+          value={stats.holding}
+          colorClass="text-seat-holding"
+        />
+        <Stat label="예매완료" value={stats.sold} colorClass="text-seat-sold" />
       </div>
 
       {/* 예약 프로세스 */}

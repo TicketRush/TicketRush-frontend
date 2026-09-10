@@ -60,11 +60,22 @@ export default {
           "fallback-end": "#EAECEF",
         },
         // 사용자 영역 좌석 상태. 관리자(admin.seat)와 색 체계가 완전히 다르다.
+        // fill은 #96, border는 Figma 「좌석 선택」(99:430) 범례 (#102).
+        // holding 이름은 #96 토큰을 유지한다. 이슈의 seat-hold 가칭은 쓰지 않는다.
         seat: {
-          selected: "#00C950",
+          selected: {
+            DEFAULT: "#00C950",
+            border: "#008236",
+          },
           available: "#6C5CE7",
-          holding: "#FF4757",
-          sold: "#99A1AF",
+          holding: {
+            DEFAULT: "#FF4757",
+            border: "#CF3A47",
+          },
+          sold: {
+            DEFAULT: "#99A1AF",
+            border: "#6A7282",
+          },
         },
         timer: {
           warning: "#C10007",
