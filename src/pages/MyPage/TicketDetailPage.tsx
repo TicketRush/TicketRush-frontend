@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import {
+  AlertCircle,
   CheckCircle,
   Calendar,
   Clock,
@@ -20,6 +21,7 @@ import {
   formatPaymentAmount,
   canFetchTicketQr,
   bookingQrPlaceholder,
+  ticketDetailHeading,
 } from "@/utils/booking";
 import { formatBackendDateTimeLabel } from "@/utils/booking/parseBackendDateTime";
 import {
@@ -95,8 +97,10 @@ export default function TicketDetailPage() {
   }
 
   const isConfirmed = canFetchTicketQr(data.status);
+  const heading = ticketDetailHeading(data.status);
 
   function handleDownload() {
+    if (!isConfirmed) return;
     downloadTicket(ticketRef.current, `ticket-${data!.bookingNumber}.png`);
   }
 
@@ -118,11 +122,21 @@ export default function TicketDetailPage() {
     <div className="max-w-2xl mx-auto px-6 py-10">
       <div ref={ticketRef} className="bg-white">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center size-24 rounded-full bg-green-100 mb-3">
-            <CheckCircle size={64} className="text-green-600" />
-          </div>
-          <h1 className="text-3xl font-bold mb-1">티켓 확인</h1>
-          <p className="text-lg text-text-secondary">티켓 정보를 확인하세요</p>
+          {isConfirmed ? (
+            <div className="inline-flex items-center justify-center size-24 rounded-full bg-green-100 mb-3">
+              <CheckCircle size={64} className="text-green-600" />
+            </div>
+          ) : data.status === "PENDING" ? (
+            <div className="inline-flex items-center justify-center size-24 rounded-full bg-amber-100 mb-3">
+              <Clock size={64} className="text-amber-700" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center size-24 rounded-full bg-gray-100 mb-3">
+              <AlertCircle size={64} className="text-text-secondary" />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold mb-1">{heading.title}</h1>
+          <p className="text-lg text-text-secondary">{heading.subtitle}</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-card overflow-hidden mb-6 p-8 space-y-6">
@@ -237,6 +251,7 @@ export default function TicketDetailPage() {
       />
 
       <TicketDownloadActions
+        showDownload={isConfirmed}
         onDownload={handleDownload}
         primaryLabel="내 예매로"
         onPrimary={() => navigate("/reservations/mypage")}

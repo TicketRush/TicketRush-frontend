@@ -100,6 +100,26 @@ export function paymentCompleteHeading(status: BookingStatus): {
   };
 }
 
+/** 티켓 확인 페이지 헤더. Figma는 CONFIRMED만 그리지만 QR·다운로드와 상태를 맞춘다. */
+export function ticketDetailHeading(status: BookingStatus): {
+  title: string;
+  subtitle: string;
+} {
+  if (status === "CONFIRMED") {
+    return { title: "티켓 확인", subtitle: "티켓 정보를 확인하세요" };
+  }
+  if (status === "PENDING") {
+    return {
+      title: "결제 대기 중",
+      subtitle: "결제를 완료하면 디지털 티켓이 발급됩니다",
+    };
+  }
+  return {
+    title: "입장할 수 없는 예매입니다",
+    subtitle: "이 예매로는 입장 QR을 사용할 수 없습니다",
+  };
+}
+
 export function formatPaymentAmount(
   amount: number | null | undefined,
 ): string {

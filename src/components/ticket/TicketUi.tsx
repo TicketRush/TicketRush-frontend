@@ -163,25 +163,32 @@ export function TicketDownloadActions({
   onDownload,
   primaryLabel,
   onPrimary,
+  showDownload = true,
 }: {
   onDownload: () => void;
   primaryLabel: string;
   onPrimary: () => void;
+  /** CONFIRMED가 아니면 미확정·취소 티켓 PNG 저장을 막는다 */
+  showDownload?: boolean;
 }) {
   return (
     <div className="space-y-3">
-      <Button
-        type="button"
-        variant="outline"
-        fullWidth
-        onClick={onDownload}
-        icon={<Download size={20} />}
-      >
-        다운로드
-      </Button>
-      <p className="px-2 text-center text-sm text-text-secondary">
-        {DOWNLOAD_QR_HINT}
-      </p>
+      {showDownload && (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            fullWidth
+            onClick={onDownload}
+            icon={<Download size={20} />}
+          >
+            다운로드
+          </Button>
+          <p className="px-2 text-center text-sm text-text-secondary">
+            {DOWNLOAD_QR_HINT}
+          </p>
+        </>
+      )}
       <Button
         type="button"
         variant="primary"
