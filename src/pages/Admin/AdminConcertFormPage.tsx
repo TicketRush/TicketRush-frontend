@@ -18,6 +18,10 @@ import {
 } from "@/hooks/admin/useAdmin";
 import type { ConcertFormData } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
+import {
+  sanitizeConcertForm,
+  validateConcertForm,
+} from "@/utils/admin/concertFormValidation";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
   resolveStoredHairStyle,
@@ -383,39 +387,26 @@ export default function AdminConcertFormPage({ mode }: Props) {
     });
   }
 
-  function validateForm() {
-    if (!form.title.trim()) return "공연명을 입력해주세요.";
-    if (!form.performer.trim()) return "출연진을 입력해주세요.";
-    if (!form.genre) return "장르를 선택해주세요.";
-    if (!form.date) return "공연 날짜를 선택해주세요.";
-    if (!form.time) return "공연 시간을 선택해주세요.";
-
-    if (!form.durationMinutes || form.durationMinutes <= 0) {
-      return "공연 러닝타임을 입력해주세요.";
-    }
-
-    if (!form.venue.trim()) return "공연장명을 입력해주세요.";
-    if (!form.address.trim()) return "상세 주소를 입력해주세요.";
-    if (!form.price || form.price <= 0) return "티켓 가격을 입력해주세요.";
-    if (!totalSeats || totalSeats <= 0) return "총 좌석 수를 입력해주세요.";
-    if (!form.description.trim()) return "공연 상세 설명을 입력해주세요.";
-
-    if (mode === "create" && !selectedCharacter) {
-      return "3D 캐릭터를 제작해주세요.";
-    }
-
-    if (mode === "create" && !mainImage) {
-      return "대표 이미지를 업로드해주세요.";
-    }
-
-    return null;
-  }
-
   async function handleSubmit() {
-    const errorMessage = validateForm();
+    const sanitizedForm = sanitizeConcertForm(form);
+
+    const errorMessage = validateConcertForm({
+      form: sanitizedForm,
+      totalSeats,
+    });
 
     if (errorMessage) {
       toast.error(errorMessage);
+      return;
+    }
+
+    if (mode === "create" && !selectedCharacter) {
+      toast.error("3D 캐릭터를 제작해주세요.");
+      return;
+    }
+
+    if (mode === "create" && !mainImage) {
+      toast.error("대표 이미지를 업로드해주세요.");
       return;
     }
 
@@ -425,10 +416,10 @@ export default function AdminConcertFormPage({ mode }: Props) {
       // totalSeats, mainImage, galleryImages, model3d는 백엔드 스펙 확정 후
       // FormData 또는 별도 업로드 API로 연결 필요.
       if (mode === "create") {
-        await createMutation.mutateAsync(form);
+        await createMutation.mutateAsync(sanitizedForm);
         toast.success("공연이 등록되었습니다.");
       } else {
-        await updateMutation.mutateAsync(form);
+        await updateMutation.mutateAsync(sanitizedForm);
         toast.success("공연이 수정되었습니다.");
       }
 
