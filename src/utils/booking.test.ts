@@ -4,15 +4,16 @@ import {
   canFetchTicketQr,
   displayBookingText,
   formatPaymentAmount,
+  formatPerformanceSchedule,
   getBookingTab,
   isRefundableBooking,
   paymentCompleteHeading,
-  ticketDetailHeading,
+  showScheduleToMs,
   toShowDateTime,
 } from "./booking";
 
 describe("getBookingTab", () => {
-  const now = new Date(2026, 4, 22, 12, 0, 0);
+  const now = new Date("2026-05-22T03:00:00.000Z");
 
   it("시간이 있으면 공연 시작 시각으로 분기한다", () => {
     expect(
@@ -30,7 +31,7 @@ describe("getBookingTab", () => {
   });
 
   it("목록처럼 시간이 없으면 공연 날짜만으로 분기한다", () => {
-    const late = new Date(2026, 4, 22, 23, 0, 0);
+    const late = new Date("2026-05-22T14:00:00.000Z");
     expect(getBookingTab({ performanceDate: "2026-05-22" }, late)).toBe(
       "upcoming",
     );
@@ -40,10 +41,20 @@ describe("getBookingTab", () => {
   it("날짜가 없으면 upcoming이다", () => {
     expect(getBookingTab({ performanceDate: "" }, now)).toBe("upcoming");
   });
+
+  it("브라우저 TZ와 무관하게 Seoul 오늘로 날짜만 비교한다 (#259)", () => {
+    const nowUtc = new Date("2026-05-22T16:00:00.000Z");
+    expect(getBookingTab({ performanceDate: "2026-05-22" }, nowUtc)).toBe(
+      "past",
+    );
+    expect(getBookingTab({ performanceDate: "2026-05-23" }, nowUtc)).toBe(
+      "upcoming",
+    );
+  });
 });
 
 describe("isRefundableBooking", () => {
-  const now = new Date(2026, 4, 22, 12, 0, 0);
+  const now = new Date("2026-05-22T03:00:00.000Z");
 
   it("시각이 있으면 공연 시작 시각 기준 7일이다", () => {
     expect(
@@ -68,7 +79,7 @@ describe("isRefundableBooking", () => {
     ).toBe(false);
   });
 
-  it("시각이 없으면 자정으로 단축하지 않고 날짜 일수로 7일을 본다", () => {
+  it("시각이 없으면 날짜 일수로 7일을 본다", () => {
     expect(
       isRefundableBooking(
         { status: "CONFIRMED", performanceDate: "2026-05-29" },
@@ -94,22 +105,47 @@ describe("isRefundableBooking", () => {
       ),
     ).toBe(false);
   });
+
+  it("Seoul 달력 기준으로 D-7을 본다 (#259)", () => {
+    const nowUtc = new Date("2026-05-22T16:00:00.000Z");
+    expect(
+      isRefundableBooking(
+        { status: "CONFIRMED", performanceDate: "2026-05-30" },
+        nowUtc,
+      ),
+    ).toBe(true);
+    expect(
+      isRefundableBooking(
+        { status: "CONFIRMED", performanceDate: "2026-05-29" },
+        nowUtc,
+      ),
+    ).toBe(false);
+  });
 });
 
-describe("toShowDateTime", () => {
-  it("HH:mm:ss를 로컬 시각으로 파싱한다", () => {
-    const d = toShowDateTime("2026-05-22", "19:30:00");
-    expect(d.getFullYear()).toBe(2026);
-    expect(d.getMonth()).toBe(4);
-    expect(d.getDate()).toBe(22);
-    expect(d.getHours()).toBe(19);
-    expect(d.getMinutes()).toBe(30);
+describe("toShowDateTime / showScheduleToMs", () => {
+  it("서울 벽시계를 Instant로 파싱한다", () => {
+    expect(showScheduleToMs("2026-05-22", "19:30:00")).toBe(
+      Date.parse("2026-05-22T19:30:00+09:00"),
+    );
+    expect(toShowDateTime("2026-05-22", "19:30:00").getTime()).toBe(
+      Date.parse("2026-05-22T19:30:00+09:00"),
+    );
   });
 
-  it("시간이 없으면 해당일 00:00이다", () => {
-    const d = toShowDateTime("2026-05-22");
-    expect(d.getHours()).toBe(0);
-    expect(d.getMinutes()).toBe(0);
+  it("시간이 없으면 서울 해당일 00:00이다", () => {
+    expect(showScheduleToMs("2026-05-22")).toBe(
+      Date.parse("2026-05-22T00:00:00+09:00"),
+    );
+  });
+});
+
+describe("formatPerformanceSchedule", () => {
+  it("달력 필드를 그대로 붙인다", () => {
+    expect(formatPerformanceSchedule("2026-05-22", "19:30:00")).toBe(
+      "2026-05-22 19:30",
+    );
+    expect(formatPerformanceSchedule("2026-05-22")).toBe("2026-05-22");
   });
 });
 
@@ -139,16 +175,9 @@ describe("paymentCompleteHeading", () => {
   it("CONFIRMED만 결제 완료로 표시한다", () => {
     expect(paymentCompleteHeading("CONFIRMED").title).toBe("결제 완료!");
     expect(paymentCompleteHeading("PENDING").title).toBe("결제 대기 중");
-    expect(paymentCompleteHeading("CANCELED").title).toContain("확인할 수 없습니다");
-  });
-});
-
-describe("ticketDetailHeading", () => {
-  it("CONFIRMED만 티켓 확인으로 표시한다", () => {
-    expect(ticketDetailHeading("CONFIRMED").title).toBe("티켓 확인");
-    expect(ticketDetailHeading("PENDING").title).toBe("결제 대기 중");
-    expect(ticketDetailHeading("CANCELED").title).toContain("입장할 수 없는");
-    expect(ticketDetailHeading("REFUNDED").title).toContain("입장할 수 없는");
+    expect(paymentCompleteHeading("CANCELED").title).toContain(
+      "확인할 수 없습니다",
+    );
   });
 });
 

@@ -10,6 +10,7 @@
 //   - venue → venue ?? address fallback (concert.venue optional 대응)
 
 import { mockDelay, mockError } from "./_helpers";
+import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
 import type {
   BookingPendingRequest,
   BookingPendingResponse,
@@ -175,11 +176,10 @@ export async function mockGetBookingDetail(
 }
 
 function toBackendDateTime(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return d.toISOString();
 }
 
-/** GET /booking/{bookingNumber} 의 expires_at — PENDING이면 생성 시각 + 5분 (#168) */
+/** GET /booking/{bookingNumber} 의 expires_at — PENDING이면 생성 시각 + 5분 (#168/#246) */
 export async function mockFetchPendingBookingExpiresAt(
   bookingNumber: string,
 ): Promise<string | null> {
@@ -188,7 +188,8 @@ export async function mockFetchPendingBookingExpiresAt(
     (b) => b.bookingNumber === bookingNumber && b.status === "PENDING",
   );
   if (!booking) return null;
-  const created = new Date(booking.createdAt).getTime();
+  const created = parseBackendDateTime(booking.createdAt);
+  if (created == null) return null;
   return toBackendDateTime(new Date(created + 5 * 60 * 1000));
 }
 
