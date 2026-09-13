@@ -1,5 +1,3 @@
-import { formatSeoulLocaleString } from "@/utils/datetime/formatSeoulInstant";
-
 /**
  * 백엔드 Instant JSON을 epoch ms로 파싱한다.
  *
@@ -37,11 +35,4 @@ export function remainingMsUntil(
   const t = parseBackendDateTime(expiresAt);
   if (t == null) return 0;
   return Math.max(0, t - nowMs);
-}
-
-/** BE Instant → Asia/Seoul 표기. `formatSeoulLocaleString` 별칭 (#246) */
-export function formatBackendDateTimeLabel(
-  value: string | null | undefined,
-): string {
-  return formatSeoulLocaleString(value);
 }

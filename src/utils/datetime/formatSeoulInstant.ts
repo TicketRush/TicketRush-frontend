@@ -74,3 +74,10 @@ export function formatSeoulLocaleString(
   if (ms == null) return fallback;
   return new Date(ms).toLocaleString("ko-KR", { timeZone: SEOUL_TIME_ZONE });
 }
+
+/** BE Instant 화면 표기. `formatSeoulLocaleString` 별칭 (#246) */
+export function formatBackendDateTimeLabel(
+  value: string | null | undefined,
+): string {
+  return formatSeoulLocaleString(value);
+}

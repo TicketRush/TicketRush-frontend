@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatBackendDateTimeLabel,
   parseBackendDateTime,
   remainingMsUntil,
 } from "./parseBackendDateTime";
@@ -51,19 +50,5 @@ describe("remainingMsUntil", () => {
 
   it("지난 시각은 0이다", () => {
     expect(remainingMsUntil("2020-01-01 00:00:00", Date.now())).toBe(0);
-  });
-});
-
-describe("formatBackendDateTimeLabel", () => {
-  it("UTC Instant를 Asia/Seoul로 표시한다", () => {
-    const label = formatBackendDateTimeLabel("2026-09-13T03:05:00.000Z");
-    expect(label).toContain("2026");
-    expect(label).toMatch(/12:\s*05|오후\s*12:\s*05/);
-  });
-
-  it("없거나 실패하면 - 이다", () => {
-    expect(formatBackendDateTimeLabel(null)).toBe("-");
-    expect(formatBackendDateTimeLabel("")).toBe("-");
-    expect(formatBackendDateTimeLabel("not-a-date")).toBe("-");
   });
 });

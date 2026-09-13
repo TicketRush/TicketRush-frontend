@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatBackendDateTimeLabel,
   formatSeoulDate,
   formatSeoulDateTime,
   formatSeoulLocaleString,
@@ -21,5 +22,13 @@ describe("formatSeoulInstant", () => {
     expect(formatSeoulDate(null)).toBe("-");
     expect(formatSeoulDateTime("")).toBe("-");
     expect(formatSeoulLocaleString(undefined)).toBe("-");
+  });
+
+  it("formatBackendDateTimeLabel은 Seoul 로케일 표기다", () => {
+    const label = formatBackendDateTimeLabel("2026-09-13T03:05:00.000Z");
+    expect(label).toContain("2026");
+    expect(label).toMatch(/12:\s*05|오후\s*12:\s*05/);
+    expect(formatBackendDateTimeLabel(null)).toBe("-");
+    expect(formatBackendDateTimeLabel("not-a-date")).toBe("-");
   });
 });

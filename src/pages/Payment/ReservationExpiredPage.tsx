@@ -15,6 +15,8 @@ export default function ReservationExpiredPage() {
   const releaseMutation = useReleaseSeat(performanceId);
   const { handleTimeout } = useReservationLifecycle();
   const [closePending, setClosePending] = useState(false);
+  /** PENDING이 클라/서버에 남아 해제 재시도가 필요할 때 */
+  const [releasePending, setReleasePending] = useState(false);
 
   const handleTimeoutRef = useRef(handleTimeout);
   handleTimeoutRef.current = handleTimeout;
@@ -36,15 +38,29 @@ export default function ReservationExpiredPage() {
     });
   }
 
+  function syncReleasePendingFlag() {
+    const { bookingNumber, status } = usePaymentStore.getState();
+    setReleasePending(!!bookingNumber && !isPaymentInFlight(status));
+  }
+
   // 남은 PENDING을 마운트 시 조용히 취소해 「이미 해제」 카피와 맞춘다.
   useEffect(() => {
     if (didCancelRef.current) return;
     const { bookingNumber, status } = usePaymentStore.getState();
-    if (!bookingNumber || isPaymentInFlight(status)) return;
+    if (!bookingNumber || isPaymentInFlight(status)) {
+      setReleasePending(false);
+      return;
+    }
     didCancelRef.current = true;
+    setReleasePending(true);
 
     setClosePending(true);
-    void cancelRemainingPending().finally(() => setClosePending(false));
+    void cancelRemainingPending()
+      .then((ok) => {
+        if (ok) setReleasePending(false);
+        else syncReleasePendingFlag();
+      })
+      .finally(() => setClosePending(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -56,14 +72,24 @@ export default function ReservationExpiredPage() {
     if (bookingNumber && !isPaymentInFlight(status)) {
       setClosePending(true);
       try {
-        await cancelRemainingPending();
+        const ok = await cancelRemainingPending();
+        if (!ok) syncReleasePendingFlag();
+        else setReleasePending(false);
       } finally {
         setClosePending(false);
       }
+    } else {
+      setReleasePending(false);
     }
 
     navigate(`/concerts/${id}/seats`);
   }, [closePending, id, navigate]);
 
-  return <TimeoutModal onClose={handleClose} closePending={closePending} />;
+  return (
+    <TimeoutModal
+      onClose={handleClose}
+      closePending={closePending}
+      releasePending={releasePending}
+    />
+  );
 }

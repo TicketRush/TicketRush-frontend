@@ -23,7 +23,7 @@ import {
   bookingQrPlaceholder,
   ticketDetailHeading,
 } from "@/utils/booking";
-import { formatBackendDateTimeLabel } from "@/utils/booking/parseBackendDateTime";
+import { formatBackendDateTimeLabel } from "@/utils/datetime/formatSeoulInstant";
 import {
   TicketDownloadActions,
   TicketInfoBox,
