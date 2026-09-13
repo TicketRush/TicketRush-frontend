@@ -432,8 +432,9 @@ export default function SeatSelectionPage() {
           value={stats.available}
           colorClass="text-seat-available"
         />
+        {/* holdCount = 공연 전체 HOLD. 내 임시예매만이 아님 (#260 후속 UX) */}
         <Stat
-          label="진행중"
+          label="임시예매"
           value={stats.holding}
           colorClass="text-seat-holding"
         />
