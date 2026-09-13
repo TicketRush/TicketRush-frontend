@@ -31,6 +31,7 @@ import {
   TicketQrCard,
 } from "@/components/ticket/TicketUi";
 import { copyBookingNumber } from "@/utils/ticket/copyBookingNumber";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 const COLS_CNT = 12;
@@ -46,6 +47,7 @@ export default function TicketDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
+  useDocumentTitle(data?.performanceTitle ?? "티켓 상세");
   const posterUrl = useBookingPoster(
     data?.performanceId,
     data?.performanceImageMainUrl,

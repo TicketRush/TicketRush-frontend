@@ -17,9 +17,12 @@ import { Loader2 } from "lucide-react";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { usePaymentConfirm } from "@/hooks/mutations/usePaymentConfirm";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import { CONFIRMING_LEAVE_MESSAGE } from "@/utils/booking/isPaymentInFlight";
 
 export default function PaymentSuccessPage() {
+  useDocumentTitle("결제 완료");
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

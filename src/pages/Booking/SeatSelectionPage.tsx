@@ -35,6 +35,7 @@ import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useCancelPendingReservation } from "@/hooks/booking/useCancelPendingReservation";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { useTimerStore } from "@/stores/reservation/timerStore";
 import { useConcertStore } from "@/stores/reservation/concertStore";
@@ -89,6 +90,11 @@ export default function SeatSelectionPage() {
     isFetching: concertFetching,
     isError: concertError,
   } = useConcertDetail(performanceId, { fresh: true });
+
+  const seatTitleSource = concert?.title ?? currentConcert?.title;
+  useDocumentTitle(
+    seatTitleSource ? `${seatTitleSource} · 좌석 선택` : "좌석 선택",
+  );
 
   const shouldFetchSeats =
     !!concert && shouldFetchSeatCounts(concert.status);

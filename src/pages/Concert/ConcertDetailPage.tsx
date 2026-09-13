@@ -36,6 +36,7 @@ import {
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
 import { useConcertListItem } from "@/hooks/queries/useConcertListItem";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import Button from "@/components/common/Button/Button";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
@@ -68,6 +69,8 @@ export default function ConcertDetailPage() {
     isLoading: seatCountsLoading,
     isError: seatCountsError,
   } = useSeatCounts(concertId, shouldFetchSeats);
+
+  useDocumentTitle(data?.title ?? "공연 상세");
 
   if (!concertId || isNaN(concertId))
     return <Navigate to="/concerts" replace />;

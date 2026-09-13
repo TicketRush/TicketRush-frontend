@@ -25,6 +25,7 @@ import {
   resolveStoredOutfitModelId,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
@@ -249,6 +250,8 @@ function resolveAdminReturnTo(returnTo: string | null): string {
 }
 
 export default function AdminCharacterCreatorPage() {
+  useDocumentTitle("캐릭터 생성");
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

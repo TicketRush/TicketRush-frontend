@@ -37,6 +37,7 @@ import {
   resolveStoredOutfitModelId,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 
 const GENRES: { value: Genre; label: string }[] = [
@@ -170,6 +171,8 @@ function loadSavedCharacter(): CharacterDraft | null {
 }
 
 export default function AdminConcertFormPage({ mode }: Props) {
+  useDocumentTitle(mode === "edit" ? "공연 수정" : "공연 등록");
+
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
