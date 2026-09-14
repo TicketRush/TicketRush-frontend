@@ -58,10 +58,6 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   wave: "/models/hair/hair_wave.glb",
 };
 
-function isSameHexColor(first: string, second: string) {
-  return first.toUpperCase() === second.toUpperCase();
-}
-
 function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
@@ -126,8 +122,8 @@ function cloneMaterialWithColor(
 
     /**
      * festival_outfit.glb에는 vertex color가 포함되어 있습니다.
-     * 사용자 지정 색상 적용 시 vertex color와 선택 색상이 곱해지는 것을
-     * 방지하기 위해 해당 파츠의 vertex color 사용을 해제합니다.
+      지정된 색상과 vertex color가 곱해지는 것을 방지하기 위해
+    * 해당 파츠의 vertex color 사용을 해제합니다.
      */
     clonedMaterial.vertexColors = false;
     clonedMaterial.needsUpdate = true;
@@ -172,23 +168,11 @@ function OutfitModel({
         return;
       }
 
-      if (
-        object.name === FESTIVAL_OUTFIT_PART_NAMES.top &&
-        !isSameHexColor(
-          festivalTopColor,
-          DEFAULT_FESTIVAL_TOP_COLOR,
-        )
-      ) {
+      if (object.name === FESTIVAL_OUTFIT_PART_NAMES.top) {
         applyMeshColor(object, festivalTopColor);
       }
 
-      if (
-        object.name === FESTIVAL_OUTFIT_PART_NAMES.bottom &&
-        !isSameHexColor(
-          festivalBottomColor,
-          DEFAULT_FESTIVAL_BOTTOM_COLOR,
-        )
-      ) {
+      if (object.name === FESTIVAL_OUTFIT_PART_NAMES.bottom) {
         applyMeshColor(object, festivalBottomColor);
       }
     });
