@@ -23,58 +23,79 @@ export const FESTIVAL_OUTFIT_PART_NAMES = {
   bottom: "festival_pants",
 } as const;
 
+/**
+ * 공연 등록 화면의 공연 장르 순서와 동일하게 정렬합니다.
+ *
+ * 공연 장르 ↔ 기존 의상 모델 매핑
+ *
+ * 콘서트   ↔ concert
+ * 뮤지컬   ↔ musical
+ * 클래식   ↔ classic
+ * 재즈     ↔ rainbow-blouse
+ * 페스티벌 ↔ festival
+ * 팬미팅   ↔ theater
+ * 발레     ↔ ballet
+ *
+ * 기존 OutfitModelId와 GLB 경로는 호환성을 위해 유지합니다.
+ */
 export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
   {
-    id: "rainbow-blouse",
-    name: "무지개 블라우스",
-    description: "가벼운 공연 의상",
-    icon: "👗",
-    modelUrl: null,
-  },
-  {
     id: "concert",
-    name: "마이크 콘서트",
-    description: "K-POP 콘서트 대표룩",
+    name: "콘서트",
+    description: "K-POP 콘서트 의상",
     icon: "🎤",
     modelUrl: "/models/outfits/concert_outfit.glb",
   },
   {
-    id: "classic",
-    name: "클래식 공연",
-    description: "포멀한 공연 의상",
-    icon: "🎻",
-    modelUrl: null,
-  },
-  {
-    id: "festival",
-    name: "DJ / 페스티벌",
-    description: "EDM 페스티벌룩",
-    icon: "🎸",
-    modelUrl: "/models/outfits/festival_outfit.glb",
-  },
-  {
-    id: "ballet",
-    name: "발레 / 무용 공연",
-    description: "무용 공연 의상",
-    icon: "🩰",
-    modelUrl: "/models/outfits/ballet_outfit.glb",
-  },
-  {
     id: "musical",
-    name: "뮤지컬 공연",
+    name: "뮤지컬",
     description: "뮤지컬 무대 의상",
     icon: "🎭",
     modelUrl: "/models/outfits/musical_outfit.glb",
   },
   {
-    id: "theater",
-    name: "연극 / 극장",
-    description: "무대 의상",
-    icon: "🎩",
+    id: "classic",
+    name: "클래식",
+    description: "클래식 공연 의상",
+    icon: "🎻",
     modelUrl: null,
+  },
+  {
+    id: "rainbow-blouse",
+    name: "재즈",
+    description: "재즈 공연 의상",
+    icon: "🎷",
+    modelUrl: null,
+  },
+  {
+    id: "festival",
+    name: "페스티벌",
+    description: "EDM 페스티벌 의상",
+    icon: "🎧",
+    modelUrl: "/models/outfits/festival_outfit.glb",
+  },
+  {
+    id: "theater",
+    name: "팬미팅",
+    description: "팬미팅 무대 의상",
+    icon: "💖",
+    modelUrl: null,
+  },
+  {
+    id: "ballet",
+    name: "발레",
+    description: "발레 공연 의상",
+    icon: "🩰",
+    modelUrl: "/models/outfits/ballet_outfit.glb",
   },
 ];
 
+/**
+ * 기존 기본 의상 값을 유지합니다.
+ *
+ * OUTFIT_OPTIONS의 표시 순서는 공연 장르 순서에 맞게 변경되었지만,
+ * 저장 데이터 및 기존 동작과의 호환성을 위해 기본 id는 변경하지 않습니다.
+ */
 export const DEFAULT_OUTFIT_MODEL_ID: OutfitModelId = "rainbow-blouse";
 
 export const OUTFIT_MODEL_URLS: Partial<
@@ -90,11 +111,14 @@ const OUTFIT_MODEL_IDS = new Set<OutfitModelId>(
 );
 
 /**
- * 기존 localStorage에는 화면 표시용 outfitName만 저장되어 있었으므로
- * stable id 도입 전 저장값을 한 번 복원하기 위한 호환 맵입니다.
- * 화면 문구가 바뀌더라도 이 키들은 삭제하지 않습니다.
+ * 기존 localStorage에는 화면에 표시하던 outfitName만 저장된 경우가 있어,
+ * stable id 도입 전 저장값을 현재 OutfitModelId로 복원하기 위한 호환 맵입니다.
+ *
+ * 기존 표시명과 변경된 표시명을 모두 지원해,
+ * 이미 저장된 캐릭터 설정이 깨지지 않도록 합니다.
  */
 const LEGACY_OUTFIT_NAME_TO_ID: Record<string, OutfitModelId> = {
+  // 기존 표시명
   "무지개 블라우스": "rainbow-blouse",
   "마이크 콘서트": "concert",
   "클래식 공연": "classic",
@@ -102,6 +126,15 @@ const LEGACY_OUTFIT_NAME_TO_ID: Record<string, OutfitModelId> = {
   "발레 / 무용 공연": "ballet",
   "뮤지컬 공연": "musical",
   "연극 / 극장": "theater",
+
+  // #273 변경 이후 표시명
+  콘서트: "concert",
+  뮤지컬: "musical",
+  클래식: "classic",
+  재즈: "rainbow-blouse",
+  페스티벌: "festival",
+  팬미팅: "theater",
+  발레: "ballet",
 };
 
 export function resolveStoredOutfitModelId(
@@ -128,6 +161,9 @@ export function resolveStoredOutfitModelId(
 export function getOutfitOption(outfitModelId: OutfitModelId) {
   return (
     OUTFIT_OPTIONS.find((outfit) => outfit.id === outfitModelId) ??
+    OUTFIT_OPTIONS.find(
+      (outfit) => outfit.id === DEFAULT_OUTFIT_MODEL_ID,
+    ) ??
     OUTFIT_OPTIONS[0]
   );
 }
