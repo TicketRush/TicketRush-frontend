@@ -1,11 +1,7 @@
-# 🎫 TicketRush Frontend - 대규모 트래픽을 처리하는 MSA 기반 공연 티켓 예매 플랫폼
-
-> TicketRush의 **사용자 예매 웹**과 **관리자 콘솔**을 담당하는 React + TypeScript 프론트엔드 레포지토리입니다.
+# 🎫 TicketRush - 대규모 트래픽을 처리하는 MSA 기반 공연 티켓 예매 플랫폼
 
 [![Frontend CI](https://github.com/TicketRush/TicketRush-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/TicketRush/TicketRush-frontend/actions/workflows/ci.yml)
 [![Deploy Vercel](https://github.com/TicketRush/TicketRush-frontend/actions/workflows/deploy-vercel.yml/badge.svg)](https://github.com/TicketRush/TicketRush-frontend/actions/workflows/deploy-vercel.yml)
-
-**🔗 서비스 바로가기 → [ticketrush.store](https://ticketrush.store)** · [Backend Repository](https://github.com/TicketRush/TicketRush-backend) · [API 문서 (Swagger)](https://api.ticketrush.store/swagger-ui.html)
 
 ---
 
@@ -17,16 +13,14 @@
 
 ### 👥 프로젝트 팀원 소개
 
-TicketRush는 **5인 팀(프론트엔드 2 · 백엔드 3)** 으로 진행하는 졸업 프로젝트입니다. 이 레포지토리는 프론트엔드 팀원이 담당합니다.
+TicketRush는 **5인 팀(프론트엔드 2 · 백엔드 3)** 으로 진행됩니다. 
 
 |                            프로필                            | 이름  |                                          GitHub                                          | 담당 파트                                                                                                                                                                    |
 |:---------------------------------------------------------:|:---:|:----------------------------------------------------------------------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| <img src="https://github.com/cheiwonlee.png" width="80"> | 이채원 | [@cheiwonlee](https://github.com/cheiwonlee)<br/>([@lxvxxu](https://github.com/lxvxxu)) | 프로젝트 세팅 · 공통 컴포넌트/라우팅 · 인증(이메일 · 소셜 로그인) · 공연 목록/상세 · 좌석 선택(SSE) · 예매/결제(Toss Payments) · 마이페이지/모바일 티켓 · 관리자(대시보드 · 예매/환불 관리 · 좌석 모니터링) · API 연동/상태 관리 · 테스트 · CI/CD(Vercel) · 코드 리뷰 |
-|  <img src="https://github.com/hannavii.png" width="80">  | 이예랑 |                        [@hannavii](https://github.com/hannavii)                         | 관리자 3D 캐릭터 제작소(React Three Fiber) · 3D 모델(GLB) 에셋 제작/적용 · 공연 등록/수정 폼 · 코드 리뷰                                                                                             |
+| <img src="https://github.com/cheiwonlee.png" width="80"> | 이채원 | [@cheiwonlee](https://github.com/cheiwonlee)<br/>([@lxvxxu](https://github.com/lxvxxu)) | 공통 컴포넌트/라우팅 · 인증(auth) · 회원(user) · 공연(performance) · 좌석(seat) · 예매(booking) · 결제(payment) · 티켓(ticket) · 관리자(대시보드 · 예매/환불 관리 · 좌석 모니터링) · API 연동/상태 관리 · CI/CD(Vercel)|
+|  <img src="https://github.com/hannavii.png" width="80">  | 이예랑 |                        [@hannavii](https://github.com/hannavii)                         | 관리자(공연 등록/수정) · 관리자 3D 캐릭터 제작소 · 3D 모델(GLB) 에셋 제작/적용                                                                                             |
 
 > 💡 **`@lxvxxu`와 `@cheiwonlee`는 동일 인물(이채원)의 GitHub 계정**입니다. 커밋 기록에는 두 계정이 함께 표시됩니다.
->
-> 백엔드 팀원 소개는 [TicketRush-backend README](https://github.com/TicketRush/TicketRush-backend#-프로젝트-팀원-소개)에서 확인할 수 있습니다.
 
 ---
 
@@ -37,20 +31,19 @@ TicketRush는 **5인 팀(프론트엔드 2 · 백엔드 3)** 으로 진행하는
 인기 공연의 티켓 오픈은 짧은 시간에 트래픽이 몰리고, 한정된 좌석을 여러 사용자가 동시에 선택하는 **고(高)동시성** 문제 영역입니다.
 백엔드는 Redis 좌석 선점 락, SSE 실시간 스트리밍, Kafka 이벤트 기반 Saga로 **더블 부킹 · 실시간성 · 분산 트랜잭션 정합성** 문제를 해결합니다.
 
-> 백엔드의 아키텍처와 문제 해결 과정은 **[TicketRush-backend 레포지토리](https://github.com/TicketRush/TicketRush-backend)** 를 확인해주세요.
-
 프론트엔드에서는 이 구조를 **사용자가 체감하는 화면**으로 옮기면서 다음과 같은 문제를 마주했습니다.
 
-- **실시간 좌석 반영** — 다른 사용자가 좌석을 선점하는 순간 내 좌석맵에도 즉시 반영되어야 하며, 연결이 끊겨도 좌석맵이 멈추면 안 됨
-- **제한 시간 안의 예매 흐름** — 좌석 선점 후 5분 안에 결제를 끝내야 하는 흐름에서 새로고침 · 뒤로가기 · 이탈 · 시간 만료 같은 예외 상황을 모두 처리해야 함
-- **외부 결제창 리다이렉트** — Toss Payments 결제창으로 페이지가 완전히 이동했다가 돌아오기 때문에, 그 사이 예매 정보를 잃지 않아야 함
-- **MSA 응답 조합** — 7개 도메인 서비스로 나뉜 API 응답을 하나의 화면 모델로 조합하고, 백엔드 스펙 변경에도 UI가 흔들리지 않아야 함
+- **실시간 좌석 반영**: 다른 사용자가 좌석을 선점하는 순간 내 좌석맵에도 즉시 반영되어야 하며, 연결이 끊겨도 좌석맵이 멈추면 안 됨
+- **제한 시간 안의 예매 흐름**: 좌석 선점 후 5분 안에 결제를 끝내야 하는 흐름에서 새로고침 · 뒤로가기 · 이탈 · 시간 만료 같은 예외 상황을 모두 처리해야 함
+- **외부 결제창 리다이렉트**: Toss Payments 결제창으로 페이지가 완전히 이동했다가 돌아오기 때문에, 그 사이 예매 정보를 잃지 않아야 함
+- **MSA 응답 조합**: 7개 도메인 서비스로 나뉜 API 응답을 하나의 화면 모델로 조합하고, 백엔드 스펙 변경에도 UI가 흔들리지 않아야 함
 
 ### 📖 개요
 
 **TicketRush Frontend**는 공연 탐색부터 좌석 선택, 결제, 모바일 티켓 확인까지 이어지는 **사용자 예매 서비스**와 매출 · 예매 · 환불 · 좌석을 관리하는 **관리자 콘솔**을 하나의 SPA로 제공합니다.
 
 프론트엔드는 Vercel에 배포되며, 모든 API 요청은 백엔드의 API Gateway(`api.ticketrush.store`) 한 곳으로 보냅니다.
+다만 결제창 · 소셜 로그인 · 포스터 이미지는 브라우저가 외부 서비스와 직접 통신하기 때문에, 프론트엔드 입장에서 시스템 경계는 아래와 같습니다.
 
 ```mermaid
 flowchart LR
@@ -75,6 +68,13 @@ flowchart LR
     SPA <-->|"결제창 리다이렉트"| TOSS
     SPA <-->|"소셜 로그인 리다이렉트"| OAUTH
 ```
+
+| 프론트엔드 관점에서 눈여겨볼 경계 | 설명 |
+|---|---|
+| **크로스 오리진** | 화면(`ticketrush.store`)과 API(`api.ticketrush.store`)의 오리진이 다릅니다. Gateway의 `CORS_ALLOWED_ORIGIN`에 배포 도메인이 등록되어 있어야 동작합니다. |
+| **SSE 전용 경로** | 좌석 스트림은 일반 REST와 달리 연결을 열어둔 채 이벤트를 받습니다. 백엔드 nginx가 이 경로만 버퍼링을 끄고 타임아웃을 늘려 처리합니다. |
+| **결제 · 로그인 리다이렉트** | 결제창과 소셜 로그인은 **브라우저가 주체**입니다. 페이지 전체가 외부로 이동했다가 돌아오므로, 그 사이 상태 보존이 프론트엔드의 책임입니다. |
+| **정적 자산 vs 업로드 이미지** | 3D 캐릭터 GLB는 Vercel이 서빙하는 정적 자산이고, 공연 포스터는 S3에서 브라우저가 직접 받아옵니다. 티켓 이미지 저장(html2canvas)은 S3의 CORS 설정에 의존합니다. |
 
 **사용자 예매 흐름**
 
@@ -110,7 +110,7 @@ flowchart LR
 
 - 메인 배너 슬라이더
 - 무한 스크롤 공연 목록 (스켈레톤 로딩)
-- 공연 상세 — 잔여 좌석 게이지, 예매 오픈 상태에 따른 예매 버튼 문구/활성화 분기
+- 공연 상세: 잔여 좌석 게이지, 예매 오픈 상태에 따른 예매 버튼 문구/활성화 분기
 
 **(3) 좌석 · 예매**
 
@@ -135,10 +135,10 @@ flowchart LR
 
 **(6) 관리자**
 
-- 대시보드 — 기간별 매출 추이 · 장르별 비중 차트, 공연 캘린더, 공연 목록 관리
+- 대시보드: 기간별 매출 추이 · 장르별 비중 차트, 공연 캘린더, 공연 목록 관리
 - 예매 내역 관리
-- 환불 모니터링 — 환불 실패 / 환불 지연 건 조회 및 재시도
-- 좌석 모니터링 — 공연별 좌석 현황, 좌석 상세 확인 및 선점 강제 해제
+- 환불 모니터링: 환불 실패 / 환불 지연 건 조회 및 재시도
+- 좌석 모니터링: 공연별 좌석 현황, 좌석 상세 확인 및 선점 강제 해제
 - 공연 등록 · 수정
 - 3D 캐릭터 제작소 — 피부 · 헤어 · 눈 · 입 · 의상 · 포즈 · 배경을 조합해 공연용 캐릭터 제작
 
@@ -170,7 +170,7 @@ flowchart LR
 
 ---
 
-## 🛠 기술 스택
+## 🛠 TicketRush 기술 스택
 
 | 구분                | 사용 기술                                                              |
 |-------------------|--------------------------------------------------------------------|
@@ -215,6 +215,26 @@ flowchart LR
 Toss Payments 간편결제는 결제창으로 **페이지 전체가 이동**했다가 `successUrl`로 돌아오는 방식이라, 돌아오는 순간 React 상태가 모두 초기화됩니다. 결제 승인 API에 필요한 `bookingId` · `seatId` 등을 잃게 되고, React StrictMode에서는 승인 요청이 두 번 나갈 위험도 있었습니다.
 
 **해결** — [`paymentStore.ts`](src/stores/reservation/paymentStore.ts) · [`PaymentSuccessPage.tsx`](src/pages/Payment/PaymentSuccessPage.tsx)
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저 (SPA)
+    participant S as sessionStorage
+    participant T as Toss Payments
+    participant A as API Gateway
+ 
+    B->>A: POST /booking (예매 생성 · PENDING)
+    A-->>B: bookingNumber · bookingId · expires_at
+    B->>S: 예매 컨텍스트 저장
+    B->>T: SDK requestPayment (결제창으로 전체 페이지 이동)
+    Note over B,T: 이 시점에 React 상태는 모두 사라진다
+    T-->>B: successUrl로 리다이렉트 (paymentKey · orderId · amount)
+    B->>S: 예매 컨텍스트 복원
+    B->>B: orderId 와 bookingNumber 일치 검증
+    B->>A: POST /payment/confirm (승인 요청)
+    A-->>B: 승인 결과
+    B->>B: 예매 완료 화면으로 이동
+```
 
 - 예매 컨텍스트(`seatStore` · `paymentStore`)를 **Zustand persist + sessionStorage**에 저장해 리다이렉트 후 복원 (탭을 닫으면 자연스럽게 정리되도록 localStorage 대신 sessionStorage 사용)
 - 결제 상태를 **상태 머신**으로 관리해, 어떤 상태에서 어떤 동작이 허용되는지 명확히 분리
@@ -570,10 +590,6 @@ flowchart LR
 |---|---|
 | Backend Repository | [TicketRush-backend](https://github.com/TicketRush/TicketRush-backend) |
 | API 명세 (Swagger) | [api.ticketrush.store/swagger-ui.html](https://api.ticketrush.store/swagger-ui.html) |
-| 기획서 | [Notion에서 보기]( <!-- TODO: 링크 추가 --> Notion에서 보기) |
-| 화면 명세서 | [Notion에서 보기]( <!-- TODO: 링크 추가 --> Notion에서 보기) |
-| 컨벤션 | [Notion에서 보기]( <!-- TODO: 링크 추가 --> Notion에서 보기) |
-| 디자인 (Figma) | <!-- TODO: Figma 링크 추가 --> Figma에서 보기 |
 | GitHub Projects | [TicketRush Projects](https://github.com/orgs/TicketRush/projects) |
 | Sprint · Milestones | [GitHub Milestones](https://github.com/TicketRush/TicketRush-frontend/milestones) |
 | ERD | [Backend docs/erd.md](https://github.com/TicketRush/TicketRush-backend/blob/develop/docs/erd.md) |
