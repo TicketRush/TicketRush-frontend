@@ -1,7 +1,12 @@
 import { Suspense, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
+import {
+  Center,
+  Html,
+  OrbitControls,
+  useGLTF,
+} from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
 import type { EyeStyle } from "@/components/admin/character/characterEye";
 import {
@@ -18,22 +23,47 @@ interface CharacterModelViewerProps {
   modelUrl?: string;
   skinColor: string;
   hairColor: string;
+
   /**
-   * #194에서 파츠별 의상 색상 커스터마이징에 사용할 예정입니다.
-   * 현재 #74에서는 기존 호출부 호환을 위해 유지합니다.
+   * 파츠별 의상 색상 커스터마이징 및 기존 호출부 호환을 위해 유지합니다.
    */
   outfitColor: string;
+
   /**
    * 화면 표시용 의상 이름입니다.
    * 3D 모델 분기에는 사용하지 않습니다.
    */
   outfitName?: string;
+
   /**
    * 3D 의상 모델을 선택하기 위한 stable id입니다.
    */
   outfitModelId: OutfitModelId;
+
   hairStyle: HairStyle;
-  eyeStyle: EyeStyle;
+
+  /**
+   * 전달되지 않으면 default 눈 모양을 사용합니다.
+   */
+  eyeStyle?: EyeStyle;
+
+  /**
+   * 기존 화면 호환용 위치값입니다.
+   * centered가 true일 때는 사용하지 않습니다.
+   */
+  modelPosition?: [number, number, number];
+
+  /**
+   * 모델 크기만 조정합니다.
+   * 중앙 정렬에는 영향을 주지 않습니다.
+   */
+  modelScale?: number;
+
+  /**
+   * true면 전체 캐릭터의 실제 bounding box를 기준으로
+   * Canvas 정중앙에 배치합니다.
+   */
+  centered?: boolean;
 }
 
 const HAIR_MODEL_URLS: Record<HairStyle, string> = {
@@ -43,6 +73,16 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   twintails: "/models/hair/hair_twintails.glb",
   wave: "/models/hair/hair_wave.glb",
 };
+
+const EYE_MODEL_URLS: Record<EyeStyle, string> = {
+  default: "/models/eyes/eye_default.glb",
+  happy: "/models/eyes/eye_happy.glb",
+  wink: "/models/eyes/eye_wink.glb",
+  squeeze: "/models/eyes/eye_squeeze.glb",
+  angry: "/models/eyes/eye_angry.glb",
+  closed: "/models/eyes/eye_closed.glb",
+};
+
 function CharacterModelLoadingFallback() {
   return (
     <Html fullscreen pointerEvents="none">
@@ -54,16 +94,6 @@ function CharacterModelLoadingFallback() {
     </Html>
   );
 }
-
-
-const EYE_MODEL_URLS: Record<EyeStyle, string> = {
-  default: "/models/eyes/eye_default.glb",
-  happy: "/models/eyes/eye_happy.glb",
-  wink: "/models/eyes/eye_wink.glb",
-  squeeze: "/models/eyes/eye_squeeze.glb",
-  angry: "/models/eyes/eye_angry.glb",
-  closed: "/models/eyes/eye_closed.glb",
-};
 
 function isBaseEyeObject(objectName: string) {
   const name = objectName.toLowerCase();
@@ -113,7 +143,9 @@ function HairModel({
   hairStyle,
   hairColor,
 }: Pick<CharacterModelViewerProps, "hairStyle" | "hairColor">) {
-  const hairModelUrl = HAIR_MODEL_URLS[hairStyle];
+  const hairModelUrl =
+    HAIR_MODEL_URLS[hairStyle] ?? HAIR_MODEL_URLS.short;
+
   const gltf = useGLTF(hairModelUrl);
 
   const scene = useMemo(() => {
@@ -137,9 +169,11 @@ function HairModel({
 }
 
 function EyeModel({
-  eyeStyle,
+  eyeStyle = "default",
 }: Pick<CharacterModelViewerProps, "eyeStyle">) {
-  const eyeModelUrl = EYE_MODEL_URLS[eyeStyle];
+  const eyeModelUrl =
+    EYE_MODEL_URLS[eyeStyle] ?? EYE_MODEL_URLS.default;
+
   const gltf = useGLTF(eyeModelUrl);
 
   const scene = useMemo(() => {
@@ -149,7 +183,11 @@ function EyeModel({
   return <primitive object={scene} />;
 }
 
-function OutfitModel({ modelUrl }: { modelUrl: string }) {
+function OutfitModel({
+  modelUrl,
+}: {
+  modelUrl: string;
+}) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
@@ -159,13 +197,15 @@ function OutfitModel({ modelUrl }: { modelUrl: string }) {
   return <primitive object={scene} />;
 }
 
-function CharacterModel({
+function CharacterParts({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
   outfitModelId,
   hairStyle,
-  eyeStyle,
+  eyeStyle = "default",
+  modelScale = 0.8,
+  position,
 }: Pick<
   CharacterModelViewerProps,
   | "modelUrl"
@@ -174,28 +214,98 @@ function CharacterModel({
   | "outfitModelId"
   | "hairStyle"
   | "eyeStyle"
+  | "modelScale"
+> & {
+  position: [number, number, number];
+}) {
+  const outfitModelUrl =
+    getOutfitModelUrl(outfitModelId);
+
+  return (
+    <group
+      scale={modelScale}
+      position={position}
+      rotation={[0, 0, 0]}
+    >
+      <CharacterBody
+        modelUrl={modelUrl}
+        skinColor={skinColor}
+      />
+
+      <HairModel
+        hairStyle={hairStyle}
+        hairColor={hairColor}
+      />
+
+      <EyeModel eyeStyle={eyeStyle} />
+
+      {/*
+        OutfitModel도 별도 Suspense로 감싸지 않습니다.
+
+        body / hair / eyes / outfit 전체가 준비된 뒤에
+        바깥 Suspense가 한 번에 렌더링하게 해서
+        Center가 완성된 캐릭터 전체의 bounds를 계산하도록 합니다.
+      */}
+      {outfitModelUrl && (
+        <OutfitModel
+          modelUrl={outfitModelUrl}
+        />
+      )}
+    </group>
+  );
+}
+
+function CharacterModel({
+  modelUrl = "/models/chibi-base.glb",
+  skinColor,
+  hairColor,
+  outfitModelId,
+  hairStyle,
+  eyeStyle = "default",
+  modelPosition = [0, -0.4, 0],
+  modelScale = 0.8,
+  centered = false,
+}: Pick<
+  CharacterModelViewerProps,
+  | "modelUrl"
+  | "skinColor"
+  | "hairColor"
+  | "outfitModelId"
+  | "hairStyle"
+  | "eyeStyle"
+  | "modelPosition"
+  | "modelScale"
+  | "centered"
 >) {
-  const outfitModelUrl = getOutfitModelUrl(outfitModelId);
+  if (centered) {
+    return (
+      <Center precise>
+        <CharacterParts
+          modelUrl={modelUrl}
+          skinColor={skinColor}
+          hairColor={hairColor}
+          outfitModelId={outfitModelId}
+          hairStyle={hairStyle}
+          eyeStyle={eyeStyle}
+          modelScale={modelScale}
+          position={[0, 0, 0]}
+        />
+      </Center>
+    );
+  }
 
   return (
     <Center>
-      <group
-        scale={0.8}
-        position={[0, -0.4, 0]}
-        rotation={[0, 0, 0]}
-      >
-        <CharacterBody modelUrl={modelUrl} skinColor={skinColor} />
-
-        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
-
-        <EyeModel eyeStyle={eyeStyle} />
-
-        {outfitModelUrl && (
-          <Suspense fallback={null}>
-            <OutfitModel modelUrl={outfitModelUrl} />
-          </Suspense>
-        )}
-      </group>
+      <CharacterParts
+        modelUrl={modelUrl}
+        skinColor={skinColor}
+        hairColor={hairColor}
+        outfitModelId={outfitModelId}
+        hairStyle={hairStyle}
+        eyeStyle={eyeStyle}
+        modelScale={modelScale}
+        position={modelPosition}
+      />
     </Center>
   );
 }
@@ -206,16 +316,41 @@ export default function CharacterModelViewer({
   hairColor,
   outfitModelId,
   hairStyle,
-  eyeStyle,
+  eyeStyle = "default",
+  modelPosition = [0, -0.4, 0],
+  modelScale = 0.8,
+  centered = false,
 }: CharacterModelViewerProps) {
+  const cameraPosition: [number, number, number] =
+    centered
+      ? [0, 0, 6]
+      : [0, 1.2, 6];
+
   return (
     <div className="h-full w-full">
-      <Canvas camera={{ position: [0, 1.2, 6], fov: 35 }}>
+      <Canvas
+        camera={{
+          position: cameraPosition,
+          fov: 35,
+        }}
+      >
         <ambientLight intensity={1.7} />
-        <directionalLight position={[3, 5, 5]} intensity={2.2} />
-        <directionalLight position={[-3, 2, 2]} intensity={0.8} />
 
-        <Suspense fallback={<CharacterModelLoadingFallback />}>
+        <directionalLight
+          position={[3, 5, 5]}
+          intensity={2.2}
+        />
+
+        <directionalLight
+          position={[-3, 2, 2]}
+          intensity={0.8}
+        />
+
+        <Suspense
+          fallback={
+            <CharacterModelLoadingFallback />
+          }
+        >
           <CharacterModel
             modelUrl={modelUrl}
             skinColor={skinColor}
@@ -223,10 +358,15 @@ export default function CharacterModelViewer({
             outfitModelId={outfitModelId}
             hairStyle={hairStyle}
             eyeStyle={eyeStyle}
+            modelPosition={modelPosition}
+            modelScale={modelScale}
+            centered={centered}
           />
         </Suspense>
 
         <OrbitControls
+          makeDefault
+          target={[0, 0, 0]}
           enablePan={false}
           enableZoom
           minDistance={2.5}
@@ -237,20 +377,48 @@ export default function CharacterModelViewer({
   );
 }
 
-useGLTF.preload("/models/chibi-base.glb");
-useGLTF.preload("/models/hair/hair_short.glb");
-useGLTF.preload("/models/hair/hair_long.glb");
-useGLTF.preload("/models/hair/hair_ponytail.glb");
-useGLTF.preload("/models/hair/hair_twintails.glb");
-useGLTF.preload("/models/hair/hair_wave.glb");
-useGLTF.preload("/models/eyes/eye_default.glb");
-useGLTF.preload("/models/eyes/eye_happy.glb");
-useGLTF.preload("/models/eyes/eye_wink.glb");
-useGLTF.preload("/models/eyes/eye_squeeze.glb");
-useGLTF.preload("/models/eyes/eye_angry.glb");
-useGLTF.preload("/models/eyes/eye_closed.glb");
+useGLTF.preload(
+  "/models/chibi-base.glb",
+);
 
-Object.values(OUTFIT_MODEL_URLS).forEach((modelUrl) => {
+useGLTF.preload(
+  "/models/hair/hair_short.glb",
+);
+useGLTF.preload(
+  "/models/hair/hair_long.glb",
+);
+useGLTF.preload(
+  "/models/hair/hair_ponytail.glb",
+);
+useGLTF.preload(
+  "/models/hair/hair_twintails.glb",
+);
+useGLTF.preload(
+  "/models/hair/hair_wave.glb",
+);
+
+useGLTF.preload(
+  "/models/eyes/eye_default.glb",
+);
+useGLTF.preload(
+  "/models/eyes/eye_happy.glb",
+);
+useGLTF.preload(
+  "/models/eyes/eye_wink.glb",
+);
+useGLTF.preload(
+  "/models/eyes/eye_squeeze.glb",
+);
+useGLTF.preload(
+  "/models/eyes/eye_angry.glb",
+);
+useGLTF.preload(
+  "/models/eyes/eye_closed.glb",
+);
+
+Object.values(
+  OUTFIT_MODEL_URLS,
+).forEach((modelUrl) => {
   if (modelUrl) {
     useGLTF.preload(modelUrl);
   }
