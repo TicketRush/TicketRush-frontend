@@ -4,7 +4,8 @@ import { formatSeoulDate } from "@/utils/datetime/formatSeoulInstant";
 
 interface ProfileCardProps {
   name: string;
-  email: string;
+  /** 카카오 등은 비어 있을 수 있다 (#217) */
+  email?: string | null;
   joinedAt: string; // ISO 8601 Instant (UTC)
   totalBookings: number;
 }
@@ -41,7 +42,10 @@ export function ProfileCard({
           <p className="text-sm text-gray-500">
             회원 가입일: {formattedJoinDate}
           </p>
-          <p className="text-sm text-gray-500">이메일: {email}</p>
+          {/* 카카오 등 이메일이 없으면 행 자체를 숨긴다 (#217) */}
+          {(email ?? "").trim() !== "" && (
+            <p className="text-sm text-gray-500">이메일: {email}</p>
+          )}
         </div>
       </div>
 

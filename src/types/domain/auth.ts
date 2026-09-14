@@ -113,10 +113,11 @@ export interface TokenReissueResponse {
 /**
  * GET /api/v1/user/me 응답
  * BE #558/#568: name, email, createdAt, role (DB enum 그대로 MEMBER|ADMIN)
+ * email은 카카오처럼 없을 수 있다 (Jackson NON_NULL → 키 생략 또는 null) (#217)
  */
 export interface MeResponse {
   name: string;
-  email: string;
+  email?: string | null;
   createdAt: string;
   role: UserRole;
 }
