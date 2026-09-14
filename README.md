@@ -45,6 +45,12 @@ TicketRush는 **5인 팀(프론트엔드 2 · 백엔드 3)** 으로 진행됩니
 프론트엔드는 Vercel에 배포되며, 모든 API 요청은 백엔드의 API Gateway(`api.ticketrush.store`) 한 곳으로 보냅니다.
 다만 결제창 · 소셜 로그인 · 포스터 이미지는 브라우저가 외부 서비스와 직접 통신하기 때문에, 프론트엔드 입장에서 시스템 경계는 아래와 같습니다.
 
+**전체 시스템 구성**
+
+<img src="docs/images/architecture.png" width="900" alt="TicketRush 시스템 아키텍처">
+
+**프론트엔드 관점의 통신 경로**
+
 ```mermaid
 flowchart LR
     USER["사용자 브라우저"]
