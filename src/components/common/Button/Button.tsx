@@ -22,8 +22,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // border-none을 두면 안 된다. Tailwind가 border-style 유틸리티를 border-width보다
 // 뒤에 출력해서, variant가 border를 붙여도 style: none이 이겨 테두리가 사라진다.
 // 테두리가 없어야 하는 variant는 border 클래스를 안 쓰는 것으로 충분하다.
+// relative: 로딩 스피너를 레이블 위에 올려 버튼 너비가 늘어나지 않게 한다 (#251)
 const baseStyle =
-  "inline-flex items-center justify-center gap-2 cursor-pointer " +
+  "relative inline-flex items-center justify-center gap-2 cursor-pointer " +
   "font-pretendard transition-all duration-150 ease-in-out " +
   "active:scale-[0.98]";
 
@@ -89,12 +90,20 @@ export default function Button({
         className, // 외부 커스터마이징 허용
       )}
       disabled={isDisabled}
+      aria-busy={loading || undefined}
       {...rest}
     >
       {loading ? (
         <>
-          <Spinner />
-          <span className="opacity-70">{children}</span>
+          {/* 보이지 않는 레이블로 원래 너비를 유지하고, 스피너만 가운데 표시 (#251) */}
+          <span className="invisible inline-flex items-center gap-2" aria-hidden>
+            {icon && iconPosition === "left" && icon}
+            {children}
+            {icon && iconPosition === "right" && icon}
+          </span>
+          <span className="absolute inset-0 flex items-center justify-center">
+            <Spinner />
+          </span>
         </>
       ) : (
         <>

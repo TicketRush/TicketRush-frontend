@@ -11,6 +11,9 @@
 //   - 소셜 버튼에 LoginPage와 동일한 OAuth 시작 로직 연결
 //     * getOauthUrlApi(provider) → window.location.href 리다이렉트
 //     * 실패 시 toast, pendingProvider로 로딩·중복 클릭 방지
+// 변경 이력 (이슈 #251/#252):
+//   - 발송 버튼 고정 너비 + 입력 min-w-0 + Button 로딩 너비 유지 (#251)
+//   - mock 안내 토스트는 USE_MOCK일 때만 노출 (#252)
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -25,6 +28,7 @@ import {
   signupApi,
   getOauthUrlApi,
 } from "@/api/auth";
+import { USE_MOCK } from "@/api/useMock";
 import { ApiError } from "@/api/errors/errorMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import { saveLoginRedirect } from "@/utils/auth/loginRedirect";
@@ -98,7 +102,12 @@ export default function SignupPage() {
     onSuccess: () => {
       setVerificationSent(true);
       setResendCountdown(180); // 3분 쿨다운
-      toast.success("인증번호가 발송되었습니다. (mock: 123456)");
+      // mock 코드 안내는 개발 mock에서만 노출한다 (#252)
+      toast.success(
+        USE_MOCK
+          ? "인증번호가 발송되었습니다. (mock: 123456)"
+          : "인증번호가 발송되었습니다.",
+      );
     },
     onError: (error: unknown) => {
       const apiError = ApiError.fromUnknown(error);
@@ -259,16 +268,18 @@ export default function SignupPage() {
                 <span className="text-error">*</span>
               </span>
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-stretch">
               <input
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 placeholder="xxxxxx"
                 disabled={!verificationSent || isEmailVerified}
-                className="flex-1 px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-50 disabled:text-text-secondary"
+                className="min-w-0 flex-1 px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-50 disabled:text-text-secondary"
                 {...register("verificationCode")}
               />
               {isEmailVerified ? (
-                <span className="px-4 py-2.5 rounded-lg bg-green-100 text-green-700 font-semibold text-sm whitespace-nowrap inline-flex items-center gap-1">
+                <span className="px-4 py-2.5 rounded-lg bg-green-100 text-green-700 font-semibold text-sm whitespace-nowrap inline-flex items-center gap-1 shrink-0">
                   <CheckCircle2 size={14} />
                   인증완료
                 </span>
@@ -279,7 +290,7 @@ export default function SignupPage() {
                   size="md"
                   onClick={handleSendCode}
                   loading={sendCodeMutation.isPending}
-                  className="whitespace-nowrap shrink-0"
+                  className="min-w-[8.75rem] shrink-0 whitespace-nowrap"
                 >
                   인증번호 발송
                 </Button>
@@ -290,7 +301,7 @@ export default function SignupPage() {
                   size="md"
                   onClick={handleVerifyCode}
                   loading={verifyCodeMutation.isPending}
-                  className="whitespace-nowrap shrink-0"
+                  className="min-w-[8.75rem] shrink-0 whitespace-nowrap"
                 >
                   확인
                 </Button>
