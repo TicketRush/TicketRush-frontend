@@ -38,6 +38,7 @@ import {
   paymentInFlightLeaveMessage,
 } from "@/utils/booking/isPaymentInFlight";
 import { requestTossPayment } from "@/utils/payment/tossSdk";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import PaymentFailedModal from "@/components/payment/FailedModal";
 import PendingTimerRestoreNotice from "@/components/payment/PendingTimerRestoreNotice";
 import type { PaymentMethod } from "@/types/domain/payment";
@@ -83,6 +84,10 @@ export default function PaymentPage() {
 
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const currentConcert = useConcertStore((s) => s.currentConcert);
+  useDocumentTitle(
+    currentConcert?.title ? `${currentConcert.title} · 결제` : "결제",
+  );
+
   const { formatted, mm } = useTimerDisplay();
   const timerStatus = useTimerStore((s) => s.status);
 

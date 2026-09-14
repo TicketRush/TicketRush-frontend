@@ -24,6 +24,7 @@ import {
   formatAdminDateTime,
   formatAdminText,
 } from "@/utils/admin/formatAdminMetric";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
   CONFIRMED: { label: "완료", bg: "#00C950" },
@@ -37,6 +38,8 @@ const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
 const PAGE_SIZE = 10;
 
 export default function AdminRefundsPage() {
+  useDocumentTitle("환불 관리");
+
   const navigate = useNavigate();
   const [failedPage, setFailedPage] = useState(0);
   const [stuckPage, setStuckPage] = useState(0);
