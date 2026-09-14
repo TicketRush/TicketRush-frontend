@@ -38,7 +38,6 @@ import {
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
 
-
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
   { value: "MUSICAL", label: "뮤지컬" },
@@ -71,6 +70,7 @@ const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_HAIR_COLOR = "#151515";
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
 const DEFAULT_BACKGROUND_COLOR = "#E9DDFF";
+const MAX_CHARACTER_MESSAGE_LENGTH = 50;
 
 interface Props {
   mode: "create" | "edit";
@@ -185,6 +185,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
   const [totalSeats, setTotalSeats] = useState(0);
   const [mainImage, setMainImage] = useState<File | null>(null);
   const [galleryImages, setGalleryImages] = useState<File[]>([]);
+  const [characterMessage, setCharacterMessage] = useState("");
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterDraft | null>(() => loadSavedCharacter());
 
@@ -203,6 +204,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
       const parsed = JSON.parse(savedDraft) as {
         form?: ConcertFormData;
         totalSeats?: number;
+        characterMessage?: unknown;
       };
 
       if (parsed.form) {
@@ -211,6 +213,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
       if (typeof parsed.totalSeats === "number") {
         setTotalSeats(parsed.totalSeats);
+      }
+
+      if (typeof parsed.characterMessage === "string") {
+        setCharacterMessage(
+          parsed.characterMessage.slice(0, MAX_CHARACTER_MESSAGE_LENGTH),
+        );
       }
     } catch {
       sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
@@ -342,6 +350,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
       JSON.stringify({
         form,
         totalSeats,
+        characterMessage,
       }),
     );
 
@@ -422,8 +431,8 @@ export default function AdminConcertFormPage({ mode }: Props) {
     try {
       // TODO:
       // 현재 createConcertApi/updateConcertApi는 ConcertFormData만 받음.
-      // totalSeats, mainImage, galleryImages, model3d는 백엔드 스펙 확정 후
-      // FormData 또는 별도 업로드 API로 연결 필요.
+      // totalSeats, mainImage, galleryImages, characterMessage, characterConfig는
+      // 백엔드 스펙 확정 후 FormData 요청에 연결 필요.
       if (mode === "create") {
         await createMutation.mutateAsync(form);
         toast.success("공연이 등록되었습니다.");
@@ -665,6 +674,27 @@ export default function AdminConcertFormPage({ mode }: Props) {
               character={selectedCharacter}
               onClick={goToCharacterCreator}
             />
+          </Field>
+
+          <Field label="캐릭터 한마디">
+            <div className="space-y-1">
+              <textarea
+                value={characterMessage}
+                onChange={(e) =>
+                  setCharacterMessage(
+                    e.target.value.slice(0, MAX_CHARACTER_MESSAGE_LENGTH),
+                  )
+                }
+                maxLength={MAX_CHARACTER_MESSAGE_LENGTH}
+                rows={2}
+                placeholder="예: 공연장에서 만나요! 함께 즐겨요 🎵"
+                className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
+              />
+
+              <p className="text-right text-xs text-admin-text-secondary">
+                {characterMessage.length}/{MAX_CHARACTER_MESSAGE_LENGTH}
+              </p>
+            </div>
           </Field>
 
           <Field label="대표 이미지" required>
@@ -995,7 +1025,6 @@ function CharacterCreatorLinkBox({
         <p className="mt-1 text-xs text-admin-text-secondary">
           피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
           헤어: {character.hairStyle} / 눈: {character.eyeStyle}
-
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
