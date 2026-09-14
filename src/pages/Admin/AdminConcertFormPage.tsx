@@ -8,7 +8,11 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -38,8 +42,10 @@ import {
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
 
-
-const GENRES: { value: Genre; label: string }[] = [
+const GENRES: {
+  value: Genre;
+  label: string;
+}[] = [
   { value: "CONCERT", label: "콘서트" },
   { value: "MUSICAL", label: "뮤지컬" },
   { value: "CLASSIC", label: "클래식" },
@@ -65,9 +71,15 @@ const INITIAL_FORM: ConcertFormData = {
   notices: [],
 };
 
-const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
-const CONCERT_FORM_SCROLL_KEY = "ticketRush:admin-concert-form-scroll";
-const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
+const CONCERT_FORM_DRAFT_KEY =
+  "ticketRush:admin-concert-form-draft";
+
+const CONCERT_FORM_SCROLL_KEY =
+  "ticketRush:admin-concert-form-scroll";
+
+const CHARACTER_STORAGE_KEY =
+  "ticketRush:admin-character";
+
 const DEFAULT_HAIR_COLOR = "#151515";
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
 const DEFAULT_BACKGROUND_COLOR = "#E9DDFF";
@@ -76,7 +88,12 @@ interface Props {
   mode: "create" | "edit";
 }
 
-type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
+type CharacterPose =
+  | "standing"
+  | "wave"
+  | "heart"
+  | "dance"
+  | "sing";
 
 interface CharacterDraft {
   skinTone: SkinToneSelection;
@@ -87,13 +104,17 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  balletWearColor: string;
+  balletShortsColor: string;
   accessory: string;
   pose: CharacterPose;
   background: string;
 }
 
 function loadSavedCharacter(): CharacterDraft | null {
-  const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
+  const savedCharacter = localStorage.getItem(
+    CHARACTER_STORAGE_KEY,
+  );
 
   if (!savedCharacter) {
     return null;
@@ -111,6 +132,8 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "balletWearColor"
+        | "balletShortsColor"
         | "background"
       >
     > & {
@@ -122,6 +145,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      balletWearColor?: unknown;
+      balletShortsColor?: unknown;
       background?: unknown;
     };
 
@@ -140,53 +165,100 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.outfitColor)
         : null;
 
+    const legacyOutfitColor =
+      resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
+
+    const resolvedBalletWearColor =
+      typeof parsed.balletWearColor === "string"
+        ? normalizeHexColor(parsed.balletWearColor)
+        : null;
+
+    const resolvedBalletShortsColor =
+      typeof parsed.balletShortsColor === "string"
+        ? normalizeHexColor(parsed.balletShortsColor)
+        : null;
+
     const resolvedBackground =
       typeof parsed.background === "string"
         ? normalizeHexColor(parsed.background)
         : null;
 
-    const resolvedOutfitModelId = resolveStoredOutfitModelId(
-      parsed.outfitModelId,
-      parsed.outfitName,
-    );
+    const resolvedOutfitModelId =
+      resolveStoredOutfitModelId(
+        parsed.outfitModelId,
+        parsed.outfitName,
+      );
 
-    const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
+    const resolvedOutfit = getOutfitOption(
+      resolvedOutfitModelId,
+    );
 
     return {
       ...parsed,
       ...resolvedSkin,
-      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
-      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
-      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
+      hairStyle: resolveStoredHairStyle(
+        parsed.hairStyle,
+      ),
+      eyeStyle: resolveStoredEyeStyle(
+        parsed.eyeStyle,
+      ),
+      hairColor:
+        resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
-      outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
-      background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
+      outfitColor: legacyOutfitColor,
+      balletWearColor:
+        resolvedBalletWearColor ??
+        legacyOutfitColor,
+      balletShortsColor:
+        resolvedBalletShortsColor ??
+        legacyOutfitColor,
+      background:
+        resolvedBackground ??
+        DEFAULT_BACKGROUND_COLOR,
     } as CharacterDraft;
   } catch {
-    localStorage.removeItem(CHARACTER_STORAGE_KEY);
+    localStorage.removeItem(
+      CHARACTER_STORAGE_KEY,
+    );
     return null;
   }
 }
 
-export default function AdminConcertFormPage({ mode }: Props) {
+export default function AdminConcertFormPage({
+  mode,
+}: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
-  const concertId = mode === "edit" && id ? Number(id) : undefined;
 
-  const { data: existingData } = useConcertForEdit(concertId);
+  const concertId =
+    mode === "edit" && id
+      ? Number(id)
+      : undefined;
+
+  const { data: existingData } =
+    useConcertForEdit(concertId);
+
   const createMutation = useCreateConcert();
-  const updateMutation = useUpdateConcert(concertId ?? 0);
+  const updateMutation = useUpdateConcert(
+    concertId ?? 0,
+  );
 
-  const [form, setForm] = useState<ConcertFormData>(INITIAL_FORM);
+  const [form, setForm] =
+    useState<ConcertFormData>(INITIAL_FORM);
 
   // TODO: 백엔드 공연 등록/수정 API 스펙 확정 후 ConcertFormData에 반영 필요
   const [totalSeats, setTotalSeats] = useState(0);
-  const [mainImage, setMainImage] = useState<File | null>(null);
-  const [galleryImages, setGalleryImages] = useState<File[]>([]);
+  const [mainImage, setMainImage] =
+    useState<File | null>(null);
+  const [galleryImages, setGalleryImages] =
+    useState<File[]>([]);
+
   const [selectedCharacter, setSelectedCharacter] =
-    useState<CharacterDraft | null>(() => loadSavedCharacter());
+    useState<CharacterDraft | null>(() =>
+      loadSavedCharacter(),
+    );
 
   useEffect(() => {
     if (existingData) {
@@ -195,7 +267,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
   }, [existingData]);
 
   useEffect(() => {
-    const savedDraft = sessionStorage.getItem(CONCERT_FORM_DRAFT_KEY);
+    const savedDraft = sessionStorage.getItem(
+      CONCERT_FORM_DRAFT_KEY,
+    );
 
     if (!savedDraft) return;
 
@@ -209,16 +283,22 @@ export default function AdminConcertFormPage({ mode }: Props) {
         setForm(parsed.form);
       }
 
-      if (typeof parsed.totalSeats === "number") {
+      if (
+        typeof parsed.totalSeats === "number"
+      ) {
         setTotalSeats(parsed.totalSeats);
       }
     } catch {
-      sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
+      sessionStorage.removeItem(
+        CONCERT_FORM_DRAFT_KEY,
+      );
     }
   }, []);
 
   useEffect(() => {
-    const savedScroll = sessionStorage.getItem(CONCERT_FORM_SCROLL_KEY);
+    const savedScroll = sessionStorage.getItem(
+      CONCERT_FORM_SCROLL_KEY,
+    );
 
     if (!savedScroll) return;
 
@@ -237,54 +317,80 @@ export default function AdminConcertFormPage({ mode }: Props) {
         Number.isFinite(parsed.scrollY);
 
       if (!isValidScroll) {
-        sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+        sessionStorage.removeItem(
+          CONCERT_FORM_SCROLL_KEY,
+        );
         return;
       }
 
       const scrollY = parsed.scrollY as number;
 
-      firstFrameId = window.requestAnimationFrame(() => {
-        secondFrameId = window.requestAnimationFrame(() => {
-          window.scrollTo({
-            top: scrollY,
-            left: 0,
-            behavior: "auto",
-          });
+      firstFrameId =
+        window.requestAnimationFrame(() => {
+          secondFrameId =
+            window.requestAnimationFrame(() => {
+              window.scrollTo({
+                top: scrollY,
+                left: 0,
+                behavior: "auto",
+              });
 
-          sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+              sessionStorage.removeItem(
+                CONCERT_FORM_SCROLL_KEY,
+              );
+            });
         });
-      });
 
       return () => {
         if (firstFrameId !== null) {
-          window.cancelAnimationFrame(firstFrameId);
+          window.cancelAnimationFrame(
+            firstFrameId,
+          );
         }
 
         if (secondFrameId !== null) {
-          window.cancelAnimationFrame(secondFrameId);
+          window.cancelAnimationFrame(
+            secondFrameId,
+          );
         }
       };
     } catch {
-      sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+      sessionStorage.removeItem(
+        CONCERT_FORM_SCROLL_KEY,
+      );
     }
   }, [location.pathname]);
 
   useEffect(() => {
-    setSelectedCharacter(loadSavedCharacter());
+    setSelectedCharacter(
+      loadSavedCharacter(),
+    );
   }, [location.key]);
 
   function update<K extends keyof ConcertFormData>(
     key: K,
     value: ConcertFormData[K],
   ) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   }
 
   function addFacility() {
-    update("facilities", [...form.facilities, { icon: "✨", label: "" }]);
+    update("facilities", [
+      ...form.facilities,
+      {
+        icon: "✨",
+        label: "",
+      },
+    ]);
   }
 
-  function updateFacility(index: number, value: string) {
+  function updateFacility(
+    index: number,
+    value: string,
+  ) {
     const next = [...form.facilities];
 
     next[index] = {
@@ -298,16 +404,25 @@ export default function AdminConcertFormPage({ mode }: Props) {
   function removeFacility(index: number) {
     update(
       "facilities",
-      form.facilities.filter((_, i) => i !== index),
+      form.facilities.filter(
+        (_, i) => i !== index,
+      ),
     );
   }
 
   function addNotice() {
-    update("notices", [...form.notices, ""]);
+    update("notices", [
+      ...form.notices,
+      "",
+    ]);
   }
 
-  function updateNotice(index: number, value: string) {
+  function updateNotice(
+    index: number,
+    value: string,
+  ) {
     const next = [...form.notices];
+
     next[index] = value;
 
     update("notices", next);
@@ -316,11 +431,15 @@ export default function AdminConcertFormPage({ mode }: Props) {
   function removeNotice(index: number) {
     update(
       "notices",
-      form.notices.filter((_, i) => i !== index),
+      form.notices.filter(
+        (_, i) => i !== index,
+      ),
     );
   }
 
-  function handleMainImageFiles(files: File[]) {
+  function handleMainImageFiles(
+    files: File[],
+  ) {
     const file = files[0];
 
     if (!file) return;
@@ -328,12 +447,20 @@ export default function AdminConcertFormPage({ mode }: Props) {
     setMainImage(file);
   }
 
-  function handleGalleryImageFiles(files: File[]) {
-    setGalleryImages((prev) => [...prev, ...files].slice(0, 3));
+  function handleGalleryImageFiles(
+    files: File[],
+  ) {
+    setGalleryImages((prev) =>
+      [...prev, ...files].slice(0, 3),
+    );
   }
 
-  function removeGalleryImage(index: number) {
-    setGalleryImages((prev) => prev.filter((_, i) => i !== index));
+  function removeGalleryImage(
+    index: number,
+  ) {
+    setGalleryImages((prev) =>
+      prev.filter((_, i) => i !== index),
+    );
   }
 
   function goToCharacterCreator() {
@@ -361,22 +488,32 @@ export default function AdminConcertFormPage({ mode }: Props) {
   }
 
   function handleEnterMoveNext(
-    event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+    event: KeyboardEvent<
+      HTMLInputElement | HTMLSelectElement
+    >,
   ) {
     if (event.key !== "Enter") return;
 
     event.preventDefault();
 
     const focusableElements = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-form-focus='true']"),
+      document.querySelectorAll<HTMLElement>(
+        "[data-form-focus='true']",
+      ),
     );
 
-    const currentIndex = focusableElements.indexOf(event.currentTarget);
-    const nextElement = focusableElements[currentIndex + 1];
+    const currentIndex =
+      focusableElements.indexOf(
+        event.currentTarget,
+      );
+
+    const nextElement =
+      focusableElements[currentIndex + 1];
 
     if (!nextElement) return;
 
     nextElement.focus();
+
     nextElement.scrollIntoView({
       behavior: "smooth",
       block: "center",
@@ -384,27 +521,70 @@ export default function AdminConcertFormPage({ mode }: Props) {
   }
 
   function validateForm() {
-    if (!form.title.trim()) return "공연명을 입력해주세요.";
-    if (!form.performer.trim()) return "출연진을 입력해주세요.";
-    if (!form.genre) return "장르를 선택해주세요.";
-    if (!form.date) return "공연 날짜를 선택해주세요.";
-    if (!form.time) return "공연 시간을 선택해주세요.";
+    if (!form.title.trim()) {
+      return "공연명을 입력해주세요.";
+    }
 
-    if (!form.durationMinutes || form.durationMinutes <= 0) {
+    if (!form.performer.trim()) {
+      return "출연진을 입력해주세요.";
+    }
+
+    if (!form.genre) {
+      return "장르를 선택해주세요.";
+    }
+
+    if (!form.date) {
+      return "공연 날짜를 선택해주세요.";
+    }
+
+    if (!form.time) {
+      return "공연 시간을 선택해주세요.";
+    }
+
+    if (
+      !form.durationMinutes ||
+      form.durationMinutes <= 0
+    ) {
       return "공연 러닝타임을 입력해주세요.";
     }
 
-    if (!form.venue.trim()) return "공연장명을 입력해주세요.";
-    if (!form.address.trim()) return "상세 주소를 입력해주세요.";
-    if (!form.price || form.price <= 0) return "티켓 가격을 입력해주세요.";
-    if (!totalSeats || totalSeats <= 0) return "총 좌석 수를 입력해주세요.";
-    if (!form.description.trim()) return "공연 상세 설명을 입력해주세요.";
+    if (!form.venue.trim()) {
+      return "공연장명을 입력해주세요.";
+    }
 
-    if (mode === "create" && !selectedCharacter) {
+    if (!form.address.trim()) {
+      return "상세 주소를 입력해주세요.";
+    }
+
+    if (
+      !form.price ||
+      form.price <= 0
+    ) {
+      return "티켓 가격을 입력해주세요.";
+    }
+
+    if (
+      !totalSeats ||
+      totalSeats <= 0
+    ) {
+      return "총 좌석 수를 입력해주세요.";
+    }
+
+    if (!form.description.trim()) {
+      return "공연 상세 설명을 입력해주세요.";
+    }
+
+    if (
+      mode === "create" &&
+      !selectedCharacter
+    ) {
       return "3D 캐릭터를 제작해주세요.";
     }
 
-    if (mode === "create" && !mainImage) {
+    if (
+      mode === "create" &&
+      !mainImage
+    ) {
       return "대표 이미지를 업로드해주세요.";
     }
 
@@ -422,33 +602,48 @@ export default function AdminConcertFormPage({ mode }: Props) {
     try {
       // TODO:
       // 현재 createConcertApi/updateConcertApi는 ConcertFormData만 받음.
-      // totalSeats, mainImage, galleryImages, model3d는 백엔드 스펙 확정 후
-      // FormData 또는 별도 업로드 API로 연결 필요.
+      // totalSeats, mainImage, galleryImages, characterConfig는
+      // 백엔드 스펙 확정 후 FormData 또는 별도 업로드 API로 연결 필요.
       if (mode === "create") {
         await createMutation.mutateAsync(form);
-        toast.success("공연이 등록되었습니다.");
+        toast.success(
+          "공연이 등록되었습니다.",
+        );
       } else {
         await updateMutation.mutateAsync(form);
-        toast.success("공연이 수정되었습니다.");
+        toast.success(
+          "공연이 수정되었습니다.",
+        );
       }
 
       navigate("/admin");
     } catch (error: unknown) {
       const err =
-        error instanceof Error ? error : new Error("저장에 실패했습니다.");
+        error instanceof Error
+          ? error
+          : new Error(
+              "저장에 실패했습니다.",
+            );
 
-      toast.error(err.message ?? "저장에 실패했습니다.");
+      toast.error(
+        err.message ??
+          "저장에 실패했습니다.",
+      );
     }
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending;
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto w-full max-w-[760px] space-y-5 sm:space-y-6 lg:max-w-[960px] xl:max-w-[1080px] 2xl:max-w-[1200px]">
         <button
           type="button"
-          onClick={() => navigate("/admin")}
+          onClick={() =>
+            navigate("/admin")
+          }
           className="flex items-center gap-2 rounded-lg border border-admin-border bg-admin-card px-4 py-2 text-sm"
         >
           <ArrowLeft size={16} />
@@ -461,7 +656,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
           </span>
 
           <h1 className="mt-3 text-2xl font-bold sm:text-3xl xl:text-4xl">
-            {mode === "create" ? "공연 등록" : "공연 수정"}
+            {mode === "create"
+              ? "공연 등록"
+              : "공연 수정"}
           </h1>
 
           <p className="mt-2 text-sm text-admin-text-secondary">
@@ -473,8 +670,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
           <Field label="공연명" required>
             <FormInput
               value={form.title}
-              onChange={(v) => update("title", v)}
-              onKeyDown={handleEnterMoveNext}
+              onChange={(v) =>
+                update("title", v)
+              }
+              onKeyDown={
+                handleEnterMoveNext
+              }
               placeholder="예: Neon Dreams Concert"
             />
           </Field>
@@ -482,8 +683,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
           <Field label="출연진" required>
             <FormInput
               value={form.performer}
-              onChange={(v) => update("performer", v)}
-              onKeyDown={handleEnterMoveNext}
+              onChange={(v) =>
+                update("performer", v)
+              }
+              onKeyDown={
+                handleEnterMoveNext
+              }
               placeholder="예: BTS"
             />
           </Field>
@@ -492,12 +697,22 @@ export default function AdminConcertFormPage({ mode }: Props) {
             <select
               data-form-focus="true"
               value={form.genre}
-              onChange={(e) => update("genre", e.target.value as Genre)}
-              onKeyDown={handleEnterMoveNext}
+              onChange={(e) =>
+                update(
+                  "genre",
+                  e.target.value as Genre,
+                )
+              }
+              onKeyDown={
+                handleEnterMoveNext
+              }
               className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
             >
               {GENRES.map((genre) => (
-                <option key={genre.value} value={genre.value}>
+                <option
+                  key={genre.value}
+                  value={genre.value}
+                >
                   {genre.label}
                 </option>
               ))}
@@ -507,34 +722,60 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
         <Section title="일정 정보">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="공연 날짜" required>
+            <Field
+              label="공연 날짜"
+              required
+            >
               <EditableDateInput
                 value={form.date}
-                onChange={(v) => update("date", v)}
-                onKeyDown={handleEnterMoveNext}
+                onChange={(v) =>
+                  update("date", v)
+                }
+                onKeyDown={
+                  handleEnterMoveNext
+                }
                 placeholder="예: 2026-07-20"
               />
             </Field>
 
-            <Field label="공연 시간" required>
+            <Field
+              label="공연 시간"
+              required
+            >
               <EditableTimeInput
                 value={form.time}
-                onChange={(v) => update("time", v)}
-                onKeyDown={handleEnterMoveNext}
+                onChange={(v) =>
+                  update("time", v)
+                }
+                onKeyDown={
+                  handleEnterMoveNext
+                }
                 placeholder="예: 19:00"
               />
             </Field>
 
-            <Field label="러닝타임(분)" required>
+            <Field
+              label="러닝타임(분)"
+              required
+            >
               <FormInput
                 type="number"
                 value={
                   form.durationMinutes === 0
                     ? ""
-                    : String(form.durationMinutes)
+                    : String(
+                        form.durationMinutes,
+                      )
                 }
-                onChange={(v) => update("durationMinutes", Number(v || 0))}
-                onKeyDown={handleEnterMoveNext}
+                onChange={(v) =>
+                  update(
+                    "durationMinutes",
+                    Number(v || 0),
+                  )
+                }
+                onKeyDown={
+                  handleEnterMoveNext
+                }
                 placeholder="예: 120"
               />
             </Field>
@@ -542,20 +783,34 @@ export default function AdminConcertFormPage({ mode }: Props) {
         </Section>
 
         <Section title="장소 정보">
-          <Field label="공연장명" required>
+          <Field
+            label="공연장명"
+            required
+          >
             <FormInput
               value={form.venue}
-              onChange={(v) => update("venue", v)}
-              onKeyDown={handleEnterMoveNext}
+              onChange={(v) =>
+                update("venue", v)
+              }
+              onKeyDown={
+                handleEnterMoveNext
+              }
               placeholder="예: Main Concert Hall"
             />
           </Field>
 
-          <Field label="상세 주소" required>
+          <Field
+            label="상세 주소"
+            required
+          >
             <FormInput
               value={form.address}
-              onChange={(v) => update("address", v)}
-              onKeyDown={handleEnterMoveNext}
+              onChange={(v) =>
+                update("address", v)
+              }
+              onKeyDown={
+                handleEnterMoveNext
+              }
               placeholder="예: 서울특별시 송파구 ..."
             />
           </Field>
@@ -563,22 +818,49 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
         <Section title="티켓 정보">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field label="티켓 가격" required>
+            <Field
+              label="티켓 가격"
+              required
+            >
               <FormInput
                 type="number"
-                value={form.price === 0 ? "" : String(form.price)}
-                onChange={(v) => update("price", Number(v || 0))}
-                onKeyDown={handleEnterMoveNext}
+                value={
+                  form.price === 0
+                    ? ""
+                    : String(form.price)
+                }
+                onChange={(v) =>
+                  update(
+                    "price",
+                    Number(v || 0),
+                  )
+                }
+                onKeyDown={
+                  handleEnterMoveNext
+                }
                 placeholder="예: 88000"
               />
             </Field>
 
-            <Field label="총 좌석 수" required>
+            <Field
+              label="총 좌석 수"
+              required
+            >
               <FormInput
                 type="number"
-                value={totalSeats === 0 ? "" : String(totalSeats)}
-                onChange={(v) => setTotalSeats(Number(v || 0))}
-                onKeyDown={handleEnterMoveNext}
+                value={
+                  totalSeats === 0
+                    ? ""
+                    : String(totalSeats)
+                }
+                onChange={(v) =>
+                  setTotalSeats(
+                    Number(v || 0),
+                  )
+                }
+                onKeyDown={
+                  handleEnterMoveNext
+                }
                 placeholder="예: 120"
               />
             </Field>
@@ -586,10 +868,18 @@ export default function AdminConcertFormPage({ mode }: Props) {
         </Section>
 
         <Section title="공연 소개">
-          <Field label="공연 상세 설명" required>
+          <Field
+            label="공연 상세 설명"
+            required
+          >
             <textarea
               value={form.description}
-              onChange={(e) => update("description", e.target.value)}
+              onChange={(e) =>
+                update(
+                  "description",
+                  e.target.value,
+                )
+              }
               rows={8}
               placeholder="공연 소개, 공연 특징, 관람 안내를 입력하세요."
               className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
@@ -598,24 +888,38 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
           <Field label="관람 안내">
             <div className="space-y-2">
-              {form.notices.map((notice, index) => (
-                <div key={index} className="flex gap-2">
-                  <FormInput
-                    value={notice}
-                    onChange={(v) => updateNotice(index, v)}
-                    onKeyDown={handleEnterMoveNext}
-                    placeholder="예: 공연 시작 10분 전까지 입장해주세요."
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => removeNotice(index)}
-                    className="shrink-0 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm"
+              {form.notices.map(
+                (notice, index) => (
+                  <div
+                    key={index}
+                    className="flex gap-2"
                   >
-                    삭제
-                  </button>
-                </div>
-              ))}
+                    <FormInput
+                      value={notice}
+                      onChange={(v) =>
+                        updateNotice(
+                          index,
+                          v,
+                        )
+                      }
+                      onKeyDown={
+                        handleEnterMoveNext
+                      }
+                      placeholder="예: 공연 시작 10분 전까지 입장해주세요."
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeNotice(index)
+                      }
+                      className="shrink-0 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ),
+              )}
 
               <button
                 type="button"
@@ -630,24 +934,38 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
         <Section title="편의 시설">
           <div className="space-y-2">
-            {form.facilities.map((facility, index) => (
-              <div key={index} className="flex gap-2">
-                <FormInput
-                  value={facility.label}
-                  onChange={(v) => updateFacility(index, v)}
-                  onKeyDown={handleEnterMoveNext}
-                  placeholder="예: 최신 음향 시스템"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => removeFacility(index)}
-                  className="shrink-0 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm"
+            {form.facilities.map(
+              (facility, index) => (
+                <div
+                  key={index}
+                  className="flex gap-2"
                 >
-                  삭제
-                </button>
-              </div>
-            ))}
+                  <FormInput
+                    value={facility.label}
+                    onChange={(v) =>
+                      updateFacility(
+                        index,
+                        v,
+                      )
+                    }
+                    onKeyDown={
+                      handleEnterMoveNext
+                    }
+                    placeholder="예: 최신 음향 시스템"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeFacility(index)
+                    }
+                    className="shrink-0 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm"
+                  >
+                    삭제
+                  </button>
+                </div>
+              ),
+            )}
 
             <button
               type="button"
@@ -660,19 +978,35 @@ export default function AdminConcertFormPage({ mode }: Props) {
         </Section>
 
         <Section title="이미지 업로드">
-          <Field label="3D 캐릭터/오브젝트 모델" required>
+          <Field
+            label="3D 캐릭터/오브젝트 모델"
+            required
+          >
             <CharacterCreatorLinkBox
-              character={selectedCharacter}
-              onClick={goToCharacterCreator}
+              character={
+                selectedCharacter
+              }
+              onClick={
+                goToCharacterCreator
+              }
             />
           </Field>
 
-          <Field label="대표 이미지" required>
+          <Field
+            label="대표 이미지"
+            required
+          >
             <UploadBox
-              text={mainImage ? mainImage.name : "대표 이미지 업로드"}
+              text={
+                mainImage
+                  ? mainImage.name
+                  : "대표 이미지 업로드"
+              }
               description="클릭하거나 파일을 끌어다 놓으세요."
               accept="image/*"
-              onFilesSelected={handleMainImageFiles}
+              onFilesSelected={
+                handleMainImageFiles
+              }
             />
           </Field>
 
@@ -686,34 +1020,51 @@ export default function AdminConcertFormPage({ mode }: Props) {
               description="최대 3개까지 업로드할 수 있습니다."
               accept="image/*"
               multiple
-              onFilesSelected={handleGalleryImageFiles}
+              onFilesSelected={
+                handleGalleryImageFiles
+              }
             />
 
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-              {[0, 1, 2].map((index) => (
-                <div
-                  key={index}
-                  className="flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-admin-border bg-admin-bg px-3 text-center text-xs text-admin-text-secondary"
-                >
-                  {galleryImages[index] ? (
-                    <>
-                      <span className="line-clamp-2">
-                        {galleryImages[index].name}
-                      </span>
+              {[0, 1, 2].map(
+                (index) => (
+                  <div
+                    key={index}
+                    className="flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-admin-border bg-admin-bg px-3 text-center text-xs text-admin-text-secondary"
+                  >
+                    {galleryImages[
+                      index
+                    ] ? (
+                      <>
+                        <span className="line-clamp-2">
+                          {
+                            galleryImages[
+                              index
+                            ].name
+                          }
+                        </span>
 
-                      <button
-                        type="button"
-                        onClick={() => removeGalleryImage(index)}
-                        className="mt-2 text-xs text-red-400"
-                      >
-                        삭제
-                      </button>
-                    </>
-                  ) : (
-                    <span>이미지 {index + 1}</span>
-                  )}
-                </div>
-              ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeGalleryImage(
+                              index,
+                            )
+                          }
+                          className="mt-2 text-xs text-red-400"
+                        >
+                          삭제
+                        </button>
+                      </>
+                    ) : (
+                      <span>
+                        이미지{" "}
+                        {index + 1}
+                      </span>
+                    )}
+                  </div>
+                ),
+              )}
             </div>
           </Field>
         </Section>
@@ -736,7 +1087,9 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
           <button
             type="button"
-            onClick={() => navigate("/admin")}
+            onClick={() =>
+              navigate("/admin")
+            }
             className="h-12 rounded-lg border border-admin-border bg-admin-card px-6 font-bold"
             disabled={isPending}
           >
@@ -757,8 +1110,13 @@ function Section({
 }) {
   return (
     <section className="rounded-xl border border-admin-border bg-admin-card p-4 shadow-sm sm:p-6 xl:p-7">
-      <h2 className="mb-4 text-base font-bold xl:text-lg">{title}</h2>
-      <div className="space-y-4">{children}</div>
+      <h2 className="mb-4 text-base font-bold xl:text-lg">
+        {title}
+      </h2>
+
+      <div className="space-y-4">
+        {children}
+      </div>
     </section>
   );
 }
@@ -776,7 +1134,12 @@ function Field({
     <div>
       <p className="mb-1 text-xs font-medium text-admin-text-secondary">
         {label}
-        {required && <span className="ml-1 text-red-400">*</span>}
+
+        {required && (
+          <span className="ml-1 text-red-400">
+            *
+          </span>
+        )}
       </p>
 
       {children}
@@ -793,7 +1156,9 @@ function FormInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (
+    event: KeyboardEvent<HTMLInputElement>,
+  ) => void;
   type?: string;
   placeholder?: string;
 }) {
@@ -802,7 +1167,9 @@ function FormInput({
       data-form-focus="true"
       type={type}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) =>
+        onChange(e.target.value)
+      }
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
@@ -821,22 +1188,34 @@ function UploadBox({
   description: string;
   accept: string;
   multiple?: boolean;
-  onFilesSelected: (files: File[]) => void;
+  onFilesSelected: (
+    files: File[],
+  ) => void;
 }) {
-  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+  function handleInputChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const files = Array.from(
+      event.target.files ?? [],
+    );
 
     onFilesSelected(files);
     event.target.value = "";
   }
 
-  function handleDrop(event: React.DragEvent<HTMLLabelElement>) {
+  function handleDrop(
+    event: React.DragEvent<HTMLLabelElement>,
+  ) {
     event.preventDefault();
 
-    const files = Array.from(event.dataTransfer.files ?? []);
+    const files = Array.from(
+      event.dataTransfer.files ?? [],
+    );
 
     if (!multiple) {
-      onFilesSelected(files.slice(0, 1));
+      onFilesSelected(
+        files.slice(0, 1),
+      );
       return;
     }
 
@@ -845,13 +1224,23 @@ function UploadBox({
 
   return (
     <label
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) =>
+        event.preventDefault()
+      }
       onDrop={handleDrop}
       className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-admin-border bg-admin-bg px-4 py-6 text-center text-sm text-admin-text-secondary transition hover:border-primary"
     >
-      <span className="font-medium text-admin-text">{text}</span>
-      <span className="mt-1 text-xs">{description}</span>
-      <span className="mt-2 text-xs">클릭하여 업로드</span>
+      <span className="font-medium text-admin-text">
+        {text}
+      </span>
+
+      <span className="mt-1 text-xs">
+        {description}
+      </span>
+
+      <span className="mt-2 text-xs">
+        클릭하여 업로드
+      </span>
 
       <input
         type="file"
@@ -872,21 +1261,36 @@ function EditableDateInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => void;
   placeholder?: string;
 }) {
-  function formatDateInput(input: string) {
-    const digits = input.replace(/\D/g, "").slice(0, 8);
+  function formatDateInput(
+    input: string,
+  ) {
+    const digits = input
+      .replace(/\D/g, "")
+      .slice(0, 8);
 
     if (digits.length <= 4) {
       return digits;
     }
 
     if (digits.length <= 6) {
-      return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+      return `${digits.slice(
+        0,
+        4,
+      )}-${digits.slice(4)}`;
     }
 
-    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+    return `${digits.slice(
+      0,
+      4,
+    )}-${digits.slice(
+      4,
+      6,
+    )}-${digits.slice(6)}`;
   }
 
   return (
@@ -894,7 +1298,13 @@ function EditableDateInput({
       data-form-focus="true"
       type="text"
       value={value}
-      onChange={(e) => onChange(formatDateInput(e.target.value))}
+      onChange={(e) =>
+        onChange(
+          formatDateInput(
+            e.target.value,
+          ),
+        )
+      }
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       maxLength={10}
@@ -912,17 +1322,26 @@ function EditableTimeInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => void;
   placeholder?: string;
 }) {
-  function formatTimeInput(input: string) {
-    const digits = input.replace(/\D/g, "").slice(0, 4);
+  function formatTimeInput(
+    input: string,
+  ) {
+    const digits = input
+      .replace(/\D/g, "")
+      .slice(0, 4);
 
     if (digits.length <= 2) {
       return digits;
     }
 
-    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+    return `${digits.slice(
+      0,
+      2,
+    )}:${digits.slice(2)}`;
   }
 
   return (
@@ -930,7 +1349,13 @@ function EditableTimeInput({
       data-form-focus="true"
       type="text"
       value={value}
-      onChange={(e) => onChange(formatTimeInput(e.target.value))}
+      onChange={(e) =>
+        onChange(
+          formatTimeInput(
+            e.target.value,
+          ),
+        )
+      }
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       maxLength={5}
@@ -969,20 +1394,41 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isBalletOutfit =
+    character.outfitModelId ===
+    "ballet";
+
   return (
     <div className="overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
       <div
         className="h-80 w-full overflow-hidden"
-        style={{ backgroundColor: character.background }}
+        style={{
+          backgroundColor:
+            character.background,
+        }}
       >
         <CharacterModelViewer
           modelUrl="/models/chibi-base.glb"
           skinColor={character.skinColor}
           hairColor={character.hairColor}
-          outfitColor={character.outfitColor}
-          outfitName={character.outfitName}
-          outfitModelId={character.outfitModelId}
-          hairStyle={character.hairStyle}
+          outfitColor={
+            character.outfitColor
+          }
+          balletWearColor={
+            character.balletWearColor
+          }
+          balletShortsColor={
+            character.balletShortsColor
+          }
+          outfitName={
+            character.outfitName
+          }
+          outfitModelId={
+            character.outfitModelId
+          }
+          hairStyle={
+            character.hairStyle
+          }
           eyeStyle={character.eyeStyle}
         />
       </div>
@@ -993,15 +1439,26 @@ function CharacterCreatorLinkBox({
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
-          헤어: {character.hairStyle} / 눈: {character.eyeStyle}
-
+          피부: {character.skinTone} (
+          {character.skinColor.toUpperCase()})
+          / 헤어: {character.hairStyle} /
+          눈: {character.eyeStyle}
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          의상: {character.outfitName} / 액세서리: {character.accessory} /
+          의상: {character.outfitName} /
+          액세서리: {character.accessory} /
           포즈: {character.pose}
         </p>
+
+        {isBalletOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            발레 의상:{" "}
+            {character.balletWearColor.toUpperCase()}{" "}
+            / 하의:{" "}
+            {character.balletShortsColor.toUpperCase()}
+          </p>
+        )}
 
         <button
           type="button"
