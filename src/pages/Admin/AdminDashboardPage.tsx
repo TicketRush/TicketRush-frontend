@@ -38,6 +38,7 @@ import {
   toLocalDateKey,
 } from "@/utils/admin/dashboardPeriod";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
+import Modal from "@/components/common/Modal/Modal";
 import {
   formatAdminCount,
   formatAdminOccupancy,
@@ -96,6 +97,11 @@ export default function AdminDashboardPage() {
       return;
     }
     setSelectedRange(range);
+  }
+
+  function handleCloseDeleteModal() {
+    if (deleteMutation.isPending) return;
+    setDeleteTarget(null);
   }
 
   async function handleConfirmDelete() {
@@ -306,35 +312,39 @@ export default function AdminDashboardPage() {
         </>
       )}
 
-      {/* 삭제 확인 모달 */}
-      {deleteTarget !== null && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-admin-card border border-admin-border rounded-xl p-6 max-w-md w-full">
-            <h3 className="font-bold mb-2">공연을 삭제하시겠습니까?</h3>
-            <p className="text-sm text-admin-text-secondary mb-4">
-              삭제된 공연은 복구할 수 없습니다.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="py-2 rounded bg-admin-border"
-                disabled={deleteMutation.isPending}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="py-2 rounded text-white font-bold bg-admin-cancel"
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? "삭제 중..." : "삭제"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={deleteTarget !== null}
+        onClose={handleCloseDeleteModal}
+        title="공연을 삭제하시겠습니까?"
+        size="md"
+        variant="admin"
+        disableOverlayClose={deleteMutation.isPending}
+        disableEscClose={deleteMutation.isPending}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCloseDeleteModal}
+              className="px-4 py-2 rounded bg-admin-border"
+              disabled={deleteMutation.isPending}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              className="px-4 py-2 rounded text-white font-bold bg-admin-cancel"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "삭제 중..." : "삭제"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-admin-text-secondary">
+          삭제된 공연은 복구할 수 없습니다.
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -1,10 +1,13 @@
 // components/common/Modal/Modal.tsx
 import { type ReactNode, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
-import type FocusTrap from "focus-trap-react";
+import FocusTrap from "focus-trap-react";
 import { X } from "lucide-react";
+import clsx from "clsx";
 
 export type ModalSize = "sm" | "md" | "lg";
+/** default: 사용자 라이트 / admin: 관리자 다크 카드 (#286) */
+export type ModalVariant = "default" | "admin";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -14,6 +17,7 @@ export interface ModalProps {
   footer?: ReactNode;
   /** sm: 작은 확인 모달 / md: 일반(기본) / lg: 폼이 들어가는 큰 모달 */
   size?: ModalSize;
+  variant?: ModalVariant;
   /** 오버레이 클릭으로 닫기 비활성화 (예: 결제 진행 중) */
   disableOverlayClose?: boolean;
   /** ESC로 닫기 비활성화 */
@@ -21,9 +25,41 @@ export interface ModalProps {
 }
 
 const sizeStyles: Record<ModalSize, string> = {
-  sm: "max-w-sm", // 384px — 단순 확인/경고
-  md: "max-w-md", // 448px — 기본
-  lg: "max-w-lg", // 512px — 폼 포함
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+};
+
+const variantStyles: Record<
+  ModalVariant,
+  {
+    panel: string;
+    header: string;
+    title: string;
+    close: string;
+    closeLocked: string;
+    body: string;
+    footer: string;
+  }
+> = {
+  default: {
+    panel: "bg-white shadow-xl",
+    header: "border-border",
+    title: "text-text",
+    close: "text-text-secondary hover:text-text",
+    closeLocked: "text-text-disabled cursor-not-allowed",
+    body: "text-text",
+    footer: "border-border bg-secondary",
+  },
+  admin: {
+    panel: "bg-admin-card border border-admin-border shadow-xl",
+    header: "border-admin-border",
+    title: "text-admin-text",
+    close: "text-admin-text-secondary hover:text-admin-text",
+    closeLocked: "text-admin-text-secondary/50 cursor-not-allowed",
+    body: "text-admin-text",
+    footer: "border-admin-border bg-admin-bg",
+  },
 };
 
 export default function Modal({
@@ -33,13 +69,15 @@ export default function Modal({
   children,
   footer,
   size = "md",
+  variant = "default",
   disableOverlayClose = false,
   disableEscClose = false,
 }: ModalProps) {
-  // 제목과 aria-labelledby를 연결할 고유 ID
   const titleId = useId();
+  // ESC·오버레이가 모두 막힌 요청 진행 중에는 X도 잠근다
+  const closeLocked = disableOverlayClose && disableEscClose;
+  const theme = variantStyles[variant];
 
-  // ESC 키로 닫기
   useEffect(() => {
     if (!isOpen || disableEscClose) return;
 
@@ -51,12 +89,10 @@ export default function Modal({
     return () => document.removeEventListener("keydown", handleEsc);
   }, [isOpen, onClose, disableEscClose]);
 
-  // 배경 스크롤 방지
-  // ⚠️ 단일 모달 기준으로 동작.
-  //    nested modal이 필요해지면 body-scroll-lock 같은 라이브러리 도입 검토.
   useEffect(() => {
     if (!isOpen) return;
 
+    // ⚠️ 단일 모달 기준. nested modal이면 body-scroll-lock 검토.
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -79,10 +115,11 @@ export default function Modal({
     >
       <FocusTrap
         focusTrapOptions={{
-          // 모달 닫힐 때 원래 포커스 위치로 복귀
           returnFocusOnDeactivate: true,
-          // 모달 안에 포커스 가능한 요소가 없을 때의 fallback
           fallbackFocus: '[role="dialog"]',
+          // 오버레이·ESC 닫기는 바깥 핸들러에서만 처리한다
+          clickOutsideDeactivates: false,
+          escapeDeactivates: false,
         }}
       >
         <div
@@ -90,24 +127,36 @@ export default function Modal({
           aria-modal="true"
           aria-labelledby={title ? titleId : undefined}
           tabIndex={-1}
-          className={[
-            "w-full bg-white rounded-2xl shadow-xl overflow-hidden outline-none",
+          className={clsx(
+            "w-full rounded-2xl overflow-hidden outline-none",
+            theme.panel,
             sizeStyles[size],
-          ].join(" ")}
+          )}
         >
-          {/* 헤더 */}
           {title && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div
+              className={clsx(
+                "flex items-center justify-between px-6 py-4 border-b",
+                theme.header,
+              )}
+            >
               <h2
                 id={titleId}
-                className="font-pretendard text-lg font-bold text-text"
+                className={clsx(
+                  "font-pretendard text-lg font-bold",
+                  theme.title,
+                )}
               >
                 {title}
               </h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="text-text-secondary hover:text-text transition-colors"
+                disabled={closeLocked}
+                className={clsx(
+                  "transition-colors",
+                  closeLocked ? theme.closeLocked : theme.close,
+                )}
                 aria-label="닫기"
               >
                 <X size={20} />
@@ -115,14 +164,19 @@ export default function Modal({
             </div>
           )}
 
-          {/* 본문 */}
-          <div className="px-6 py-5 font-pretendard text-base text-text">
+          <div
+            className={clsx("px-6 py-5 font-pretendard text-base", theme.body)}
+          >
             {children}
           </div>
 
-          {/* 푸터 */}
           {footer && (
-            <div className="px-6 py-4 border-t border-border bg-secondary flex justify-end gap-2">
+            <div
+              className={clsx(
+                "px-6 py-4 border-t flex justify-end gap-2",
+                theme.footer,
+              )}
+            >
               {footer}
             </div>
           )}

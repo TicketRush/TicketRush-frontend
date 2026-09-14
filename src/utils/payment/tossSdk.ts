@@ -84,8 +84,12 @@ export async function requestTossPayment(
     amount: { currency: "KRW", value: params.amount },
     orderId: params.orderId,
     orderName: params.orderName,
-    customerName: params.customerName,
-    customerEmail: params.customerEmail,
+    ...(params.customerName?.trim()
+      ? { customerName: params.customerName.trim() }
+      : {}),
+    ...(params.customerEmail?.trim()
+      ? { customerEmail: params.customerEmail.trim() }
+      : {}),
     successUrl: params.successUrl,
     failUrl: params.failUrl,
     card: {
