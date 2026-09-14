@@ -33,6 +33,8 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FESTIVAL_TOP_COLOR,
   getOutfitOption,
   resolveStoredOutfitModelId,
   type OutfitModelId,
@@ -88,6 +90,8 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  festivalTopColor: string;
+  festivalBottomColor: string;
   accessory: string;
   pose: CharacterPose;
   background: string;
@@ -112,6 +116,8 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "festivalTopColor"
+        | "festivalBottomColor"
         | "background"
       >
     > & {
@@ -123,6 +129,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      festivalTopColor?: unknown;
+      festivalBottomColor?: unknown;
       background?: unknown;
     };
 
@@ -139,6 +147,16 @@ function loadSavedCharacter(): CharacterDraft | null {
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
+    const resolvedFestivalTopColor =
+      typeof parsed.festivalTopColor === "string"
+        ? normalizeHexColor(parsed.festivalTopColor)
+        : null;
+
+    const resolvedFestivalBottomColor =
+      typeof parsed.festivalBottomColor === "string"
+        ? normalizeHexColor(parsed.festivalBottomColor)
         : null;
 
     const resolvedBackground =
@@ -162,6 +180,10 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      festivalTopColor:
+        resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
+      festivalBottomColor:
+        resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
       background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
     } as CharacterDraft;
   } catch {
@@ -311,6 +333,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   function updateNotice(index: number, value: string) {
     const next = [...form.notices];
+
     next[index] = value;
 
     update("notices", next);
@@ -972,6 +995,8 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isFestivalOutfit = character.outfitModelId === "festival";
+
   return (
     <div className="overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
       <div
@@ -983,6 +1008,8 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          festivalTopColor={character.festivalTopColor}
+          festivalBottomColor={character.festivalBottomColor}
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
@@ -1005,6 +1032,13 @@ function CharacterCreatorLinkBox({
           의상: {character.outfitName} / 액세서리: {character.accessory} /
           포즈: {character.pose}
         </p>
+
+        {isFestivalOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            상의: {character.festivalTopColor.toUpperCase()} / 하의:{" "}
+            {character.festivalBottomColor.toUpperCase()}
+          </p>
+        )}
 
         <button
           type="button"

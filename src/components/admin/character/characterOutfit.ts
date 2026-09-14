@@ -15,6 +15,14 @@ interface OutfitOption {
   modelUrl: string | null;
 }
 
+export const DEFAULT_FESTIVAL_TOP_COLOR = "#FFF526";
+export const DEFAULT_FESTIVAL_BOTTOM_COLOR = "#53CBFF";
+
+export const FESTIVAL_OUTFIT_PART_NAMES = {
+  top: "festival_windbreak",
+  bottom: "festival_pants",
+} as const;
+
 /**
  * 공연 등록 화면의 공연 장르 순서와 동일하게 정렬합니다.
  *

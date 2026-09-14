@@ -5,6 +5,9 @@ import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
 import type { EyeStyle } from "@/components/admin/character/characterEye";
 import {
+  DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FESTIVAL_TOP_COLOR,
+  FESTIVAL_OUTFIT_PART_NAMES,
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
   type OutfitModelId,
@@ -18,20 +21,34 @@ interface CharacterModelViewerProps {
   modelUrl?: string;
   skinColor: string;
   hairColor: string;
+
   /**
-   * #194에서 파츠별 의상 색상 커스터마이징에 사용할 예정입니다.
-   * 현재 #74에서는 기존 호출부 호환을 위해 유지합니다.
+   * 기존 단일 의상 색상 값입니다.
+   * 다른 의상 및 기존 호출부 호환을 위해 유지합니다.
    */
   outfitColor: string;
+
+  /**
+   * 페스티벌 의상 상의 색상입니다.
+   */
+  festivalTopColor?: string;
+
+  /**
+   * 페스티벌 의상 하의 색상입니다.
+   */
+  festivalBottomColor?: string;
+
   /**
    * 화면 표시용 의상 이름입니다.
    * 3D 모델 분기에는 사용하지 않습니다.
    */
   outfitName?: string;
+
   /**
    * 3D 의상 모델을 선택하기 위한 stable id입니다.
    */
   outfitModelId: OutfitModelId;
+
   hairStyle: HairStyle;
   eyeStyle: EyeStyle;
 }
@@ -43,6 +60,16 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   twintails: "/models/hair/hair_twintails.glb",
   wave: "/models/hair/hair_wave.glb",
 };
+
+const EYE_MODEL_URLS: Record<EyeStyle, string> = {
+  default: "/models/eyes/eye_default.glb",
+  happy: "/models/eyes/eye_happy.glb",
+  wink: "/models/eyes/eye_wink.glb",
+  squeeze: "/models/eyes/eye_squeeze.glb",
+  angry: "/models/eyes/eye_angry.glb",
+  closed: "/models/eyes/eye_closed.glb",
+};
+
 function CharacterModelLoadingFallback() {
   return (
     <Html fullscreen pointerEvents="none">
@@ -55,16 +82,6 @@ function CharacterModelLoadingFallback() {
   );
 }
 
-
-const EYE_MODEL_URLS: Record<EyeStyle, string> = {
-  default: "/models/eyes/eye_default.glb",
-  happy: "/models/eyes/eye_happy.glb",
-  wink: "/models/eyes/eye_wink.glb",
-  squeeze: "/models/eyes/eye_squeeze.glb",
-  angry: "/models/eyes/eye_angry.glb",
-  closed: "/models/eyes/eye_closed.glb",
-};
-
 function isBaseEyeObject(objectName: string) {
   const name = objectName.toLowerCase();
 
@@ -76,6 +93,10 @@ function isBaseEyeObject(objectName: string) {
     name.endsWith("_eye") ||
     name.endsWith("_eyes")
   );
+}
+
+function isSameHexColor(first: string, second: string) {
+  return first.toUpperCase() === second.toUpperCase();
 }
 
 function CharacterBody({
@@ -149,12 +170,91 @@ function EyeModel({
   return <primitive object={scene} />;
 }
 
-function OutfitModel({ modelUrl }: { modelUrl: string }) {
+function cloneMaterialWithColor(
+  material: THREE.Material,
+  color: string,
+): THREE.Material {
+  const clonedMaterial = material.clone();
+
+  if (clonedMaterial instanceof THREE.MeshStandardMaterial) {
+    clonedMaterial.color.set(color);
+
+    /**
+     * festival_outfit.glb에는 vertex color가 포함되어 있습니다.
+     * 사용자 지정 색상 적용 시 vertex color와 선택 색상이 곱해지는 것을
+     * 방지하기 위해 해당 파츠의 vertex color 사용을 해제합니다.
+     */
+    clonedMaterial.vertexColors = false;
+    clonedMaterial.needsUpdate = true;
+  }
+
+  return clonedMaterial;
+}
+
+function applyMeshColor(object: THREE.Mesh, color: string) {
+  if (Array.isArray(object.material)) {
+    object.material = object.material.map((material) =>
+      cloneMaterialWithColor(material, color),
+    );
+    return;
+  }
+
+  object.material = cloneMaterialWithColor(object.material, color);
+}
+
+function OutfitModel({
+  modelUrl,
+  outfitModelId,
+  festivalTopColor,
+  festivalBottomColor,
+}: {
+  modelUrl: string;
+  outfitModelId: OutfitModelId;
+  festivalTopColor: string;
+  festivalBottomColor: string;
+}) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
-    return gltf.scene.clone(true);
-  }, [gltf.scene]);
+    const clonedScene = gltf.scene.clone(true);
+
+    if (outfitModelId !== "festival") {
+      return clonedScene;
+    }
+
+    clonedScene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (
+        object.name === FESTIVAL_OUTFIT_PART_NAMES.top &&
+        !isSameHexColor(
+          festivalTopColor,
+          DEFAULT_FESTIVAL_TOP_COLOR,
+        )
+      ) {
+        applyMeshColor(object, festivalTopColor);
+      }
+
+      if (
+        object.name === FESTIVAL_OUTFIT_PART_NAMES.bottom &&
+        !isSameHexColor(
+          festivalBottomColor,
+          DEFAULT_FESTIVAL_BOTTOM_COLOR,
+        )
+      ) {
+        applyMeshColor(object, festivalBottomColor);
+      }
+    });
+
+    return clonedScene;
+  }, [
+    gltf.scene,
+    outfitModelId,
+    festivalTopColor,
+    festivalBottomColor,
+  ]);
 
   return <primitive object={scene} />;
 }
@@ -166,6 +266,8 @@ function CharacterModel({
   outfitModelId,
   hairStyle,
   eyeStyle,
+  festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
+  festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: Pick<
   CharacterModelViewerProps,
   | "modelUrl"
@@ -174,6 +276,8 @@ function CharacterModel({
   | "outfitModelId"
   | "hairStyle"
   | "eyeStyle"
+  | "festivalTopColor"
+  | "festivalBottomColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
 
@@ -184,15 +288,26 @@ function CharacterModel({
         position={[0, -0.4, 0]}
         rotation={[0, 0, 0]}
       >
-        <CharacterBody modelUrl={modelUrl} skinColor={skinColor} />
+        <CharacterBody
+          modelUrl={modelUrl}
+          skinColor={skinColor}
+        />
 
-        <HairModel hairStyle={hairStyle} hairColor={hairColor} />
+        <HairModel
+          hairStyle={hairStyle}
+          hairColor={hairColor}
+        />
 
         <EyeModel eyeStyle={eyeStyle} />
 
         {outfitModelUrl && (
           <Suspense fallback={null}>
-            <OutfitModel modelUrl={outfitModelUrl} />
+            <OutfitModel
+              modelUrl={outfitModelUrl}
+              outfitModelId={outfitModelId}
+              festivalTopColor={festivalTopColor}
+              festivalBottomColor={festivalBottomColor}
+            />
           </Suspense>
         )}
       </group>
@@ -207,6 +322,8 @@ export default function CharacterModelViewer({
   outfitModelId,
   hairStyle,
   eyeStyle,
+  festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
+  festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
@@ -223,6 +340,8 @@ export default function CharacterModelViewer({
             outfitModelId={outfitModelId}
             hairStyle={hairStyle}
             eyeStyle={eyeStyle}
+            festivalTopColor={festivalTopColor}
+            festivalBottomColor={festivalBottomColor}
           />
         </Suspense>
 
