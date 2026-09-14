@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
@@ -304,14 +304,6 @@ export default function AdminCharacterCreatorPage() {
       left: 0,
       behavior: "auto",
     });
-  }, []);
-
-  useEffect(() => {
-    document.body.classList.add("admin-layout");
-
-    return () => {
-      document.body.classList.remove("admin-layout");
-    };
   }, []);
 
   const [character, setCharacter] = useState<CharacterConfig>(() =>
