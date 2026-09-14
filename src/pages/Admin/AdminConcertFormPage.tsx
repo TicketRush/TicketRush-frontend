@@ -24,6 +24,10 @@ import {
   type HairStyle,
 } from "@/components/admin/character/characterHair";
 import {
+  resolveStoredEyeStyle,
+  type EyeStyle,
+} from "@/components/admin/character/characterEye";
+import {
   normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
@@ -35,6 +39,8 @@ import {
   resolveStoredOutfitModelId,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
+
 
 const GENRES: { value: Genre; label: string }[] = [
   { value: "CONCERT", label: "콘서트" },
@@ -63,9 +69,11 @@ const INITIAL_FORM: ConcertFormData = {
 };
 
 const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
+const CONCERT_FORM_SCROLL_KEY = "ticketRush:admin-concert-form-scroll";
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_HAIR_COLOR = "#151515";
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
+const DEFAULT_BACKGROUND_COLOR = "#E9DDFF";
 
 interface Props {
   mode: "create" | "edit";
@@ -77,6 +85,7 @@ interface CharacterDraft {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitName: string;
@@ -102,23 +111,27 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
         | "festivalTopColor"
         | "festivalBottomColor"
+        | "background"
       >
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
+      background?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -146,6 +159,11 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.festivalBottomColor)
         : null;
 
+    const resolvedBackground =
+      typeof parsed.background === "string"
+        ? normalizeHexColor(parsed.background)
+        : null;
+
     const resolvedOutfitModelId = resolveStoredOutfitModelId(
       parsed.outfitModelId,
       parsed.outfitName,
@@ -157,6 +175,7 @@ function loadSavedCharacter(): CharacterDraft | null {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
@@ -165,6 +184,7 @@ function loadSavedCharacter(): CharacterDraft | null {
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
         resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
+      background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
     } as CharacterDraft;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -173,6 +193,8 @@ function loadSavedCharacter(): CharacterDraft | null {
 }
 
 export default function AdminConcertFormPage({ mode }: Props) {
+  useDocumentTitle(mode === "edit" ? "공연 수정" : "공연 등록");
+
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
@@ -219,6 +241,58 @@ export default function AdminConcertFormPage({ mode }: Props) {
       sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem(CONCERT_FORM_SCROLL_KEY);
+
+    if (!savedScroll) return;
+
+    let firstFrameId: number | null = null;
+    let secondFrameId: number | null = null;
+
+    try {
+      const parsed = JSON.parse(savedScroll) as {
+        pathname?: unknown;
+        scrollY?: unknown;
+      };
+
+      const isValidScroll =
+        parsed.pathname === location.pathname &&
+        typeof parsed.scrollY === "number" &&
+        Number.isFinite(parsed.scrollY);
+
+      if (!isValidScroll) {
+        sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+        return;
+      }
+
+      const scrollY = parsed.scrollY as number;
+
+      firstFrameId = window.requestAnimationFrame(() => {
+        secondFrameId = window.requestAnimationFrame(() => {
+          window.scrollTo({
+            top: scrollY,
+            left: 0,
+            behavior: "auto",
+          });
+
+          sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+        });
+      });
+
+      return () => {
+        if (firstFrameId !== null) {
+          window.cancelAnimationFrame(firstFrameId);
+        }
+
+        if (secondFrameId !== null) {
+          window.cancelAnimationFrame(secondFrameId);
+        }
+      };
+    } catch {
+      sessionStorage.removeItem(CONCERT_FORM_SCROLL_KEY);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     setSelectedCharacter(loadSavedCharacter());
@@ -297,9 +371,17 @@ export default function AdminConcertFormPage({ mode }: Props) {
       }),
     );
 
+    sessionStorage.setItem(
+      CONCERT_FORM_SCROLL_KEY,
+      JSON.stringify({
+        pathname: location.pathname,
+        scrollY: window.scrollY,
+      }),
+    );
+
     navigate(
       `/admin/character-creator?returnTo=${encodeURIComponent(
-        window.location.pathname,
+        location.pathname,
       )}`,
     );
   }
@@ -388,8 +470,8 @@ export default function AdminConcertFormPage({ mode }: Props) {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-[760px] space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto w-full max-w-[760px] space-y-5 sm:space-y-6 lg:max-w-[960px] xl:max-w-[1080px] 2xl:max-w-[1200px]">
         <button
           type="button"
           onClick={() => navigate("/admin")}
@@ -404,7 +486,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
             CONCERT FORM
           </span>
 
-          <h1 className="mt-3 text-3xl font-bold">
+          <h1 className="mt-3 text-2xl font-bold sm:text-3xl xl:text-4xl">
             {mode === "create" ? "공연 등록" : "공연 수정"}
           </h1>
 
@@ -438,7 +520,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
               value={form.genre}
               onChange={(e) => update("genre", e.target.value as Genre)}
               onKeyDown={handleEnterMoveNext}
-              className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+              className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
             >
               {GENRES.map((genre) => (
                 <option key={genre.value} value={genre.value}>
@@ -536,7 +618,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
               onChange={(e) => update("description", e.target.value)}
               rows={8}
               placeholder="공연 소개, 공연 특징, 관람 안내를 입력하세요."
-              className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+              className="w-full resize-none rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
             />
           </Field>
 
@@ -662,7 +744,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
           </Field>
         </Section>
 
-        <div className="grid grid-cols-[1fr_auto] gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
           <button
             type="button"
             onClick={handleSubmit}
@@ -700,8 +782,8 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-admin-border bg-admin-card p-6 shadow-sm">
-      <h2 className="mb-4 text-base font-bold">{title}</h2>
+    <section className="rounded-xl border border-admin-border bg-admin-card p-4 shadow-sm sm:p-6 xl:p-7">
+      <h2 className="mb-4 text-base font-bold xl:text-lg">{title}</h2>
       <div className="space-y-4">{children}</div>
     </section>
   );
@@ -749,7 +831,7 @@ function FormInput({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
 }
@@ -843,7 +925,7 @@ function EditableDateInput({
       placeholder={placeholder}
       maxLength={10}
       inputMode="numeric"
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
 }
@@ -879,7 +961,7 @@ function EditableTimeInput({
       placeholder={placeholder}
       maxLength={5}
       inputMode="numeric"
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary"
+      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
 }
@@ -931,6 +1013,7 @@ function CharacterCreatorLinkBox({
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
+          eyeStyle={character.eyeStyle}
         />
       </div>
 
@@ -941,11 +1024,13 @@ function CharacterCreatorLinkBox({
 
         <p className="mt-1 text-xs text-admin-text-secondary">
           피부: {character.skinTone} ({character.skinColor.toUpperCase()}) /
-          헤어: {character.hairStyle} / 포즈: {character.pose}
+          헤어: {character.hairStyle} / 눈: {character.eyeStyle}
+
         </p>
 
         <p className="mt-1 text-xs text-admin-text-secondary">
-          의상: {character.outfitName} / 액세서리: {character.accessory}
+          의상: {character.outfitName} / 액세서리: {character.accessory} /
+          포즈: {character.pose}
         </p>
 
         {isFestivalOutfit && (

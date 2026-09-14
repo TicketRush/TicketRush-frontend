@@ -33,3 +33,14 @@ export function remainingMsUntil(
   if (t == null) return 0;
   return Math.max(0, t - nowMs);
 }
+
+/** BE datetime을 화면 표기용으로 변환. 없거나 파싱 실패면 "-" */
+export function formatBackendDateTimeLabel(
+  value: string | null | undefined,
+  locales: string = "ko-KR",
+): string {
+  if (!value) return "-";
+  const ms = parseBackendDateTime(value);
+  if (ms == null) return "-";
+  return new Date(ms).toLocaleString(locales);
+}

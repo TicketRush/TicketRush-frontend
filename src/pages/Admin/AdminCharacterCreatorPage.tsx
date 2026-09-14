@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
   resolveStoredHairStyle,
   type HairStyle,
 } from "@/components/admin/character/characterHair";
+import {
+  resolveStoredEyeStyle,
+  type EyeStyle,
+} from "@/components/admin/character/characterEye";
 import {
   DEFAULT_SKIN_COLOR,
   DEFAULT_SKIN_TONE,
@@ -23,6 +27,7 @@ import {
   resolveStoredOutfitModelId,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
 
@@ -30,6 +35,7 @@ interface CharacterConfig {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitName: string;
@@ -60,6 +66,19 @@ const HAIR_STYLES: {
   { value: "ponytail", label: "포니테일", icon: "🎀" },
   { value: "twintails", label: "양갈래", icon: "👧" },
   { value: "wave", label: "웨이브", icon: "🌀" },
+];
+
+const EYE_STYLES: {
+  value: EyeStyle;
+  label: string;
+  icon: string;
+}[] = [
+  { value: "default", label: "기본", icon: "👀" },
+  { value: "happy", label: "웃는 눈", icon: "^^" },
+  { value: "wink", label: "윙크", icon: "😉" },
+  { value: "squeeze", label: "찡긋", icon: "><" },
+  { value: "angry", label: "화난 눈", icon: "😠" },
+  { value: "closed", label: "감은 눈", icon: "—" },
 ];
 
 const DEFAULT_HAIR_COLOR = "#151515";
@@ -147,6 +166,7 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   skinTone: DEFAULT_SKIN_TONE,
   skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
+  eyeStyle: "default",
   hairColor: DEFAULT_HAIR_COLOR,
   outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
   outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
@@ -176,23 +196,27 @@ function loadSavedCharacter(): CharacterConfig {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
         | "festivalTopColor"
         | "festivalBottomColor"
+        | "background"
       >
     > & {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
+      background?: unknown;
     };
 
     const resolvedSkin = resolveStoredSkinTone(
@@ -220,6 +244,11 @@ function loadSavedCharacter(): CharacterConfig {
         ? normalizeHexColor(parsed.festivalBottomColor)
         : null;
 
+    const resolvedBackground =
+      typeof parsed.background === "string"
+        ? normalizeHexColor(parsed.background)
+        : null;
+
     const resolvedOutfitModelId = resolveStoredOutfitModelId(
       parsed.outfitModelId,
       parsed.outfitName,
@@ -232,6 +261,7 @@ function loadSavedCharacter(): CharacterConfig {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
@@ -240,6 +270,7 @@ function loadSavedCharacter(): CharacterConfig {
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
         resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
+      background: resolvedBackground ?? DEFAULT_CHARACTER.background,
     } as CharacterConfig;
   } catch {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
@@ -262,8 +293,18 @@ function resolveAdminReturnTo(returnTo: string | null): string {
 }
 
 export default function AdminCharacterCreatorPage() {
+  useDocumentTitle("캐릭터 생성");
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useLayoutEffect(() => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+  }, []);
 
   useEffect(() => {
     document.body.classList.add("admin-layout");
@@ -1108,6 +1149,26 @@ export default function AdminCharacterCreatorPage() {
               </div>
             </CreatorSection>
 
+            <CreatorSection title="눈 모양">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                {EYE_STYLES.map((eyeStyle) => (
+                  <OptionCard
+                    key={eyeStyle.value}
+                    selected={character.eyeStyle === eyeStyle.value}
+                    onClick={() => update("eyeStyle", eyeStyle.value)}
+                  >
+                    <div className="text-2xl font-bold text-slate-800">
+                      {eyeStyle.icon}
+                    </div>
+
+                    <p className="mt-2 text-xs font-bold text-slate-800">
+                      {eyeStyle.label}
+                    </p>
+                  </OptionCard>
+                ))}
+              </div>
+            </CreatorSection>
+
             <CreatorSection title="의상 선택">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {OUTFIT_OPTIONS.map((outfit) => (
@@ -1421,6 +1482,7 @@ export default function AdminCharacterCreatorPage() {
                 outfitName={character.outfitName}
                 outfitModelId={character.outfitModelId}
                 hairStyle={character.hairStyle}
+                eyeStyle={character.eyeStyle}
               />
             </div>
 
@@ -1431,6 +1493,7 @@ export default function AdminCharacterCreatorPage() {
                 {character.skinColor.toUpperCase()}
               </p>
               <p>헤어: {character.hairStyle}</p>
+              <p>눈: {character.eyeStyle}</p>
               <p>
                 헤어 컬러:{" "}
                 {character.hairColor.toUpperCase()}

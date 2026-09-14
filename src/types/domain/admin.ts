@@ -8,10 +8,8 @@
 // 대시보드·관리자 공연 목록은 performance admin API(#563)에 맞춘다.
 // 집계 필드는 전역 NON_NULL이라 실패 시 키가 생략되므로 optional이다.
 //
-// 변경 요약(리팩터링 관련):
-//   - AdminBookingItem: seatNumbers 배열로 표준화
-//   - AdminSeatDetail: seatNumber 필드 정렬
-//   - ConcertFormData: artist → performer, duration → durationMinutes
+// 예매 내역(#174 / BE #561): GET /booking/admin/bookings|stats, POST .../refund.
+// 보강 필드(공연·예매자·좌석)와 미결제 paymentAmount는 생략 또는 null이다.
 
 import type { Genre, ConcertStatus, ConcertFacility } from "./concert";
 import type { BookingStatus } from "./booking";
@@ -111,38 +109,45 @@ export interface AdminConcertItem {
   status: ConcertStatus;
 }
 
-// ── 예매 내역 관리 ────────────────────────────────────
+// ── 예매 내역 관리 (BE BookingAdminStatsResponse) ─────
 export interface AdminBookingStats {
   totalBookings: number;
+  /** CONFIRMED만 */
   completedBookings: number;
+  /** CANCELED + REFUNDED. EXPIRED·PENDING·REFUNDING 제외 */
+  canceledBookings: number;
+  /** CONFIRMED paid_amount 합. revenueComplete가 false면 실제보다 작을 수 있음 */
   totalRevenue: number;
-  cancelledBookings: number;
+  revenueComplete: boolean;
+  missingAmountBookings: number;
 }
 
 export interface AdminBookingItem {
+  bookingId: number;
   bookingNumber: string;
-  concertTitle: string;
-  concertDate: string;
-  /** ISO datetime */
+  userId: number;
+  performanceId: number;
+  seatId: number;
+  /** 보강 실패 시 null */
+  concertTitle: string | null;
+  /** YYYY-MM-DD. 보강 실패 시 null */
+  concertDate: string | null;
+  /** BE `yyyy-MM-dd HH:mm:ss` (createdAt) */
   bookedAt: string;
-  userName: string;
-  userEmail: string;
-  /** 좌석 번호 배열 (사용자는 1인 1석이지만 관리자 표시는 배열로 일반화) */
+  userName: string | null;
+  userEmail: string | null;
+  /** 1인 1매. 좌석 보강 실패 시 빈 배열 */
   seatNumbers: string[];
   seatCount: number;
-  unitPrice: number;
-  totalAmount: number;
+  /** paymentAmount. 미결제(PENDING 등)는 null. 단가=총액 */
+  unitPrice: number | null;
+  totalAmount: number | null;
   status: BookingStatus;
-  /** 결제 수단 ("간편결제", "신용카드" 등) */
-  paymentMethod: string;
 }
 
 export interface AdminBookingListParams {
-  /** offset 페이지네이션 — TanStack Table */
   page?: number;
   size?: number;
-  status?: BookingStatus | "ALL";
-  keyword?: string;
 }
 
 export interface AdminBookingListResponse {

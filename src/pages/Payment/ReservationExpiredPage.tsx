@@ -7,8 +7,11 @@ import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 export default function ReservationExpiredPage() {
+  useDocumentTitle("예매 만료");
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const performanceId = id ? Number(id) : 0;

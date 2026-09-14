@@ -1,4 +1,4 @@
-// 예매 상세 조회
+// 예매 상세 조회 — GET /api/v1/booking/{bookingNumber}
 import { useQuery } from "@tanstack/react-query";
 import { fetchBookingDetail } from "@/api/bookings";
 import { queryKeys } from "@/constants/queryKeys";

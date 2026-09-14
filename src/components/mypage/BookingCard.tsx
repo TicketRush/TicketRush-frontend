@@ -10,7 +10,13 @@ import type {
   BookingStatus,
   BookingTab,
 } from "@/types/domain/booking";
-import { toShowDateTime } from "@/utils/booking";
+import {
+  toShowDateTime,
+  formatPaymentAmount,
+  displayBookingText,
+  isRefundableBooking,
+} from "@/utils/booking";
+import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
 
 interface BookingCardProps {
@@ -65,6 +71,7 @@ const STATUS_BADGE: Record<
  * [환불 정책]
  *  - 공연 7일 전까지: [환불 신청] 활성화
  *  - 공연 7일 미만: "환불 불가 (D-7 미만)" 비활성화
+ *  - 목록에 공연 시각이 없으면 날짜(자정 00:00이 아닌 달력 일수)로 계산
  *
  * [표시 기능 — 지난 공연(past 탭)]
  *  - 환불 신청 버튼 미노출 (지난 공연은 환불 기능 제공하지 않음)
@@ -82,11 +89,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
     booking.performanceTime,
   );
 
-  // ─ 환불 가능 여부 계산 (D-7 기준) ─
-  const now = new Date();
-  const msUntilShow = showDateTime.getTime() - now.getTime();
-  const daysUntilShow = msUntilShow / (1000 * 60 * 60 * 24);
-  const isRefundable = daysUntilShow >= 7 && booking.status === "CONFIRMED";
+  const isRefundable = isRefundableBooking(booking);
 
   // ─ 지난 공연 여부 ─
   const isPastTab = tab === "past";
@@ -123,8 +126,16 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
 
   const createdAtLabel = (() => {
     if (!booking.createdAt) return "-";
-    const d = new Date(booking.createdAt);
-    return Number.isNaN(d.getTime()) ? "-" : formatShowDateTime(d);
+    const ms = parseBackendDateTime(booking.createdAt);
+    if (ms == null) return "-";
+    return formatShowDateTime(new Date(ms));
+  })();
+
+  const showDateLabel = (() => {
+    if (!booking.performanceDate) return "-";
+    if (!booking.performanceTime?.trim()) return booking.performanceDate;
+    if (Number.isNaN(showDateTime.getTime())) return booking.performanceDate;
+    return formatShowDateTime(showDateTime);
   })();
 
   const isTerminal =
@@ -138,7 +149,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-lg font-bold text-gray-900">
-            {booking.performanceTitle}
+            {displayBookingText(booking.performanceTitle)}
           </h3>
           <span
             className={`text-xs px-2.5 py-1 rounded font-medium ${statusBadge.bg} ${statusBadge.text}`}
@@ -158,11 +169,11 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       <div className="space-y-1 text-sm text-gray-600 mb-4">
         <div className="flex items-center gap-1.5">
           <Calendar className="w-4 h-4" />
-          <span>{formatShowDateTime(showDateTime)}</span>
+          <span>{showDateLabel}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <MapPin className="w-4 h-4" />
-          <span>{booking.performanceVenue}</span>
+          <span>{displayBookingText(booking.performanceVenue)}</span>
         </div>
       </div>
 
@@ -172,14 +183,14 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           <p className="text-xs text-gray-500 mb-2">좌석</p>
           {/* 1인 1석 — 단일 좌석 번호 */}
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-white font-medium">
-            {booking.seatNumber}
+            {displayBookingText(booking.seatNumber)}
           </span>
         </div>
 
         <div>
           <p className="text-xs text-gray-500 mb-2">결제 금액</p>
           <p className="text-base font-bold text-primary">
-            ₩{booking.price.toLocaleString()}
+            {formatPaymentAmount(booking.price)}
           </p>
         </div>
 
@@ -274,7 +285,9 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
                     ? "환불 완료"
                     : booking.status === "EXPIRED"
                       ? "만료된 예매"
-                      : "환불 불가 (D-7 미만)"}
+                      : booking.performanceDate?.trim()
+                        ? "환불 불가 (D-7 미만)"
+                        : "환불 불가"}
             </button>
           )}
         </div>

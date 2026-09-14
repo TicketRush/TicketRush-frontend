@@ -14,6 +14,9 @@
 // - BookingSummary 백엔드 응답 매핑 명시:
 //   * bookingStatus(백엔드) ↔ status(프론트) — api 함수에서 매핑
 //   * createdAt 필드는 백엔드에 없음 → 프론트 도메인에서 optional 처리
+//- 2026-09-05 (이슈 #168 / BE #560):
+//   * 단건 조회 BookingDetailResponse 매핑
+//   * /booking/me 는 BookingMySummaryResponse 보강 필드 사용
 //
 // ⚠️ 2026-07-18 swagger-ui 실측: REFUND_FAILED는 실제 enum 값이 아님 (제거).
 // "환불 실패" 판단은 대신 booking-service의 별도 관리자 엔드포인트
@@ -63,16 +66,13 @@ export interface BookingPendingResponse {
 }
 
 // ── 내 예매 목록 (백엔드 확정) ─────────
-//  백엔드 GET /api/v1/booking/me 응답 항목 (BookingSummaryResponse).
-
+//  백엔드 GET /api/v1/booking/me 응답 항목 (BookingMySummaryResponse, #560).
+//
 //  필드 매핑:
 //    백엔드 bookingStatus → 프론트 status (api/bookings.ts에서 매핑)
-//    백엔드 응답에 createdAt 없음 → 프론트에서 optional
-
-//  ⚠️ 백엔드가 공연/좌석 정보를 함께 주지 않음. 프론트에서 aggregation 필요:
-//    - 예매마다 GET /performance/{performanceId} 별도 호출 (N+1 문제)
-//    - GET /seat/numbers?seatIds= 별도 호출로 seatNumber 획득
-//    - 또는 백엔드에 aggregation API 요청
+//    공연/좌석/금액은 같은 응답에 보강됨. performance·seat 조회 실패 시
+//    해당 키만 생략(null 직렬화 안 함). 코어 필드와 performanceId/seatId는 유지.
+//    목록에는 performanceTime이 없다. 예정/지난 탭은 **공연 날짜(performanceDate)** 기준.
 
 export interface BookingSummary {
   bookingId: number;
@@ -80,61 +80,59 @@ export interface BookingSummary {
   performanceId: number;
   seatId: number;
   status: BookingStatus;
-  /** ISO datetime — 결제 완료 시각 (PENDING은 null) */
-  confirmedAt: string | null;
-
-  // ISO datetime — 예매 생성 시각.
-  // ⚠️ 백엔드 응답에 이 필드 없음. mock 호환 및 표시용으로 optional 유지.
-
-  createdAt?: string;
+  /** BE `yyyy-MM-dd HH:mm:ss`. PENDING·부분 응답이면 키 생략 */
+  confirmedAt?: string | null;
   /** PENDING만 존재. BE `yyyy-MM-dd HH:mm:ss`, 그 외는 생략 (#559/#167) */
   expiresAt?: string | null;
+  performanceTitle?: string;
+  performanceDate?: string;
+  /** 공연 장소. BE `performance_address` (venue 컬럼 없음) */
+  performanceAddress?: string;
+  seatNumber?: string;
+  /** 표시용. 출처는 공연 가격. 조회 실패 시 키 생략 */
+  paymentAmount?: number;
 }
 
-// ── 예매 상세 (프론트 aggregation) ───────────────────
-
-// 프론트에서 aggregation한 예매 상세.
-
-// 백엔드 응답 자체는 BookingSummary이지만,
-// TicketDetailPage/PaymentCompletePage에서 공연/좌석 정보가 필요하므로
-// 다음을 조합하여 구성:
-//  - BookingSummary (booking-service)
-//   - PerformanceDetail (performance-service)
-//   - SeatNumber (seat-service GET /seat/numbers)
+// ── 예매 상세 (GET /api/v1/booking/{bookingNumber}, #560) ─
+//
+// 본인 예매만 조회. 타인·미존재는 동일 404.
+// bookingId는 화면용이 아니라 QR 키(GET /ticket/bookings/{bookingId}/qr).
+// 예매자 이름·이메일은 응답에 없음 → GET /user/me.
 export interface BookingDetail {
   bookingId: number;
   bookingNumber: string;
   status: BookingStatus;
 
-  // 공연 정보 (performance-service 조회)
   performanceId: number;
   performanceTitle: string;
-  performancePerformer: string;
+  /** mock 전용. 실 API 단건 응답에는 없음 */
+  performancePerformer?: string;
+  /** BE `performance_address` */
   performanceVenue: string;
   performanceDate: string;
   performanceTime: string;
-  performanceImageMainUrl: string;
+  /** mock 전용. 실 API 단건 응답에는 포스터가 없음 */
+  performanceImageMainUrl?: string;
 
-  // 좌석 정보 (seat-service 조회)
   seatId: number;
   seatNumber: string;
 
-  // 결제 정보
-  price: number;
+  /** BE `payment_amount`. 부분 응답이면 생략 */
+  price?: number;
+  /** BE `confirmed_at`. PENDING이면 생략 */
   paidAt: string | null;
+  /** PENDING만. BE `expires_at` — 딥링크 타이머 복원 (#560/#168) */
+  expiresAt?: string | null;
 
   createdAt: string;
   /** ⚠️ 스펠링: 프론트 UI 표시용. 백엔드 상태는 CANCELED. */
   cancelledAt: string | null;
 }
 
-// ── 마이페이지 표시용 항목 (프론트 aggregation) ─────
+// ── 마이페이지 표시용 항목 ─────
 export type BookingTab = "upcoming" | "past";
 
-//
-// 마이페이지 카드에 표시할 정보.
-// BookingSummary + 공연 정보 + 좌석 번호 aggregation 결과.
-
+// 마이페이지 카드. GET /booking/me 보강 필드를 그대로 매핑.
 export interface BookingListItem {
   bookingId: number;
   bookingNumber: string;
@@ -142,10 +140,11 @@ export interface BookingListItem {
   performanceTitle: string;
   performanceVenue: string;
   performanceDate: string;
-  performanceTime: string;
-  performanceImageMainUrl: string;
+  /** 목록 API에 없음. mock만 채움. 없으면 날짜만으로 탭 분기 */
+  performanceTime?: string;
+  performanceImageMainUrl?: string;
   seatNumber: string;
-  price: number;
+  price?: number;
   createdAt: string;
 }
 
