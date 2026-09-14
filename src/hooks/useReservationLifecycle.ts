@@ -9,6 +9,7 @@ import {
   ApiError,
   isIgnorablePendingCancelError,
 } from "@/api/errors/errorMapper";
+import { shouldResetStoresAfterTimeoutRelease } from "@/utils/booking/decideTimeoutCleanup";
 
 /** 서버 통신(좌석 hold 해제 등)이 필요할 때 주입하는 콜백. async 허용. */
 type ReleaseSeatCallback = () => void | Promise<void>;
@@ -17,13 +18,13 @@ type ReleaseSeatCallback = () => void | Promise<void>;
 type NavigateCallback = () => void;
 
 interface TimeoutOptions {
-  /** 좌석 hold 해제 등 서버 정리. 실패해도 store 초기화는 진행됨. */
+  /** 좌석 hold 해제 등 서버 정리. 이미 만료/없음은 무시, 그 외 실패 시 store 유지 (#260). */
   onReleaseSeat?: ReleaseSeatCallback;
   /** 만료 안내 후 이동(예: /expired). */
   onNavigate?: NavigateCallback;
   /** 토스트 메시지 커스터마이즈. */
   message?: string;
-  /** true면 토스트를 생략. 만료 화면이 이미 안내할 때 사용. */
+  /** true면 만료 안내 토스트를 생략. 만료 화면이 이미 안내할 때 사용. */
   silent?: boolean;
 }
 
@@ -67,19 +68,26 @@ export function useReservationLifecycle() {
 
   // ───────────────────────────────────────────────────────────────────────
   // 1) 타이머 만료
-  //    seat + timer + payment 초기화 (+ 선택적 서버 정리/이동)
-  //    silent가 아니면 안내 토스트를 띄운다.
+  //    서버 취소 성공·이미 만료/없음 → seat+timer+payment 초기화 후 이동
+  //    네트워크·5xx → bookingNumber 유지(재시도·좌석 재진입 정리용), false (#260)
   // ───────────────────────────────────────────────────────────────────────
   const handleTimeout = useCallback(
-    async (options: TimeoutOptions = {}) => {
+    async (options: TimeoutOptions = {}): Promise<boolean> => {
       const { onReleaseSeat, onNavigate, message, silent } = options;
 
-      // 서버 정리는 실패해도 클라 상태 초기화는 반드시 진행
       if (onReleaseSeat) {
         try {
           await onReleaseSeat();
-        } catch {
-          // 만료된 hold는 백엔드에서 이미 풀렸을 수 있음 → 조용히 무시
+        } catch (error) {
+          if (!shouldResetStoresAfterTimeoutRelease(error)) {
+            const err = ApiError.fromUnknown(error);
+            toast.error(
+              err.message ||
+                "예매 해제에 실패했습니다. 좌석 선택으로 돌아가 다시 시도해 주세요.",
+            );
+            onNavigate?.();
+            return false;
+          }
         }
       }
 
@@ -91,6 +99,7 @@ export function useReservationLifecycle() {
         toast.warning(message ?? DEFAULT_TIMEOUT_MSG);
       }
       onNavigate?.();
+      return true;
     },
     [resetSeat, resetTimer, resetPayment],
   );
@@ -113,9 +122,10 @@ export function useReservationLifecycle() {
   // 3) 결제 실패
   //    paymentStore.fail(message) + 에러 토스트.
   //    기본은 좌석을 비우지 않음(재시도 가능). releaseSeat 주입 시에만 정리.
+  //    해제 실패(네트워크·5xx)면 seat/timer를 비우지 않음 (#260 정책과 동일).
   // ───────────────────────────────────────────────────────────────────────
   const handlePaymentFail = useCallback(
-    async (message: string, options: PaymentFailOptions = {}) => {
+    async (message: string, options: PaymentFailOptions = {}): Promise<boolean> => {
       const { releaseSeat, onNavigate } = options;
 
       failPayment(message);
@@ -124,13 +134,22 @@ export function useReservationLifecycle() {
       if (releaseSeat) {
         try {
           await releaseSeat();
-        } catch {
-          /* 무시 */
+        } catch (error) {
+          if (!shouldResetStoresAfterTimeoutRelease(error)) {
+            const err = ApiError.fromUnknown(error);
+            toast.error(
+              err.message ||
+                "좌석 해제에 실패했습니다. 결제 실패 화면에서 다시 시도해 주세요.",
+            );
+            onNavigate?.();
+            return false;
+          }
         }
         resetSeatAndTimer();
       }
 
       onNavigate?.();
+      return true;
     },
     [failPayment, resetSeatAndTimer],
   );
