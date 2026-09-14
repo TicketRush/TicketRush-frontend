@@ -3,6 +3,9 @@
 // 변경 이력 (이슈 #119):
 //   - develop LoginPage UI/에러 처리(setFocus, errors.root) 유지
 //   - 소셜 로그인만 추가: getOauthUrlApi → 리다이렉트, provider별 loading·중복 클릭 방지
+// 변경 이력 (이슈 #249):
+//   - OAuth 이탈 후 뒤로가기(bfcache) 시 pendingProvider 초기화
+//   - 소셜 버튼 비활성/로딩 스타일은 Button 공통 수정으로 맞춤
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -54,6 +57,14 @@ export default function LoginPage() {
   useEffect(() => {
     applyLoginRedirectFromLocation(location.state);
   }, [location.state]);
+
+  // 소셜 OAuth로 떠난 뒤 뒤로가기로 bfcache에서 복원되면
+  // pendingProvider가 남아 버튼이 무한 로딩·비활성으로 고정된다 (#249)
+  useEffect(() => {
+    const resetPending = () => setPendingProvider(null);
+    window.addEventListener("pageshow", resetPending);
+    return () => window.removeEventListener("pageshow", resetPending);
+  }, []);
 
   const onSubmit = (data: LoginFormData) => {
     emailLogin.mutate(data, {

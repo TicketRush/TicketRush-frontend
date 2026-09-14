@@ -11,6 +11,8 @@
 //   - 소셜 버튼에 LoginPage와 동일한 OAuth 시작 로직 연결
 //     * getOauthUrlApi(provider) → window.location.href 리다이렉트
 //     * 실패 시 toast, pendingProvider로 로딩·중복 클릭 방지
+// 변경 이력 (이슈 #249):
+//   - OAuth 이탈 후 뒤로가기(bfcache) 시 pendingProvider 초기화 (LoginPage와 동일)
 // 변경 이력 (이슈 #250):
 //   - 인증번호 placeholder만 ●●●●●● (입력값은 평문 유지)
 // 변경 이력 (이슈 #251/#252):
@@ -82,6 +84,14 @@ export default function SignupPage() {
   const email = watch("email");
   const verificationCode = watch("verificationCode");
   const isEmailVerified = watch("isEmailVerified");
+
+  // 소셜 OAuth로 떠난 뒤 뒤로가기로 bfcache에서 복원되면
+  // pendingProvider가 남아 버튼이 무한 로딩·비활성으로 고정된다 (#249)
+  useEffect(() => {
+    const resetPending = () => setPendingProvider(null);
+    window.addEventListener("pageshow", resetPending);
+    return () => window.removeEventListener("pageshow", resetPending);
+  }, []);
 
   // 예매 흐름에서 밀려온 경우 복귀 경로를 보관한다. 가입 후 /login으로 넘어가도
   // sessionStorage에 남아 있어 로그인 성공 시 그대로 복귀한다 (#101)
