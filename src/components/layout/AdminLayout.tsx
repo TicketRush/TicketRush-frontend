@@ -1,5 +1,4 @@
 // components/layout/AdminLayout.tsx
-import { useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -26,11 +25,6 @@ export default function AdminLayout() {
 
   const isActive = (to: string, exact?: boolean) =>
     exact ? location.pathname === to : location.pathname.startsWith(to);
-
-  useEffect(() => {
-    document.body.classList.add("admin-layout");
-    return () => document.body.classList.remove("admin-layout");
-  }, []);
 
   return (
     <div className="min-h-screen flex bg-admin-bg text-admin-text">

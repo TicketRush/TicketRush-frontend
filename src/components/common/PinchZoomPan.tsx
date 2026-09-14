@@ -68,7 +68,7 @@ export default function PinchZoomPan({
       if (!container) return;
 
       const rect = container.getBoundingClientRect();
-      // 컨테이너 기준 포인터 위치 (0.7배율 영향 제거: rect가 실제 크기)
+      // 컨테이너 기준 포인터 위치
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
 
