@@ -1,7 +1,7 @@
 // 결제 페이지
 //
 // 백엔드 스펙 반영:
-//   - PaymentMethod = KAKAO | NAVER | TOSS (PG provider)
+//   - PaymentMethod = KAKAO | NAVER | TOSS (PG provider; UI는 TOSS만 노출)
 //   - paymentStore에 bookingId/bookingNumber/seatId 보관 (hold 후 전달)
 //
 // 변경 이력:
@@ -52,22 +52,6 @@ const PAYMENT_PROVIDERS: Array<{
   textColor: string;
 }> = [
   {
-    value: "KAKAO",
-    label: "카카오페이",
-    description: "카카오톡으로 간편하게 결제",
-    initial: "K",
-    bgColor: "bg-kakao",
-    textColor: "text-kakao-text",
-  },
-  {
-    value: "NAVER",
-    label: "네이버페이",
-    description: "네이버로 안전하게 결제",
-    initial: "N",
-    bgColor: "bg-naver",
-    textColor: "text-naver-text",
-  },
-  {
     value: "TOSS",
     label: "토스페이",
     description: "토스로 빠르게 결제",
@@ -76,6 +60,9 @@ const PAYMENT_PROVIDERS: Array<{
     textColor: "text-white",
   },
 ];
+
+const UI_PAYMENT_METHODS = new Set(PAYMENT_PROVIDERS.map((p) => p.value));
+const DEFAULT_PAYMENT_METHOD: PaymentMethod = "TOSS";
 
 export default function PaymentPage() {
   const { id } = useParams<{ id: string }>();
@@ -143,6 +130,16 @@ export default function PaymentPage() {
       navigate(`/concerts/${id}/seats`, { replace: true });
     }
   }, [selectedSeat, bookingNumber, id, navigate]);
+
+  // UI에 노출된 수단만 허용. 미선택·구 provider(KAKAO/NAVER)는 토스페이로 보정.
+  useEffect(() => {
+    if (
+      selectedProvider == null ||
+      !UI_PAYMENT_METHODS.has(selectedProvider)
+    ) {
+      setMethod(DEFAULT_PAYMENT_METHOD);
+    }
+  }, [selectedProvider, setMethod]);
 
   if (!selectedSeat || !bookingNumber) return null;
 
