@@ -36,6 +36,7 @@ import {
   resolveAdminBookingHandoff,
 } from "@/utils/admin/resolveAdminBookingHandoff";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
+import Modal from "@/components/common/Modal/Modal";
 
 type Tab = "ALL" | "CONFIRMED" | "PENDING" | "CANCELED";
 
@@ -184,6 +185,7 @@ export default function AdminBookingsPage() {
   }
 
   function handleCloseRefundModal() {
+    if (refundMutation.isPending) return;
     setRefundTarget(null);
     stripHandoffIntent();
   }
@@ -399,36 +401,41 @@ export default function AdminBookingsPage() {
         )}
       </div>
 
-      {refundTarget && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-admin-card border border-admin-border rounded-xl p-6 max-w-md w-full">
-            <h3 className="font-bold mb-2">환불을 요청하시겠습니까?</h3>
-            <p className="text-sm text-admin-text-secondary mb-4">
-              예매번호 <span className="font-mono">{refundTarget}</span>의 환불을
-              요청합니다. 요청 직후 상태는 환불 중이며, 입금 완료는 PG 처리 뒤에
-              환불 완료로 바뀝니다.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleCloseRefundModal}
-                disabled={refundMutation.isPending}
-                className="py-2 rounded bg-admin-border"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRefund}
-                disabled={refundMutation.isPending}
-                className="py-2 rounded text-white font-bold bg-admin-refund"
-              >
-                {refundMutation.isPending ? "처리 중..." : "환불 요청"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={refundTarget !== null}
+        onClose={handleCloseRefundModal}
+        title="환불을 요청하시겠습니까?"
+        size="md"
+        variant="admin"
+        disableOverlayClose={refundMutation.isPending}
+        disableEscClose={refundMutation.isPending}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCloseRefundModal}
+              disabled={refundMutation.isPending}
+              className="px-4 py-2 rounded bg-admin-border"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmRefund}
+              disabled={refundMutation.isPending}
+              className="px-4 py-2 rounded text-white font-bold bg-admin-refund"
+            >
+              {refundMutation.isPending ? "처리 중..." : "환불 요청"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-admin-text-secondary">
+          예매번호 <span className="font-mono">{refundTarget}</span>의 환불을
+          요청합니다. 요청 직후 상태는 환불 중이며, 입금 완료는 PG 처리 뒤에
+          환불 완료로 바뀝니다.
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -189,8 +189,9 @@ export default function PaymentPage() {
           ? `${currentConcert.title} 티켓 1매`
           : "공연 티켓 1매",
         amount: totalAmount,
-        customerName: user?.name,
-        customerEmail: user?.email,
+        customerName: user?.name?.trim() || undefined,
+        // 카카오 등 이메일이 없으면 빈 문자열을 보내지 않는다 (#284)
+        customerEmail: user?.email?.trim() || undefined,
         successUrl: `${window.location.origin}/concerts/${id}/payment/success`,
         failUrl: `${window.location.origin}/concerts/${id}/payment/failed`,
       });
