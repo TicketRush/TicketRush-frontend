@@ -32,6 +32,7 @@ import { Ticket, AlertTriangle, Info } from "lucide-react";
 import type { ConcertStatus } from "@/types/domain/concert";
 import { formatBookingOpenAt } from "@/utils/concert/formatBookingOpenAt";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
+import { UNSET_LABEL } from "@/utils/concert/formatOptionalText";
 
 interface BookingSidebarProps {
   /** 상세 게이지 잔여. null이면 `-` (#203) */
@@ -239,7 +240,13 @@ export default function BookingSidebar({
 
         <div className="border-2 border-border rounded-lg p-3 bg-white flex items-center justify-between">
           <span className="text-xs text-text-secondary">관람 시간</span>
-          <span className="text-sm font-semibold">{duration}분</span>
+          <span
+            className={`text-sm font-semibold ${
+              duration > 0 ? "" : "text-placeholder font-medium"
+            }`}
+          >
+            {duration > 0 ? `${duration}분` : UNSET_LABEL}
+          </span>
         </div>
 
         <button

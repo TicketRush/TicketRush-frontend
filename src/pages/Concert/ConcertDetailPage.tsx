@@ -23,6 +23,8 @@
 // - 2026-08-31 (이슈 #203):
 //   - 상세 게이지는 목록 캐시 우선, 없으면 seat-counts(totalCount - soldCount)
 //   - 상세 totalSeats(등록값) 미사용. 예매 CTA는 availableCount (#181)
+// - 2026-09-15 (이슈 #297):
+//   - InfoBox·출연 등 핵심 메타 미입력 시 「미정」 (섹션형 필드는 기존처럼 숨김)
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { useEffect, useRef, type ComponentProps, type SyntheticEvent } from "react";
 import {
@@ -48,6 +50,11 @@ import {
   shouldFetchSeatCounts,
 } from "@/utils/concert/canBookConcert";
 import { getDetailGaugeSeats } from "@/utils/concert/getDetailGaugeSeats";
+import {
+  formatShowScheduleLabel,
+  trimOrNull,
+  UNSET_LABEL,
+} from "@/utils/concert/formatOptionalText";
 
 const POSTER_FALLBACK =
   "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
@@ -153,12 +160,20 @@ export default function ConcertDetailPage() {
   });
 
   // 빈 문자열 venue는 없는 것과 같다. 실 API는 venue/address가 둘 다 도로명.
-  const venueDisplay = data.venue || data.address || "";
+  const venueDisplay =
+    trimOrNull(data.venue) ?? trimOrNull(data.address);
+  const address = trimOrNull(data.address);
   const showAddressBox = Boolean(
-    data.address && data.address !== venueDisplay,
+    address && address !== venueDisplay,
   );
   const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
-  const description = data.description?.trim() ?? "";
+  const description = trimOrNull(data.description) ?? "";
+  const performer = trimOrNull(data.performer);
+  const showDate = trimOrNull(data.showDate);
+  const scheduleLabel = formatShowScheduleLabel(
+    data.showTime,
+    data.durationMinutes,
+  );
 
   const characterConfig = import.meta.env.DEV ? MOCK_CHARACTER_CONFIG : null;
   const characterMessage = import.meta.env.DEV ? MOCK_CHARACTER_MESSAGE : "";
@@ -170,7 +185,7 @@ export default function ConcertDetailPage() {
       price: data!.price,
       showDate: data!.showDate,
       showTime: data!.showTime,
-      venue: venueDisplay,
+      venue: venueDisplay ?? "",
       // optional 메타데이터 — 결제 페이지에서 활용
       performer: data!.performer,
       genre: data!.genre,
@@ -234,7 +249,13 @@ export default function ConcertDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6 items-start">
         <div className="order-1 lg:sticky lg:top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card lg:col-start-1 lg:row-start-1">
           <h1 className="text-3xl font-bold text-text">{data.title}</h1>
-          <p className="text-text-secondary mt-1">{data.performer}</p>
+          <p
+            className={`mt-1 ${
+              performer ? "text-text-secondary" : "text-placeholder"
+            }`}
+          >
+            {performer ?? UNSET_LABEL}
+          </p>
           <div className="mt-3">
             <GenreBadge genre={data.genre} />
           </div>
@@ -245,17 +266,17 @@ export default function ConcertDetailPage() {
             <InfoBox
               icon={<Calendar size={20} className="text-primary" />}
               label="공연일"
-              value={data.showDate}
+              value={showDate ?? ""}
             />
             <InfoBox
               icon={<Clock size={20} className="text-primary" />}
               label="시간"
-              value={`${data.showTime} (${data.durationMinutes}분)`}
+              value={scheduleLabel}
             />
             <InfoBox
               icon={<MapPin size={20} className="text-primary" />}
               label="장소"
-              value={venueDisplay}
+              value={venueDisplay ?? ""}
             />
             <InfoBox
               icon={<DollarSign size={20} className="text-primary" />}
@@ -264,12 +285,12 @@ export default function ConcertDetailPage() {
             />
           </div>
 
-          {showAddressBox && (
+          {showAddressBox && address && (
             <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 flex items-start gap-3">
               <MapPin size={16} className="text-primary mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs text-text-secondary">공연장 주소</p>
-                <p className="text-sm font-semibold mt-0.5">{data.address}</p>
+                <p className="text-sm font-semibold mt-0.5">{address}</p>
               </div>
             </div>
           )}
@@ -277,7 +298,7 @@ export default function ConcertDetailPage() {
           {description && (
             <Section title="공연 소개">
               <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-                {data.description}
+                {description}
               </p>
             </Section>
           )}
@@ -462,6 +483,9 @@ function InfoBox({
   label: string;
   value: string;
 }) {
+  const display = trimOrNull(value);
+  const isUnset = !display;
+
   return (
     <div className="bg-white border-2 border-border rounded-xl p-4 flex items-center gap-3">
       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -469,7 +493,15 @@ function InfoBox({
       </div>
       <div className="min-w-0">
         <p className="text-xs text-text-secondary">{label}</p>
-        <p className="text-sm font-semibold mt-0.5 truncate">{value}</p>
+        <p
+          className={`text-sm mt-0.5 truncate ${
+            isUnset
+              ? "font-medium text-placeholder"
+              : "font-semibold text-text"
+          }`}
+        >
+          {display ?? UNSET_LABEL}
+        </p>
       </div>
     </div>
   );
