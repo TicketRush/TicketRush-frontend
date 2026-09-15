@@ -5,8 +5,12 @@ import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
 import type { EyeStyle } from "@/components/admin/character/characterEye";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
+  MUSICAL_OUTFIT_PART_NAMES,
   FESTIVAL_OUTFIT_PART_NAMES,
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
@@ -27,6 +31,10 @@ interface CharacterModelViewerProps {
    * 다른 의상 및 기존 호출부 호환을 위해 유지합니다.
    */
   outfitColor: string;
+
+  musicalJacketColor?: string;
+  musicalInnerColor?: string;
+  musicalShortsColor?: string;
 
   /**
    * 페스티벌 의상 상의 색상입니다.
@@ -205,11 +213,17 @@ function applyMeshColor(object: THREE.Mesh, color: string) {
 function OutfitModel({
   modelUrl,
   outfitModelId,
+  musicalJacketColor,
+  musicalInnerColor,
+  musicalShortsColor,
   festivalTopColor,
   festivalBottomColor,
 }: {
   modelUrl: string;
   outfitModelId: OutfitModelId;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
 }) {
@@ -218,12 +232,29 @@ function OutfitModel({
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
 
-    if (outfitModelId !== "festival") {
+    if (outfitModelId !== "festival" && outfitModelId !== "musical") {
       return clonedScene;
     }
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "musical") {
+        if (object.name === MUSICAL_OUTFIT_PART_NAMES.jacket) {
+          applyMeshColor(object, musicalJacketColor);
+          return;
+        }
+
+        if (object.name === MUSICAL_OUTFIT_PART_NAMES.inner) {
+          applyMeshColor(object, musicalInnerColor);
+          return;
+        }
+
+        if (object.name === MUSICAL_OUTFIT_PART_NAMES.shorts) {
+          applyMeshColor(object, musicalShortsColor);
+        }
         return;
       }
 
@@ -252,6 +283,9 @@ function OutfitModel({
   }, [
     gltf.scene,
     outfitModelId,
+    musicalJacketColor,
+    musicalInnerColor,
+    musicalShortsColor,
     festivalTopColor,
     festivalBottomColor,
   ]);
@@ -266,6 +300,9 @@ function CharacterModel({
   outfitModelId,
   hairStyle,
   eyeStyle,
+  musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: Pick<
@@ -276,6 +313,9 @@ function CharacterModel({
   | "outfitModelId"
   | "hairStyle"
   | "eyeStyle"
+  | "musicalJacketColor"
+  | "musicalInnerColor"
+  | "musicalShortsColor"
   | "festivalTopColor"
   | "festivalBottomColor"
 >) {
@@ -305,6 +345,9 @@ function CharacterModel({
             <OutfitModel
               modelUrl={outfitModelUrl}
               outfitModelId={outfitModelId}
+              musicalJacketColor={musicalJacketColor}
+              musicalInnerColor={musicalInnerColor}
+              musicalShortsColor={musicalShortsColor}
               festivalTopColor={festivalTopColor}
               festivalBottomColor={festivalBottomColor}
             />
@@ -322,6 +365,9 @@ export default function CharacterModelViewer({
   outfitModelId,
   hairStyle,
   eyeStyle,
+  musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: CharacterModelViewerProps) {
@@ -340,6 +386,9 @@ export default function CharacterModelViewer({
             outfitModelId={outfitModelId}
             hairStyle={hairStyle}
             eyeStyle={eyeStyle}
+            musicalJacketColor={musicalJacketColor}
+            musicalInnerColor={musicalInnerColor}
+            musicalShortsColor={musicalShortsColor}
             festivalTopColor={festivalTopColor}
             festivalBottomColor={festivalBottomColor}
           />

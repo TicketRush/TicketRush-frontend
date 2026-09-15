@@ -19,6 +19,9 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   DEFAULT_OUTFIT_MODEL_ID,
@@ -40,6 +43,9 @@ interface CharacterConfig {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
   accessory: string;
@@ -108,6 +114,27 @@ const OUTFIT_COLORS = [
   "#ff3333",
 ];
 
+function createPartColorPresets(defaultColor: string) {
+  return [
+    defaultColor,
+    ...OUTFIT_COLORS.filter(
+      (color) => !isSameHexColor(color, defaultColor),
+    ).slice(0, 9),
+  ];
+}
+
+const MUSICAL_JACKET_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_JACKET_COLOR,
+);
+
+const MUSICAL_INNER_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_INNER_COLOR,
+);
+
+const MUSICAL_SHORTS_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_SHORTS_COLOR,
+);
+
 const FESTIVAL_TOP_COLORS = [
   DEFAULT_FESTIVAL_TOP_COLOR,
   ...OUTFIT_COLORS.filter(
@@ -171,6 +198,9 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
   outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
   outfitColor: DEFAULT_OUTFIT_COLOR,
+  musicalJacketColor: DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor: DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor: DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor: DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor: DEFAULT_FESTIVAL_BOTTOM_COLOR,
   accessory: "none",
@@ -201,6 +231,9 @@ function loadSavedCharacter(): CharacterConfig {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "musicalJacketColor"
+        | "musicalInnerColor"
+        | "musicalShortsColor"
         | "festivalTopColor"
         | "festivalBottomColor"
         | "background"
@@ -214,6 +247,9 @@ function loadSavedCharacter(): CharacterConfig {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      musicalJacketColor?: unknown;
+      musicalInnerColor?: unknown;
+      musicalShortsColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
       background?: unknown;
@@ -232,6 +268,21 @@ function loadSavedCharacter(): CharacterConfig {
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
+    const resolvedMusicalJacketColor =
+      typeof parsed.musicalJacketColor === "string"
+        ? normalizeHexColor(parsed.musicalJacketColor)
+        : null;
+
+    const resolvedMusicalInnerColor =
+      typeof parsed.musicalInnerColor === "string"
+        ? normalizeHexColor(parsed.musicalInnerColor)
+        : null;
+
+    const resolvedMusicalShortsColor =
+      typeof parsed.musicalShortsColor === "string"
+        ? normalizeHexColor(parsed.musicalShortsColor)
         : null;
 
     const resolvedFestivalTopColor =
@@ -266,6 +317,12 @@ function loadSavedCharacter(): CharacterConfig {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      musicalJacketColor:
+        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
+      musicalInnerColor:
+        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
+      musicalShortsColor:
+        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
       festivalTopColor:
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
@@ -325,6 +382,23 @@ export default function AdminCharacterCreatorPage() {
   );
   const [outfitHexError, setOutfitHexError] = useState("");
 
+  const [musicalJacketHexInput, setMusicalJacketHexInput] = useState(
+    () => character.musicalJacketColor,
+  );
+  const [musicalJacketHexError, setMusicalJacketHexError] =
+    useState("");
+
+  const [musicalInnerHexInput, setMusicalInnerHexInput] = useState(
+    () => character.musicalInnerColor,
+  );
+  const [musicalInnerHexError, setMusicalInnerHexError] = useState("");
+
+  const [musicalShortsHexInput, setMusicalShortsHexInput] = useState(
+    () => character.musicalShortsColor,
+  );
+  const [musicalShortsHexError, setMusicalShortsHexError] =
+    useState("");
+
   const [festivalTopHexInput, setFestivalTopHexInput] = useState(
     () => character.festivalTopColor,
   );
@@ -353,6 +427,21 @@ export default function AdminCharacterCreatorPage() {
   );
   const isCustomOutfitColor = !selectedOutfitColorPreset;
 
+  const selectedMusicalJacketPreset = MUSICAL_JACKET_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalJacketColor),
+  );
+  const isCustomMusicalJacketColor = !selectedMusicalJacketPreset;
+
+  const selectedMusicalInnerPreset = MUSICAL_INNER_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalInnerColor),
+  );
+  const isCustomMusicalInnerColor = !selectedMusicalInnerPreset;
+
+  const selectedMusicalShortsPreset = MUSICAL_SHORTS_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalShortsColor),
+  );
+  const isCustomMusicalShortsColor = !selectedMusicalShortsPreset;
+
   const selectedFestivalTopColorPreset = FESTIVAL_TOP_COLORS.find(
     (color) => isSameHexColor(color, character.festivalTopColor),
   );
@@ -369,6 +458,7 @@ export default function AdminCharacterCreatorPage() {
   );
 
   const isCustomBackground = !selectedBackgroundPreset;
+  const isMusicalOutfit = character.outfitModelId === "musical";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
   function update<K extends keyof CharacterConfig>(
@@ -566,6 +656,168 @@ export default function AdminCharacterCreatorPage() {
     setOutfitHexError("");
   }
 
+  function applyMusicalJacketColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalJacketColor", normalized);
+    setMusicalJacketHexInput(normalized);
+    setMusicalJacketHexError("");
+
+    return true;
+  }
+
+  function handleMusicalJacketHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalJacketHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalJacketColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalJacketHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalJacketHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalJacketHexError("");
+  }
+
+  function handleMusicalJacketHexBlur() {
+    const normalized = normalizeHexColor(musicalJacketHexInput);
+
+    if (normalized) {
+      applyMusicalJacketColor(normalized);
+      return;
+    }
+
+    setMusicalJacketHexInput(character.musicalJacketColor);
+    setMusicalJacketHexError("");
+  }
+
+  function applyMusicalInnerColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalInnerColor", normalized);
+    setMusicalInnerHexInput(normalized);
+    setMusicalInnerHexError("");
+
+    return true;
+  }
+
+  function handleMusicalInnerHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalInnerHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalInnerColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalInnerHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalInnerHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalInnerHexError("");
+  }
+
+  function handleMusicalInnerHexBlur() {
+    const normalized = normalizeHexColor(musicalInnerHexInput);
+
+    if (normalized) {
+      applyMusicalInnerColor(normalized);
+      return;
+    }
+
+    setMusicalInnerHexInput(character.musicalInnerColor);
+    setMusicalInnerHexError("");
+  }
+
+  function applyMusicalShortsColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalShortsColor", normalized);
+    setMusicalShortsHexInput(normalized);
+    setMusicalShortsHexError("");
+
+    return true;
+  }
+
+  function handleMusicalShortsHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalShortsHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalShortsColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalShortsHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalShortsHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalShortsHexError("");
+  }
+
+  function handleMusicalShortsHexBlur() {
+    const normalized = normalizeHexColor(musicalShortsHexInput);
+
+    if (normalized) {
+      applyMusicalShortsColor(normalized);
+      return;
+    }
+
+    setMusicalShortsHexInput(character.musicalShortsColor);
+    setMusicalShortsHexError("");
+  }
+
   function applyFestivalTopColor(value: string) {
     const normalized = normalizeHexColor(value);
 
@@ -742,6 +994,15 @@ export default function AdminCharacterCreatorPage() {
     setOutfitHexInput(DEFAULT_CHARACTER.outfitColor);
     setOutfitHexError("");
 
+    setMusicalJacketHexInput(DEFAULT_CHARACTER.musicalJacketColor);
+    setMusicalJacketHexError("");
+
+    setMusicalInnerHexInput(DEFAULT_CHARACTER.musicalInnerColor);
+    setMusicalInnerHexError("");
+
+    setMusicalShortsHexInput(DEFAULT_CHARACTER.musicalShortsColor);
+    setMusicalShortsHexError("");
+
     setFestivalTopHexInput(DEFAULT_CHARACTER.festivalTopColor);
     setFestivalTopHexError("");
 
@@ -767,9 +1028,43 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
-    if (!normalizeHexColor(outfitHexInput)) {
+    if (
+      !isMusicalOutfit &&
+      !isFestivalOutfit &&
+      !normalizeHexColor(outfitHexInput)
+    ) {
       setOutfitHexError(
         "의상 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalJacketHexInput)
+    ) {
+      setMusicalJacketHexError(
+        "자켓 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalInnerHexInput)
+    ) {
+      setMusicalInnerHexError(
+        "이너 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalShortsHexInput)
+    ) {
+      setMusicalShortsHexError(
+        "반바지 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
       );
       return;
     }
@@ -1190,7 +1485,57 @@ export default function AdminCharacterCreatorPage() {
                 ))}
               </div>
 
-              {isFestivalOutfit ? (
+              {isMusicalOutfit ? (
+                <>
+                  <OutfitColorControl
+                    title="자켓 컬러"
+                    customTitle="사용자 지정 자켓 컬러"
+                    idPrefix="musical-jacket"
+                    currentColor={character.musicalJacketColor}
+                    hexInput={musicalJacketHexInput}
+                    hexError={musicalJacketHexError}
+                    presets={MUSICAL_JACKET_COLORS}
+                    isCustom={isCustomMusicalJacketColor}
+                    placeholder={DEFAULT_MUSICAL_JACKET_COLOR}
+                    onPresetClick={applyMusicalJacketColor}
+                    onColorPickerChange={applyMusicalJacketColor}
+                    onHexChange={handleMusicalJacketHexChange}
+                    onHexBlur={handleMusicalJacketHexBlur}
+                  />
+
+                  <OutfitColorControl
+                    title="이너 컬러"
+                    customTitle="사용자 지정 이너 컬러"
+                    idPrefix="musical-inner"
+                    currentColor={character.musicalInnerColor}
+                    hexInput={musicalInnerHexInput}
+                    hexError={musicalInnerHexError}
+                    presets={MUSICAL_INNER_COLORS}
+                    isCustom={isCustomMusicalInnerColor}
+                    placeholder={DEFAULT_MUSICAL_INNER_COLOR}
+                    onPresetClick={applyMusicalInnerColor}
+                    onColorPickerChange={applyMusicalInnerColor}
+                    onHexChange={handleMusicalInnerHexChange}
+                    onHexBlur={handleMusicalInnerHexBlur}
+                  />
+
+                  <OutfitColorControl
+                    title="반바지 컬러"
+                    customTitle="사용자 지정 반바지 컬러"
+                    idPrefix="musical-shorts"
+                    currentColor={character.musicalShortsColor}
+                    hexInput={musicalShortsHexInput}
+                    hexError={musicalShortsHexError}
+                    presets={MUSICAL_SHORTS_COLORS}
+                    isCustom={isCustomMusicalShortsColor}
+                    placeholder={DEFAULT_MUSICAL_SHORTS_COLOR}
+                    onPresetClick={applyMusicalShortsColor}
+                    onColorPickerChange={applyMusicalShortsColor}
+                    onHexChange={handleMusicalShortsHexChange}
+                    onHexBlur={handleMusicalShortsHexBlur}
+                  />
+                </>
+              ) : isFestivalOutfit ? (
                 <>
                   <OutfitColorControl
                     title="상의 컬러"
@@ -1465,6 +1810,9 @@ export default function AdminCharacterCreatorPage() {
                 skinColor={character.skinColor}
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
+                musicalJacketColor={character.musicalJacketColor}
+                musicalInnerColor={character.musicalInnerColor}
+                musicalShortsColor={character.musicalShortsColor}
                 festivalTopColor={
                   character.festivalTopColor
                 }
@@ -1492,7 +1840,19 @@ export default function AdminCharacterCreatorPage() {
               </p>
               <p>의상: {character.outfitName}</p>
 
-              {isFestivalOutfit ? (
+              {isMusicalOutfit ? (
+                <>
+                  <p>
+                    자켓: {character.musicalJacketColor.toUpperCase()}
+                  </p>
+                  <p>
+                    이너: {character.musicalInnerColor.toUpperCase()}
+                  </p>
+                  <p>
+                    반바지: {character.musicalShortsColor.toUpperCase()}
+                  </p>
+                </>
+              ) : isFestivalOutfit ? (
                 <>
                   <p>
                     상의 컬러:{" "}

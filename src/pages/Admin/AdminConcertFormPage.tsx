@@ -33,6 +33,9 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   getOutfitOption,
@@ -90,6 +93,9 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
   accessory: string;
@@ -116,6 +122,9 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "musicalJacketColor"
+        | "musicalInnerColor"
+        | "musicalShortsColor"
         | "festivalTopColor"
         | "festivalBottomColor"
         | "background"
@@ -129,6 +138,9 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      musicalJacketColor?: unknown;
+      musicalInnerColor?: unknown;
+      musicalShortsColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
       background?: unknown;
@@ -147,6 +159,21 @@ function loadSavedCharacter(): CharacterDraft | null {
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
+    const resolvedMusicalJacketColor =
+      typeof parsed.musicalJacketColor === "string"
+        ? normalizeHexColor(parsed.musicalJacketColor)
+        : null;
+
+    const resolvedMusicalInnerColor =
+      typeof parsed.musicalInnerColor === "string"
+        ? normalizeHexColor(parsed.musicalInnerColor)
+        : null;
+
+    const resolvedMusicalShortsColor =
+      typeof parsed.musicalShortsColor === "string"
+        ? normalizeHexColor(parsed.musicalShortsColor)
         : null;
 
     const resolvedFestivalTopColor =
@@ -180,6 +207,12 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      musicalJacketColor:
+        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
+      musicalInnerColor:
+        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
+      musicalShortsColor:
+        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
       festivalTopColor:
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
@@ -995,6 +1028,7 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isMusicalOutfit = character.outfitModelId === "musical";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
   return (
@@ -1008,6 +1042,9 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          musicalJacketColor={character.musicalJacketColor}
+          musicalInnerColor={character.musicalInnerColor}
+          musicalShortsColor={character.musicalShortsColor}
           festivalTopColor={character.festivalTopColor}
           festivalBottomColor={character.festivalBottomColor}
           outfitName={character.outfitName}
@@ -1032,6 +1069,14 @@ function CharacterCreatorLinkBox({
           의상: {character.outfitName} / 액세서리: {character.accessory} /
           포즈: {character.pose}
         </p>
+
+        {isMusicalOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            자켓: {character.musicalJacketColor.toUpperCase()} / 이너:{" "}
+            {character.musicalInnerColor.toUpperCase()} / 반바지:{" "}
+            {character.musicalShortsColor.toUpperCase()}
+          </p>
+        )}
 
         {isFestivalOutfit && (
           <p className="mt-1 text-xs text-admin-text-secondary">
