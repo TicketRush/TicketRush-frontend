@@ -1,6 +1,7 @@
 import { useState } from "react";
 import useAuthStore from "@/stores/global/authStore";
 import { useMyBookings } from "@/hooks/queries/useMyBookings";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import { ProfileCard } from "@/components/mypage/ProfileCard";
 import { BookingTabs } from "@/components/mypage/BookingTabs";
 import { BookingCard } from "@/components/mypage/BookingCard";
@@ -8,13 +9,16 @@ import { filterBookingsByTab } from "@/utils/booking";
 import type { BookingTab } from "@/types/domain/booking";
 
 export default function MyBookingsPage() {
+  useDocumentTitle("내 예매");
+
   const [tab, setTab] = useState<BookingTab>("upcoming");
   const user = useAuthStore((s) => s.user);
 
   const { data, isLoading, isError } = useMyBookings();
 
   const allBookings = data?.items ?? [];
-  // 탭 전환 시 API 재요청 없이 프론트에서 필터 (정책: 공연 시작시각 기준)
+  // 탭 전환 시 API 재요청 없이 프론트에서 필터
+  // 목록 API에 공연 시간이 없어 공연 날짜(performanceDate) 기준 (#168)
   const bookings = filterBookingsByTab(allBookings, tab);
 
   return (

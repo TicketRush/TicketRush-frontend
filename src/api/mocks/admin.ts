@@ -20,8 +20,10 @@ import {
   _findMockBookingBySeat,
   _findMockBooking,
   _updateMockBookingStatus,
+  registerAdminBookerFallback,
 } from "./bookings";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
+import type { AdminBookingBookerResponse } from "../adminSeatMapper";
 import type {
   AdminConcertItem,
   AdminConcertListParams,
@@ -212,7 +214,9 @@ const ADMIN_USERS = [
   { name: "최서연", email: "seoyeon@example.com" },
   { name: "정하늘", email: "haneul@example.com" },
 ];
-const PAYMENT_METHODS = ["간편결제", "신용카드", "카카오페이", "네이버페이"];
+
+/** CONFIRMED + 입장 완료 — 환불 시 BOOKING_409_006 */
+const TICKET_USED_BOOKING_NUMBER = "X7008-KLPW8";
 
 const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
   const items: AdminBookingItem[] = [];
@@ -223,52 +227,91 @@ const ADMIN_BOOKINGS: AdminBookingItem[] = (() => {
     const rowIdx = Math.floor((seatId - 1) / 12);
     const colIdx = ((seatId - 1) % 12) + 1;
     const seatNumber = `${String.fromCharCode("A".charCodeAt(0) + rowIdx)}-${colIdx}`;
+    const remainder = i % 10;
+    const bookedAt = new Date(Date.now() - i * 3600 * 1000)
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
 
-    const isCancelled = i % 7 === 0;
+    let status: AdminBookingItem["status"] = "CONFIRMED";
+    let unitPrice: number | null = concert.price;
+    let concertTitle: string | null = concert.title;
+    let concertDate: string | null = concert.showDate;
+    let userName: string | null = user.name;
+    let userEmail: string | null = user.email;
+    let seatNumbers = [seatNumber];
+
+    if (remainder === 0) status = "CANCELED";
+    else if (remainder === 1) {
+      status = "PENDING";
+      unitPrice = null;
+    } else if (remainder === 2) status = "REFUNDED";
+    else if (remainder === 3) {
+      concertTitle = null;
+      concertDate = null;
+      userName = null;
+      userEmail = null;
+      seatNumbers = [];
+    } else if (remainder === 4) status = "REFUNDING";
+    else if (remainder === 5) status = "EXPIRED";
+    else if (remainder === 6) {
+      status = "CONFIRMED";
+      unitPrice = null;
+    }
+
     items.push({
+      bookingId: i + 1,
       bookingNumber: `X${7000 + i}-KLPW${i % 10}`,
-      concertTitle: concert.title,
-      concertDate: `${concert.showDate} ${concert.showTime}`,
-      bookedAt: new Date(Date.now() - i * 3600 * 1000).toISOString(),
-      userName: user.name,
-      userEmail: user.email,
-      seatNumbers: [seatNumber],
+      userId: (i % ADMIN_USERS.length) + 1,
+      performanceId: concert.id,
+      seatId,
+      concertTitle,
+      concertDate,
+      bookedAt,
+      userName,
+      userEmail,
+      seatNumbers,
       seatCount: 1,
-      unitPrice: concert.price,
-      totalAmount: concert.price,
-      status: isCancelled ? "CANCELED" : "CONFIRMED",
-      paymentMethod: PAYMENT_METHODS[i % PAYMENT_METHODS.length],
+      unitPrice,
+      totalAmount: unitPrice,
+      status,
     });
   }
   return items;
 })();
+
+registerAdminBookerFallback((bookingNumber) => {
+  const item = ADMIN_BOOKINGS.find((b) => b.bookingNumber === bookingNumber);
+  if (!item) return undefined;
+  const paid =
+    item.status === "CONFIRMED" ||
+    item.status === "REFUNDED" ||
+    item.status === "REFUNDING";
+  return {
+    bookingNumber: item.bookingNumber,
+    bookerName: item.userName,
+    bookerEmail: item.userEmail,
+    bookedAt: item.bookedAt,
+    bookingStatus: item.status,
+    performanceTitle: item.concertTitle,
+    performanceDate: item.concertDate,
+    seatNumber: item.seatNumbers[0] ?? null,
+    seatCount: item.seatCount,
+    paymentAmount: paid ? item.totalAmount : null,
+  } satisfies AdminBookingBookerResponse;
+});
 
 export async function mockGetAdminBookings(
   params: AdminBookingListParams,
 ): Promise<AdminBookingListResponse> {
   await mockDelay(400);
 
-  let filtered = [...ADMIN_BOOKINGS];
-
-  if (params.status && params.status !== "ALL") {
-    filtered = filtered.filter((b) => b.status === params.status);
-  }
-  if (params.keyword) {
-    const kw = params.keyword.toLowerCase();
-    filtered = filtered.filter(
-      (b) =>
-        b.concertTitle.toLowerCase().includes(kw) ||
-        b.userName.toLowerCase().includes(kw) ||
-        b.bookingNumber.toLowerCase().includes(kw),
-    );
-  }
-
   const size = params.size ?? 10;
   const pageIndex = params.page ?? 0;
-  const totalElements = filtered.length;
-  const totalPages = Math.ceil(totalElements / size);
+  const totalElements = ADMIN_BOOKINGS.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / size));
   const start = pageIndex * size;
-  const items = filtered.slice(start, start + size);
+  const items = ADMIN_BOOKINGS.slice(start, start + size);
 
   return {
     items,
@@ -284,16 +327,19 @@ export async function mockGetAdminBookings(
 
 export async function mockGetAdminBookingStats(): Promise<AdminBookingStats> {
   await mockDelay(200);
+  const confirmed = ADMIN_BOOKINGS.filter((b) => b.status === "CONFIRMED");
+  const missingAmountBookings = confirmed.filter(
+    (b) => b.totalAmount == null,
+  ).length;
   return {
     totalBookings: ADMIN_BOOKINGS.length,
-    completedBookings: ADMIN_BOOKINGS.filter((b) => b.status === "CONFIRMED")
-      .length,
-    totalRevenue: ADMIN_BOOKINGS.filter((b) => b.status === "CONFIRMED").reduce(
-      (sum, b) => sum + b.totalAmount,
-      0,
-    ),
-    cancelledBookings: ADMIN_BOOKINGS.filter((b) => b.status === "CANCELED")
-      .length,
+    completedBookings: confirmed.length,
+    totalRevenue: confirmed.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0),
+    canceledBookings: ADMIN_BOOKINGS.filter(
+      (b) => b.status === "CANCELED" || b.status === "REFUNDED",
+    ).length,
+    revenueComplete: missingAmountBookings === 0,
+    missingAmountBookings,
   };
 }
 
@@ -302,19 +348,35 @@ export async function mockAdminRefundBooking(
 ): Promise<void> {
   await mockDelay(500);
   const booking = ADMIN_BOOKINGS.find((b) => b.bookingNumber === bookingNumber);
+  if (!booking) {
+    await mockError(
+      ERROR_CODES.BOOKING_NOT_FOUND,
+      "예매 정보를 찾을 수 없습니다.",
+      300,
+      404,
+    );
+  }
+  if (booking!.status !== "CONFIRMED") {
+    await mockError(
+      ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED,
+      "현재 상태에서는 취소하거나 환불할 수 없습니다.",
+      300,
+      409,
+    );
+  }
+  if (booking!.bookingNumber === TICKET_USED_BOOKING_NUMBER) {
+    await mockError(
+      ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED_TICKET_USED,
+      "이미 입장한 예매는 환불할 수 없습니다.",
+      300,
+      409,
+    );
+  }
+  booking!.status = "REFUNDING";
+
   const userSide = _findMockBooking(bookingNumber);
-  if (!booking && !userSide) {
-    await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
-  }
-  const currentStatus = booking?.status ?? userSide?.status;
-  if (currentStatus === "CANCELED" || currentStatus === "REFUNDED") {
-    await mockError("ALREADY_CANCELLED", "이미 취소된 예매입니다.");
-  }
-  if (booking) {
-    booking.status = "CANCELED";
-  }
   if (userSide) {
-    _updateMockBookingStatus(bookingNumber, "CANCELED");
+    _updateMockBookingStatus(bookingNumber, "REFUNDING");
   }
 }
 

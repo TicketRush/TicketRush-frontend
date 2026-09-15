@@ -30,8 +30,11 @@ export default function SeatMap({
       }));
   }, [seats]);
 
-  // 첫 행 기준으로 열 수 계산 (헤더용)
-  const colCount = rows[0]?.seats.length ?? 12;
+  // 가장 긴 행 기준 (헤더·캡션). 빈 배치는 헤더를 그리지 않는다.
+  const colCount = rows.reduce(
+    (max, row) => Math.max(max, row.seats.length),
+    0,
+  );
 
   return (
     <div className="inline-block">
@@ -69,6 +72,12 @@ export default function SeatMap({
           </div>
         ))}
       </div>
+
+      {rows.length > 0 && colCount > 0 && (
+        <p className="text-center text-[10px] text-text-secondary mt-4">
+          [Seat Grid: {rows.length} rows × {colCount} columns]
+        </p>
+      )}
     </div>
   );
 }

@@ -1,19 +1,24 @@
 import { Suspense, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { Center, OrbitControls, useGLTF } from "@react-three/drei";
+import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import type { HairStyle } from "@/components/admin/character/characterHair";
+import type { EyeStyle } from "@/components/admin/character/characterEye";
 import {
   DEFAULT_MUSICAL_INNER_COLOR,
   DEFAULT_MUSICAL_JACKET_COLOR,
   DEFAULT_MUSICAL_SHORTS_COLOR,
+  DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FESTIVAL_TOP_COLOR,
   MUSICAL_OUTFIT_PART_NAMES,
+  FESTIVAL_OUTFIT_PART_NAMES,
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
 
 export type { HairStyle } from "@/components/admin/character/characterHair";
+export type { EyeStyle } from "@/components/admin/character/characterEye";
 export type { OutfitModelId } from "@/components/admin/character/characterOutfit";
 
 interface CharacterModelViewerProps {
@@ -22,14 +27,24 @@ interface CharacterModelViewerProps {
   hairColor: string;
 
   /**
-   * 기존 단일 의상 컬러입니다.
-   * 다른 의상 및 기존 저장 데이터 호환을 위해 유지합니다.
+   * 기존 단일 의상 색상 값입니다.
+   * 다른 의상 및 기존 호출부 호환을 위해 유지합니다.
    */
   outfitColor: string;
 
   musicalJacketColor?: string;
   musicalInnerColor?: string;
   musicalShortsColor?: string;
+
+  /**
+   * 페스티벌 의상 상의 색상입니다.
+   */
+  festivalTopColor?: string;
+
+  /**
+   * 페스티벌 의상 하의 색상입니다.
+   */
+  festivalBottomColor?: string;
 
   /**
    * 화면 표시용 의상 이름입니다.
@@ -43,6 +58,7 @@ interface CharacterModelViewerProps {
   outfitModelId: OutfitModelId;
 
   hairStyle: HairStyle;
+  eyeStyle: EyeStyle;
 }
 
 const HAIR_MODEL_URLS: Record<HairStyle, string> = {
@@ -52,6 +68,44 @@ const HAIR_MODEL_URLS: Record<HairStyle, string> = {
   twintails: "/models/hair/hair_twintails.glb",
   wave: "/models/hair/hair_wave.glb",
 };
+
+const EYE_MODEL_URLS: Record<EyeStyle, string> = {
+  default: "/models/eyes/eye_default.glb",
+  happy: "/models/eyes/eye_happy.glb",
+  wink: "/models/eyes/eye_wink.glb",
+  squeeze: "/models/eyes/eye_squeeze.glb",
+  angry: "/models/eyes/eye_angry.glb",
+  closed: "/models/eyes/eye_closed.glb",
+};
+
+function CharacterModelLoadingFallback() {
+  return (
+    <Html fullscreen pointerEvents="none">
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-600 shadow-sm">
+          3D 모델 불러오는 중...
+        </div>
+      </div>
+    </Html>
+  );
+}
+
+function isBaseEyeObject(objectName: string) {
+  const name = objectName.toLowerCase();
+
+  return (
+    name === "eye" ||
+    name === "eyes" ||
+    name.startsWith("eye_") ||
+    name.startsWith("eyes_") ||
+    name.endsWith("_eye") ||
+    name.endsWith("_eyes")
+  );
+}
+
+function isSameHexColor(first: string, second: string) {
+  return first.toUpperCase() === second.toUpperCase();
+}
 
 function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
@@ -64,6 +118,11 @@ function CharacterBody({
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (isBaseEyeObject(object.name)) {
+        object.visible = false;
         return;
       }
 
@@ -106,6 +165,19 @@ function HairModel({
   return <primitive object={scene} />;
 }
 
+function EyeModel({
+  eyeStyle,
+}: Pick<CharacterModelViewerProps, "eyeStyle">) {
+  const eyeModelUrl = EYE_MODEL_URLS[eyeStyle];
+  const gltf = useGLTF(eyeModelUrl);
+
+  const scene = useMemo(() => {
+    return gltf.scene.clone(true);
+  }, [gltf.scene]);
+
+  return <primitive object={scene} />;
+}
+
 function cloneMaterialWithColor(
   material: THREE.Material,
   color: string,
@@ -115,7 +187,11 @@ function cloneMaterialWithColor(
   if (clonedMaterial instanceof THREE.MeshStandardMaterial) {
     clonedMaterial.color.set(color);
 
-    // Blender vertex color가 선택 색상과 곱해지는 것을 방지합니다.
+    /**
+     * festival_outfit.glb에는 vertex color가 포함되어 있습니다.
+     * 사용자 지정 색상 적용 시 vertex color와 선택 색상이 곱해지는 것을
+     * 방지하기 위해 해당 파츠의 vertex color 사용을 해제합니다.
+     */
     clonedMaterial.vertexColors = false;
     clonedMaterial.needsUpdate = true;
   }
@@ -140,19 +216,23 @@ function OutfitModel({
   musicalJacketColor,
   musicalInnerColor,
   musicalShortsColor,
+  festivalTopColor,
+  festivalBottomColor,
 }: {
   modelUrl: string;
   outfitModelId: OutfitModelId;
   musicalJacketColor: string;
   musicalInnerColor: string;
   musicalShortsColor: string;
+  festivalTopColor: string;
+  festivalBottomColor: string;
 }) {
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
 
-    if (outfitModelId !== "musical") {
+    if (outfitModelId !== "festival" && outfitModelId !== "musical") {
       return clonedScene;
     }
 
@@ -161,18 +241,41 @@ function OutfitModel({
         return;
       }
 
-      if (object.name === MUSICAL_OUTFIT_PART_NAMES.jacket) {
-        applyMeshColor(object, musicalJacketColor);
+      if (outfitModelId === "musical") {
+        if (object.name === MUSICAL_OUTFIT_PART_NAMES.jacket) {
+          applyMeshColor(object, musicalJacketColor);
+          return;
+        }
+
+        if (object.name === MUSICAL_OUTFIT_PART_NAMES.inner) {
+          applyMeshColor(object, musicalInnerColor);
+          return;
+        }
+
+        if (object.name === MUSICAL_OUTFIT_PART_NAMES.shorts) {
+          applyMeshColor(object, musicalShortsColor);
+        }
         return;
       }
 
-      if (object.name === MUSICAL_OUTFIT_PART_NAMES.inner) {
-        applyMeshColor(object, musicalInnerColor);
-        return;
+      if (
+        object.name === FESTIVAL_OUTFIT_PART_NAMES.top &&
+        !isSameHexColor(
+          festivalTopColor,
+          DEFAULT_FESTIVAL_TOP_COLOR,
+        )
+      ) {
+        applyMeshColor(object, festivalTopColor);
       }
 
-      if (object.name === MUSICAL_OUTFIT_PART_NAMES.shorts) {
-        applyMeshColor(object, musicalShortsColor);
+      if (
+        object.name === FESTIVAL_OUTFIT_PART_NAMES.bottom &&
+        !isSameHexColor(
+          festivalBottomColor,
+          DEFAULT_FESTIVAL_BOTTOM_COLOR,
+        )
+      ) {
+        applyMeshColor(object, festivalBottomColor);
       }
     });
 
@@ -183,6 +286,8 @@ function OutfitModel({
     musicalJacketColor,
     musicalInnerColor,
     musicalShortsColor,
+    festivalTopColor,
+    festivalBottomColor,
   ]);
 
   return <primitive object={scene} />;
@@ -194,9 +299,12 @@ function CharacterModel({
   hairColor,
   outfitModelId,
   hairStyle,
+  eyeStyle,
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
   musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
+  festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
+  festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: Pick<
   CharacterModelViewerProps,
   | "modelUrl"
@@ -204,9 +312,12 @@ function CharacterModel({
   | "hairColor"
   | "outfitModelId"
   | "hairStyle"
+  | "eyeStyle"
   | "musicalJacketColor"
   | "musicalInnerColor"
   | "musicalShortsColor"
+  | "festivalTopColor"
+  | "festivalBottomColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
 
@@ -227,6 +338,8 @@ function CharacterModel({
           hairColor={hairColor}
         />
 
+        <EyeModel eyeStyle={eyeStyle} />
+
         {outfitModelUrl && (
           <Suspense fallback={null}>
             <OutfitModel
@@ -235,6 +348,8 @@ function CharacterModel({
               musicalJacketColor={musicalJacketColor}
               musicalInnerColor={musicalInnerColor}
               musicalShortsColor={musicalShortsColor}
+              festivalTopColor={festivalTopColor}
+              festivalBottomColor={festivalBottomColor}
             />
           </Suspense>
         )}
@@ -249,9 +364,12 @@ export default function CharacterModelViewer({
   hairColor,
   outfitModelId,
   hairStyle,
+  eyeStyle,
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
   musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
+  festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
+  festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
@@ -260,16 +378,19 @@ export default function CharacterModelViewer({
         <directionalLight position={[3, 5, 5]} intensity={2.2} />
         <directionalLight position={[-3, 2, 2]} intensity={0.8} />
 
-        <Suspense fallback={null}>
+        <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
             modelUrl={modelUrl}
             skinColor={skinColor}
             hairColor={hairColor}
             outfitModelId={outfitModelId}
             hairStyle={hairStyle}
+            eyeStyle={eyeStyle}
             musicalJacketColor={musicalJacketColor}
             musicalInnerColor={musicalInnerColor}
             musicalShortsColor={musicalShortsColor}
+            festivalTopColor={festivalTopColor}
+            festivalBottomColor={festivalBottomColor}
           />
         </Suspense>
 
@@ -290,6 +411,12 @@ useGLTF.preload("/models/hair/hair_long.glb");
 useGLTF.preload("/models/hair/hair_ponytail.glb");
 useGLTF.preload("/models/hair/hair_twintails.glb");
 useGLTF.preload("/models/hair/hair_wave.glb");
+useGLTF.preload("/models/eyes/eye_default.glb");
+useGLTF.preload("/models/eyes/eye_happy.glb");
+useGLTF.preload("/models/eyes/eye_wink.glb");
+useGLTF.preload("/models/eyes/eye_squeeze.glb");
+useGLTF.preload("/models/eyes/eye_angry.glb");
+useGLTF.preload("/models/eyes/eye_closed.glb");
 
 Object.values(OUTFIT_MODEL_URLS).forEach((modelUrl) => {
   if (modelUrl) {

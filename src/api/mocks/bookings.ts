@@ -10,6 +10,7 @@
 //   - venue → venue ?? address fallback (concert.venue optional 대응)
 
 import { mockDelay, mockError } from "./_helpers";
+import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
 import type {
   BookingPendingRequest,
   BookingPendingResponse,
@@ -175,11 +176,10 @@ export async function mockGetBookingDetail(
 }
 
 function toBackendDateTime(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return d.toISOString();
 }
 
-/** GET /booking/me?status=PENDING 의 expires_at — 생성 시각 + 5분 (#167) */
+/** GET /booking/{bookingNumber} 의 expires_at — PENDING이면 생성 시각 + 5분 (#168/#246) */
 export async function mockFetchPendingBookingExpiresAt(
   bookingNumber: string,
 ): Promise<string | null> {
@@ -188,7 +188,8 @@ export async function mockFetchPendingBookingExpiresAt(
     (b) => b.bookingNumber === bookingNumber && b.status === "PENDING",
   );
   if (!booking) return null;
-  const created = new Date(booking.createdAt).getTime();
+  const created = parseBackendDateTime(booking.createdAt);
+  if (created == null) return null;
   return toBackendDateTime(new Date(created + 5 * 60 * 1000));
 }
 
@@ -387,36 +388,49 @@ export async function mockRetryRefund(bookingNumber: string): Promise<void> {
   await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
 }
 
-/** GET /api/v1/booking/admin/bookings/{bookingNumber} (#169) */
+/** 사용자 예매 스토어에 없는 관리자 목록 mock을 단건 GET에 붙인다. */
+let adminBookerFallback:
+  | ((bookingNumber: string) => AdminBookingBookerResponse | undefined)
+  | null = null;
+
+export function registerAdminBookerFallback(
+  lookup: (bookingNumber: string) => AdminBookingBookerResponse | undefined,
+) {
+  adminBookerFallback = lookup;
+}
+
 export async function mockGetAdminBookingByNumber(
   bookingNumber: string,
 ): Promise<AdminBookingBookerResponse> {
   await mockDelay(150);
   const booking = _findMockBooking(bookingNumber);
-  if (!booking) {
-    await mockError(
-      ERROR_CODES.BOOKING_NOT_FOUND,
-      "예매 정보를 찾을 수 없습니다.",
-      0,
-      404,
-    );
+  if (booking) {
+    const paid =
+      booking.status === "CONFIRMED" ||
+      booking.status === "REFUNDED" ||
+      booking.status === "REFUNDING";
+
+    return {
+      bookingNumber: booking.bookingNumber,
+      bookerName: booking.status === "PENDING" ? "예매 진행자" : "김철수",
+      bookerEmail: "user@example.com",
+      bookedAt: booking.paidAt ?? booking.createdAt,
+      bookingStatus: booking.status,
+      performanceTitle: booking.performanceTitle,
+      performanceDate: booking.performanceDate,
+      seatNumber: booking.seatNumber,
+      seatCount: 1,
+      paymentAmount: paid ? booking.price : null,
+    };
   }
 
-  const paid =
-    booking!.status === "CONFIRMED" ||
-    booking!.status === "REFUNDED" ||
-    booking!.status === "REFUNDING";
+  const fromAdminList = adminBookerFallback?.(bookingNumber);
+  if (fromAdminList) return fromAdminList;
 
-  return {
-    bookingNumber: booking!.bookingNumber,
-    bookerName: booking!.status === "PENDING" ? "예매 진행자" : "김철수",
-    bookerEmail: "user@example.com",
-    bookedAt: booking!.paidAt ?? booking!.createdAt,
-    bookingStatus: booking!.status,
-    performanceTitle: booking!.performanceTitle,
-    performanceDate: booking!.performanceDate,
-    seatNumber: booking!.seatNumber,
-    seatCount: 1,
-    paymentAmount: paid ? booking!.price : null,
-  };
+  return await mockError(
+    ERROR_CODES.BOOKING_NOT_FOUND,
+    "예매 정보를 찾을 수 없습니다.",
+    0,
+    404,
+  );
 }

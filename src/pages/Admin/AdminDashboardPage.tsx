@@ -37,6 +37,7 @@ import {
   isDashboardPeriodWithinLimit,
   toLocalDateKey,
 } from "@/utils/admin/dashboardPeriod";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import {
   formatAdminCount,
   formatAdminOccupancy,
@@ -61,6 +62,8 @@ function toSalesStatus(items: AdminConcertItem[]): ConcertSalesStatus[] {
 }
 
 export default function AdminDashboardPage() {
+  useDocumentTitle("관리자 대시보드");
+
   const navigate = useNavigate();
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [concertPage, setConcertPage] = useState(0);

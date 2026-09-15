@@ -77,12 +77,13 @@ export function useAdminConcerts(params: AdminConcertListParams = {}) {
 }
 
 // ── 예매 내역 ─────────────────────────────────────────
-export function useAdminBookings(params: AdminBookingListParams) {
+export function useAdminBookings(params: AdminBookingListParams = {}) {
   return useQuery({
     queryKey: adminKeys.bookings(params),
     queryFn: () => api.fetchAdminBookings(params),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
+    retry: retryUnlessClientError,
   });
 }
 
@@ -91,6 +92,7 @@ export function useAdminBookingStats() {
     queryKey: adminKeys.bookingStats(),
     queryFn: api.fetchAdminBookingStats,
     staleTime: 30_000,
+    retry: retryUnlessClientError,
   });
 }
 
@@ -109,7 +111,8 @@ export function useAdminRefundBooking() {
   return useMutation({
     mutationFn: api.adminRefundBookingApi,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.all });
+      qc.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      qc.invalidateQueries({ queryKey: ["admin", "booking"] });
     },
   });
 }
