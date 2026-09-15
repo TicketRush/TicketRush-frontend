@@ -33,6 +33,11 @@ export type { OutfitModelId } from "@/components/admin/character/characterOutfit
 
 interface CharacterModelViewerProps {
   modelUrl?: string;
+  /** Used when centered is false. */
+  modelPosition?: [number, number, number];
+  modelScale?: number;
+  /** Center all loaded parts, including the outfit, using their bounds. */
+  centered?: boolean;
   skinColor: string;
   hairColor: string;
 
@@ -195,7 +200,7 @@ function HairModel({
   hairStyle,
   hairColor,
 }: Pick<CharacterModelViewerProps, "hairStyle" | "hairColor">) {
-  const hairModelUrl = HAIR_MODEL_URLS[hairStyle];
+  const hairModelUrl = HAIR_MODEL_URLS[hairStyle] ?? HAIR_MODEL_URLS.short;
   const gltf = useGLTF(hairModelUrl);
 
   const scene = useMemo(() => {
@@ -219,9 +224,9 @@ function HairModel({
 }
 
 function EyeModel({
-  eyeStyle,
+  eyeStyle = "default",
 }: Pick<CharacterModelViewerProps, "eyeStyle">) {
-  const eyeModelUrl = EYE_MODEL_URLS[eyeStyle];
+  const eyeModelUrl = EYE_MODEL_URLS[eyeStyle] ?? EYE_MODEL_URLS.default;
   const gltf = useGLTF(eyeModelUrl);
 
   const scene = useMemo(() => {
@@ -648,6 +653,9 @@ function OutfitModel({
 }
 
 function CharacterModel({
+  modelPosition = [0, -0.4, 0],
+  modelScale = 0.8,
+  centered = false,
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
@@ -659,7 +667,7 @@ function CharacterModel({
   innerColor,
   bottomColor,
   hairStyle,
-  eyeStyle,
+  eyeStyle = "default",
   mouthStyle = "DEFAULT",
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
   musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
@@ -668,6 +676,9 @@ function CharacterModel({
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
 }: Pick<
   CharacterModelViewerProps,
+  | "modelPosition"
+  | "modelScale"
+  | "centered"
   | "modelUrl"
   | "skinColor"
   | "hairColor"
@@ -688,12 +699,33 @@ function CharacterModel({
   | "festivalBottomColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
+  const outfit = outfitModelUrl ? (
+    <OutfitModel
+      modelUrl={outfitModelUrl}
+      outfitModelId={outfitModelId}
+      outfitColor={outfitColor}
+      balletWearColor={balletWearColor}
+      balletShortsColor={balletShortsColor}
+      jacketColor={jacketColor}
+      innerColor={innerColor}
+      bottomColor={bottomColor}
+      musicalJacketColor={musicalJacketColor}
+      musicalInnerColor={musicalInnerColor}
+      musicalShortsColor={musicalShortsColor}
+      festivalTopColor={festivalTopColor}
+      festivalBottomColor={festivalBottomColor}
+    />
+  ) : null;
 
   return (
-    <Center>
+    <Center
+      cacheKey={centered
+        ? [modelUrl, hairStyle, eyeStyle, mouthStyle, outfitModelId, modelScale].join(":")
+        : 0}
+    >
       <group
-        scale={0.8}
-        position={[0, -0.4, 0]}
+        scale={modelScale}
+        position={centered ? [0, 0, 0] : modelPosition}
         rotation={[0, 0, 0]}
       >
         <CharacterBody
@@ -710,24 +742,8 @@ function CharacterModel({
 
         <MouthModel mouthStyle={mouthStyle} />
 
-        {outfitModelUrl && (
-          <Suspense fallback={null}>
-            <OutfitModel
-              modelUrl={outfitModelUrl}
-              outfitModelId={outfitModelId}
-              outfitColor={outfitColor}
-              balletWearColor={balletWearColor}
-              balletShortsColor={balletShortsColor}
-              jacketColor={jacketColor}
-              innerColor={innerColor}
-              bottomColor={bottomColor}
-              musicalJacketColor={musicalJacketColor}
-              musicalInnerColor={musicalInnerColor}
-              musicalShortsColor={musicalShortsColor}
-              festivalTopColor={festivalTopColor}
-              festivalBottomColor={festivalBottomColor}
-            />
-          </Suspense>
+        {centered ? outfit : (
+          <Suspense fallback={null}>{outfit}</Suspense>
         )}
       </group>
     </Center>
@@ -735,6 +751,9 @@ function CharacterModel({
 }
 
 export default function CharacterModelViewer({
+  modelPosition = [0, -0.4, 0],
+  modelScale = 0.8,
+  centered = false,
   modelUrl = "/models/chibi-base.glb",
   skinColor,
   hairColor,
@@ -746,7 +765,7 @@ export default function CharacterModelViewer({
   innerColor,
   bottomColor,
   hairStyle,
-  eyeStyle,
+  eyeStyle = "default",
   mouthStyle = "DEFAULT",
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
   musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
@@ -756,13 +775,16 @@ export default function CharacterModelViewer({
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
-      <Canvas camera={{ position: [0, 1.2, 6], fov: 35 }}>
+      <Canvas camera={{ position: centered ? [0, 0, 6] : [0, 1.2, 6], fov: 35 }}>
         <ambientLight intensity={1.7} />
         <directionalLight position={[3, 5, 5]} intensity={2.2} />
         <directionalLight position={[-3, 2, 2]} intensity={0.8} />
 
         <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
+            modelPosition={modelPosition}
+            modelScale={modelScale}
+            centered={centered}
             modelUrl={modelUrl}
             skinColor={skinColor}
             hairColor={hairColor}
