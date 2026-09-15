@@ -24,7 +24,7 @@
 //   - 상세 게이지는 목록 캐시 우선, 없으면 seat-counts(totalCount - soldCount)
 //   - 상세 totalSeats(등록값) 미사용. 예매 CTA는 availableCount (#181)
 import { useNavigate, useParams, Navigate } from "react-router-dom";
-import type { SyntheticEvent } from "react";
+import { useEffect, useRef, type ComponentProps, type SyntheticEvent } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -40,6 +40,8 @@ import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import Button from "@/components/common/Button/Button";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
+import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
+import { DEFAULT_FESTIVAL_TOP_COLOR, DEFAULT_FESTIVAL_BOTTOM_COLOR } from "@/components/admin/character/characterOutfit";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import {
   canBookConcert,
@@ -49,6 +51,27 @@ import { getDetailGaugeSeats } from "@/utils/concert/getDetailGaugeSeats";
 
 const POSTER_FALLBACK =
   "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
+
+type DetailCharacterConfig = ComponentProps<typeof CharacterModelViewer> & {
+  background: string;
+};
+
+const MOCK_CHARACTER_CONFIG: DetailCharacterConfig = {
+  skinColor: "#F7C6A8",
+  hairColor: "#151515",
+  hairStyle: "short",
+  eyeStyle: "squeeze",
+  mouthStyle: "SMILE",
+  festivalTopColor: DEFAULT_FESTIVAL_TOP_COLOR,
+  festivalBottomColor: DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  outfitModelId: "festival",
+  outfitName: "페스티벌",
+  outfitColor: "#60A5FA",
+  background: "#FFF3D6",
+};
+
+const MOCK_CHARACTER_MESSAGE =
+  "공연장에서 만나요! 함께 즐겨요 🎵";
 
 function hideBrokenImage(e: SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = "none";
@@ -137,6 +160,9 @@ export default function ConcertDetailPage() {
   const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
   const description = data.description?.trim() ?? "";
 
+  const characterConfig = import.meta.env.DEV ? MOCK_CHARACTER_CONFIG : null;
+  const characterMessage = import.meta.env.DEV ? MOCK_CHARACTER_MESSAGE : "";
+
   function handleBooking() {
     setConcert({
       id: data!.id,
@@ -161,6 +187,27 @@ export default function ConcertDetailPage() {
     });
     navigate(`/concerts/${data!.id}/seats`);
   }
+
+  const bookingSidebar = (
+    <BookingSidebar
+      gaugeRemaining={gaugeRemaining}
+      gaugeTotal={gaugeTotal}
+      remaining={remaining}
+      price={data.price}
+      duration={data.durationMinutes}
+      isOnSale={isOnSale}
+      status={data.status}
+      bookingOpenAt={data.bookingOpenAt}
+      seatsLoading={shouldFetchSeats && seatCountsLoading}
+      seatsError={shouldFetchSeats && seatCountsError}
+      notices={
+        data.notices && data.notices.length > 0
+          ? data.notices
+          : DEFAULT_NOTICES
+      }
+      onBooking={handleBooking}
+    />
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -272,24 +319,12 @@ export default function ConcertDetailPage() {
           )}
         </div>
 
-        <BookingSidebar
-          gaugeRemaining={gaugeRemaining}
-          gaugeTotal={gaugeTotal}
-          remaining={remaining}
-          price={data.price}
-          duration={data.durationMinutes}
-          isOnSale={isOnSale}
-          status={data.status}
-          bookingOpenAt={data.bookingOpenAt}
-          seatsLoading={shouldFetchSeats && seatCountsLoading}
-          seatsError={shouldFetchSeats && seatCountsError}
-          notices={
-            data.notices && data.notices.length > 0
-              ? data.notices
-              : DEFAULT_NOTICES
-          }
-          onBooking={handleBooking}
-        />
+        {characterConfig ? (
+          <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-16 [&>div]:lg:static">
+            {bookingSidebar}
+            <CharacterPreviewCard characterConfig={characterConfig} message={characterMessage} />
+          </div>
+        ) : bookingSidebar}
       </div>
     </div>
   );
@@ -301,6 +336,122 @@ const DEFAULT_NOTICES = [
   "공연 당일 티켓과 신분증을 지참해주세요.",
   "미성년자는 보호자 동반이 필요합니다.",
 ];
+
+function CharacterPreviewCard({
+  message,
+  characterConfig,
+}: {
+  message: string;
+  characterConfig: DetailCharacterConfig;
+}) {
+  const floatingRef =
+    useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element =
+      floatingRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    const prefersReducedMotion =
+      window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+    if (
+      prefersReducedMotion
+    ) {
+      return;
+    }
+
+    let animationFrameId = 0;
+
+    const startedAt =
+      performance.now();
+
+    const animate = (
+      now: number,
+    ) => {
+      const elapsed =
+        now - startedAt;
+
+      const offsetY =
+        Math.sin(
+          elapsed / 700,
+        ) * 4;
+
+      element.style.transform =
+        `translateY(${offsetY}px)`;
+
+      animationFrameId =
+        window.requestAnimationFrame(
+          animate,
+        );
+    };
+
+    animationFrameId =
+      window.requestAnimationFrame(
+        animate,
+      );
+
+    return () => {
+      window.cancelAnimationFrame(
+        animationFrameId,
+      );
+
+      element.style.transform =
+        "";
+    };
+  }, []);
+
+  return (
+    <section className="overflow-hidden rounded-xl border-2 border-border bg-white shadow-card">
+      <div className="px-4 pt-5">
+        <p className="mb-3 text-xs font-bold tracking-wide text-text-secondary">
+          공연 3D 캐릭터
+        </p>
+
+        <div className="relative mx-auto max-w-[260px] rounded-2xl border-2 border-primary/20 bg-primary/5 px-4 py-3 text-center">
+          <p className="break-words text-sm font-semibold leading-relaxed text-text">
+            {message}
+          </p>
+
+          <div
+            aria-hidden="true"
+            className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-primary/20 bg-primary/5"
+          />
+        </div>
+      </div>
+
+      <div
+        className="relative mt-1 h-[320px] w-full overflow-hidden"
+        style={{
+          backgroundColor:
+            characterConfig.background,
+        }}
+      >
+        <div
+          ref={floatingRef}
+          className="absolute inset-0 will-change-transform"
+        >
+          <CharacterModelViewer
+            {...characterConfig}
+            centered
+            modelScale={0.9}
+          />
+        </div>
+      </div>
+
+      <div className="border-t-2 border-border px-4 py-3 text-center">
+        <p className="text-xs text-text-secondary">
+          드래그해서 캐릭터를 회전해보세요.
+        </p>
+      </div>
+    </section>
+  );
+}
 
 function InfoBox({
   icon,

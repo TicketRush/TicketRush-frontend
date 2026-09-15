@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
@@ -10,6 +10,11 @@ import {
   type EyeStyle,
 } from "@/components/admin/character/characterEye";
 import {
+  MOUTH_STYLE_LABELS,
+  resolveStoredMouthStyle,
+  type MouthStyle,
+} from "@/components/admin/character/characterMouth";
+import {
   DEFAULT_SKIN_COLOR,
   DEFAULT_SKIN_TONE,
   SKIN_TONE_PRESETS,
@@ -19,6 +24,9 @@ import {
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   DEFAULT_OUTFIT_MODEL_ID,
@@ -35,11 +43,20 @@ interface CharacterConfig {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  mouthStyle: MouthStyle;
   eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  balletWearColor: string;
+  balletShortsColor: string;
+  jacketColor: string;
+  innerColor: string;
+  bottomColor: string;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
   accessory: string;
@@ -51,6 +68,18 @@ interface BackgroundPreset {
   id: string;
   label: string;
   color: string;
+}
+
+interface OutfitColorCustomizerProps {
+  idPrefix: string;
+  title: string;
+  customTitle: string;
+  value: string;
+  hexInput: string;
+  hexError: string;
+  onApplyColor: (value: string) => void;
+  onHexChange: (value: string) => void;
+  onHexBlur: () => void;
 }
 
 const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
@@ -81,6 +110,43 @@ const EYE_STYLES: {
   { value: "closed", label: "감은 눈", icon: "—" },
 ];
 
+const MOUTH_OPTIONS: {
+  value: MouthStyle;
+  label: string;
+  icon: string;
+}[] = [
+  {
+    value: "DEFAULT",
+    label: MOUTH_STYLE_LABELS.DEFAULT,
+    icon: "—",
+  },
+  {
+    value: "SMILE",
+    label: MOUTH_STYLE_LABELS.SMILE,
+    icon: "⌣",
+  },
+  {
+    value: "OPEN_SMILE",
+    label: MOUTH_STYLE_LABELS.OPEN_SMILE,
+    icon: "◡",
+  },
+  {
+    value: "PUCKER",
+    label: MOUTH_STYLE_LABELS.PUCKER,
+    icon: "3",
+  },
+  {
+    value: "CAT",
+    label: MOUTH_STYLE_LABELS.CAT,
+    icon: "ㅅ",
+  },
+  {
+    value: "ROUND",
+    label: MOUTH_STYLE_LABELS.ROUND,
+    icon: "○",
+  },
+];
+
 const DEFAULT_HAIR_COLOR = "#151515";
 
 const HAIR_COLORS = [
@@ -95,6 +161,13 @@ const HAIR_COLORS = [
 
 const DEFAULT_OUTFIT_COLOR = "#60A5FA";
 
+const DEFAULT_BALLET_WEAR_COLOR = DEFAULT_OUTFIT_COLOR;
+const DEFAULT_BALLET_SHORTS_COLOR = DEFAULT_OUTFIT_COLOR;
+
+const DEFAULT_CONCERT_JACKET_COLOR = DEFAULT_OUTFIT_COLOR;
+const DEFAULT_CONCERT_INNER_COLOR = DEFAULT_OUTFIT_COLOR;
+const DEFAULT_CONCERT_BOTTOM_COLOR = DEFAULT_OUTFIT_COLOR;
+
 const OUTFIT_COLORS = [
   "#ffd60a",
   "#ffafcc",
@@ -107,6 +180,27 @@ const OUTFIT_COLORS = [
   "#14213d",
   "#ff3333",
 ];
+
+function createPartColorPresets(defaultColor: string) {
+  return [
+    defaultColor,
+    ...OUTFIT_COLORS.filter(
+      (color) => !isSameHexColor(color, defaultColor),
+    ).slice(0, 9),
+  ];
+}
+
+const MUSICAL_JACKET_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_JACKET_COLOR,
+);
+
+const MUSICAL_INNER_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_INNER_COLOR,
+);
+
+const MUSICAL_SHORTS_COLORS = createPartColorPresets(
+  DEFAULT_MUSICAL_SHORTS_COLOR,
+);
 
 const FESTIVAL_TOP_COLORS = [
   DEFAULT_FESTIVAL_TOP_COLOR,
@@ -166,11 +260,20 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   skinTone: DEFAULT_SKIN_TONE,
   skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
+  mouthStyle: "DEFAULT",
   eyeStyle: "default",
   hairColor: DEFAULT_HAIR_COLOR,
   outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
   outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
   outfitColor: DEFAULT_OUTFIT_COLOR,
+  balletWearColor: DEFAULT_BALLET_WEAR_COLOR,
+  balletShortsColor: DEFAULT_BALLET_SHORTS_COLOR,
+  jacketColor: DEFAULT_CONCERT_JACKET_COLOR,
+  innerColor: DEFAULT_CONCERT_INNER_COLOR,
+  bottomColor: DEFAULT_CONCERT_BOTTOM_COLOR,
+  musicalJacketColor: DEFAULT_MUSICAL_JACKET_COLOR,
+  musicalInnerColor: DEFAULT_MUSICAL_INNER_COLOR,
+  musicalShortsColor: DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor: DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor: DEFAULT_FESTIVAL_BOTTOM_COLOR,
   accessory: "none",
@@ -196,11 +299,20 @@ function loadSavedCharacter(): CharacterConfig {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "mouthStyle"
         | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "balletWearColor"
+        | "balletShortsColor"
+        | "jacketColor"
+        | "innerColor"
+        | "bottomColor"
+        | "musicalJacketColor"
+        | "musicalInnerColor"
+        | "musicalShortsColor"
         | "festivalTopColor"
         | "festivalBottomColor"
         | "background"
@@ -209,11 +321,20 @@ function loadSavedCharacter(): CharacterConfig {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      mouthStyle?: unknown;
       eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      balletWearColor?: unknown;
+      balletShortsColor?: unknown;
+      jacketColor?: unknown;
+      innerColor?: unknown;
+      bottomColor?: unknown;
+      musicalJacketColor?: unknown;
+      musicalInnerColor?: unknown;
+      musicalShortsColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
       background?: unknown;
@@ -232,6 +353,49 @@ function loadSavedCharacter(): CharacterConfig {
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
+    const legacyOutfitColor =
+      resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
+
+    const resolvedBalletWearColor =
+      typeof parsed.balletWearColor === "string"
+        ? normalizeHexColor(parsed.balletWearColor)
+        : null;
+
+    const resolvedBalletShortsColor =
+      typeof parsed.balletShortsColor === "string"
+        ? normalizeHexColor(parsed.balletShortsColor)
+        : null;
+
+    const resolvedJacketColor =
+      typeof parsed.jacketColor === "string"
+        ? normalizeHexColor(parsed.jacketColor)
+        : null;
+
+    const resolvedInnerColor =
+      typeof parsed.innerColor === "string"
+        ? normalizeHexColor(parsed.innerColor)
+        : null;
+
+    const resolvedBottomColor =
+      typeof parsed.bottomColor === "string"
+        ? normalizeHexColor(parsed.bottomColor)
+        : null;
+
+    const resolvedMusicalJacketColor =
+      typeof parsed.musicalJacketColor === "string"
+        ? normalizeHexColor(parsed.musicalJacketColor)
+        : null;
+
+    const resolvedMusicalInnerColor =
+      typeof parsed.musicalInnerColor === "string"
+        ? normalizeHexColor(parsed.musicalInnerColor)
+        : null;
+
+    const resolvedMusicalShortsColor =
+      typeof parsed.musicalShortsColor === "string"
+        ? normalizeHexColor(parsed.musicalShortsColor)
         : null;
 
     const resolvedFestivalTopColor =
@@ -261,11 +425,23 @@ function loadSavedCharacter(): CharacterConfig {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
       eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      balletWearColor: resolvedBalletWearColor ?? legacyOutfitColor,
+      balletShortsColor: resolvedBalletShortsColor ?? legacyOutfitColor,
+      jacketColor: resolvedJacketColor ?? legacyOutfitColor,
+      innerColor: resolvedInnerColor ?? legacyOutfitColor,
+      bottomColor: resolvedBottomColor ?? legacyOutfitColor,
+      musicalJacketColor:
+        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
+      musicalInnerColor:
+        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
+      musicalShortsColor:
+        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
       festivalTopColor:
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
@@ -306,14 +482,6 @@ export default function AdminCharacterCreatorPage() {
     });
   }, []);
 
-  useEffect(() => {
-    document.body.classList.add("admin-layout");
-
-    return () => {
-      document.body.classList.remove("admin-layout");
-    };
-  }, []);
-
   const [character, setCharacter] = useState<CharacterConfig>(() =>
     loadSavedCharacter(),
   );
@@ -332,6 +500,49 @@ export default function AdminCharacterCreatorPage() {
     () => character.outfitColor,
   );
   const [outfitHexError, setOutfitHexError] = useState("");
+
+  const [balletWearHexInput, setBalletWearHexInput] = useState(
+    () => character.balletWearColor,
+  );
+  const [balletWearHexError, setBalletWearHexError] =
+    useState("");
+
+  const [balletShortsHexInput, setBalletShortsHexInput] =
+    useState(() => character.balletShortsColor);
+  const [balletShortsHexError, setBalletShortsHexError] =
+    useState("");
+
+  const [jacketHexInput, setJacketHexInput] = useState(
+    () => character.jacketColor,
+  );
+  const [jacketHexError, setJacketHexError] = useState("");
+
+  const [innerHexInput, setInnerHexInput] = useState(
+    () => character.innerColor,
+  );
+  const [innerHexError, setInnerHexError] = useState("");
+
+  const [bottomHexInput, setBottomHexInput] = useState(
+    () => character.bottomColor,
+  );
+  const [bottomHexError, setBottomHexError] = useState("");
+
+  const [musicalJacketHexInput, setMusicalJacketHexInput] = useState(
+    () => character.musicalJacketColor,
+  );
+  const [musicalJacketHexError, setMusicalJacketHexError] =
+    useState("");
+
+  const [musicalInnerHexInput, setMusicalInnerHexInput] = useState(
+    () => character.musicalInnerColor,
+  );
+  const [musicalInnerHexError, setMusicalInnerHexError] = useState("");
+
+  const [musicalShortsHexInput, setMusicalShortsHexInput] = useState(
+    () => character.musicalShortsColor,
+  );
+  const [musicalShortsHexError, setMusicalShortsHexError] =
+    useState("");
 
   const [festivalTopHexInput, setFestivalTopHexInput] = useState(
     () => character.festivalTopColor,
@@ -361,6 +572,34 @@ export default function AdminCharacterCreatorPage() {
   );
   const isCustomOutfitColor = !selectedOutfitColorPreset;
 
+  const selectedBalletWearColorPreset = OUTFIT_COLORS.find((color) =>
+    isSameHexColor(color, character.balletWearColor),
+  );
+  const isCustomBalletWearColor =
+    !selectedBalletWearColorPreset;
+
+  const selectedBalletShortsColorPreset = OUTFIT_COLORS.find(
+    (color) =>
+      isSameHexColor(color, character.balletShortsColor),
+  );
+  const isCustomBalletShortsColor =
+    !selectedBalletShortsColorPreset;
+
+  const selectedMusicalJacketPreset = MUSICAL_JACKET_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalJacketColor),
+  );
+  const isCustomMusicalJacketColor = !selectedMusicalJacketPreset;
+
+  const selectedMusicalInnerPreset = MUSICAL_INNER_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalInnerColor),
+  );
+  const isCustomMusicalInnerColor = !selectedMusicalInnerPreset;
+
+  const selectedMusicalShortsPreset = MUSICAL_SHORTS_COLORS.find(
+    (color) => isSameHexColor(color, character.musicalShortsColor),
+  );
+  const isCustomMusicalShortsColor = !selectedMusicalShortsPreset;
+
   const selectedFestivalTopColorPreset = FESTIVAL_TOP_COLORS.find(
     (color) => isSameHexColor(color, character.festivalTopColor),
   );
@@ -377,6 +616,9 @@ export default function AdminCharacterCreatorPage() {
   );
 
   const isCustomBackground = !selectedBackgroundPreset;
+  const isBalletOutfit = character.outfitModelId === "ballet";
+  const isConcertOutfit = character.outfitModelId === "concert";
+  const isMusicalOutfit = character.outfitModelId === "musical";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
   function update<K extends keyof CharacterConfig>(
@@ -574,6 +816,446 @@ export default function AdminCharacterCreatorPage() {
     setOutfitHexError("");
   }
 
+  function applyBalletWearColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("balletWearColor", normalized);
+    setBalletWearHexInput(normalized);
+    setBalletWearHexError("");
+
+    return true;
+  }
+
+  function handleBalletWearHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setBalletWearHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyBalletWearColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setBalletWearHexError(
+        "0-9와 A-F만 입력할 수 있습니다.",
+      );
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setBalletWearHexError(
+        "HEX 색상은 6자리로 입력해주세요.",
+      );
+      return;
+    }
+
+    setBalletWearHexError("");
+  }
+
+  function handleBalletWearHexBlur() {
+    const normalized = normalizeHexColor(balletWearHexInput);
+
+    if (normalized) {
+      applyBalletWearColor(normalized);
+      return;
+    }
+
+    setBalletWearHexInput(character.balletWearColor);
+    setBalletWearHexError("");
+  }
+
+  function applyBalletShortsColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("balletShortsColor", normalized);
+    setBalletShortsHexInput(normalized);
+    setBalletShortsHexError("");
+
+    return true;
+  }
+
+  function handleBalletShortsHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setBalletShortsHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyBalletShortsColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setBalletShortsHexError(
+        "0-9와 A-F만 입력할 수 있습니다.",
+      );
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setBalletShortsHexError(
+        "HEX 색상은 6자리로 입력해주세요.",
+      );
+      return;
+    }
+
+    setBalletShortsHexError("");
+  }
+
+  function handleBalletShortsHexBlur() {
+    const normalized = normalizeHexColor(balletShortsHexInput);
+
+    if (normalized) {
+      applyBalletShortsColor(normalized);
+      return;
+    }
+
+    setBalletShortsHexInput(character.balletShortsColor);
+    setBalletShortsHexError("");
+  }
+
+  function applyJacketColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("jacketColor", normalized);
+    setJacketHexInput(normalized);
+    setJacketHexError("");
+
+    return true;
+  }
+
+  function handleJacketHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setJacketHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyJacketColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setJacketHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setJacketHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setJacketHexError("");
+  }
+
+  function handleJacketHexBlur() {
+    const normalized = normalizeHexColor(jacketHexInput);
+
+    if (normalized) {
+      applyJacketColor(normalized);
+      return;
+    }
+
+    setJacketHexInput(character.jacketColor);
+    setJacketHexError("");
+  }
+
+  function applyInnerColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("innerColor", normalized);
+    setInnerHexInput(normalized);
+    setInnerHexError("");
+
+    return true;
+  }
+
+  function handleInnerHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setInnerHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyInnerColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setInnerHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setInnerHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setInnerHexError("");
+  }
+
+  function handleInnerHexBlur() {
+    const normalized = normalizeHexColor(innerHexInput);
+
+    if (normalized) {
+      applyInnerColor(normalized);
+      return;
+    }
+
+    setInnerHexInput(character.innerColor);
+    setInnerHexError("");
+  }
+
+  function applyBottomColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("bottomColor", normalized);
+    setBottomHexInput(normalized);
+    setBottomHexError("");
+
+    return true;
+  }
+
+  function handleBottomHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setBottomHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyBottomColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setBottomHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setBottomHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setBottomHexError("");
+  }
+
+  function handleBottomHexBlur() {
+    const normalized = normalizeHexColor(bottomHexInput);
+
+    if (normalized) {
+      applyBottomColor(normalized);
+      return;
+    }
+
+    setBottomHexInput(character.bottomColor);
+    setBottomHexError("");
+  }
+
+  function applyMusicalJacketColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalJacketColor", normalized);
+    setMusicalJacketHexInput(normalized);
+    setMusicalJacketHexError("");
+
+    return true;
+  }
+
+  function handleMusicalJacketHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalJacketHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalJacketColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalJacketHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalJacketHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalJacketHexError("");
+  }
+
+  function handleMusicalJacketHexBlur() {
+    const normalized = normalizeHexColor(musicalJacketHexInput);
+
+    if (normalized) {
+      applyMusicalJacketColor(normalized);
+      return;
+    }
+
+    setMusicalJacketHexInput(character.musicalJacketColor);
+    setMusicalJacketHexError("");
+  }
+
+  function applyMusicalInnerColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalInnerColor", normalized);
+    setMusicalInnerHexInput(normalized);
+    setMusicalInnerHexError("");
+
+    return true;
+  }
+
+  function handleMusicalInnerHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalInnerHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalInnerColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalInnerHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalInnerHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalInnerHexError("");
+  }
+
+  function handleMusicalInnerHexBlur() {
+    const normalized = normalizeHexColor(musicalInnerHexInput);
+
+    if (normalized) {
+      applyMusicalInnerColor(normalized);
+      return;
+    }
+
+    setMusicalInnerHexInput(character.musicalInnerColor);
+    setMusicalInnerHexError("");
+  }
+
+  function applyMusicalShortsColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("musicalShortsColor", normalized);
+    setMusicalShortsHexInput(normalized);
+    setMusicalShortsHexError("");
+
+    return true;
+  }
+
+  function handleMusicalShortsHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setMusicalShortsHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyMusicalShortsColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setMusicalShortsHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setMusicalShortsHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setMusicalShortsHexError("");
+  }
+
+  function handleMusicalShortsHexBlur() {
+    const normalized = normalizeHexColor(musicalShortsHexInput);
+
+    if (normalized) {
+      applyMusicalShortsColor(normalized);
+      return;
+    }
+
+    setMusicalShortsHexInput(character.musicalShortsColor);
+    setMusicalShortsHexError("");
+  }
+
   function applyFestivalTopColor(value: string) {
     const normalized = normalizeHexColor(value);
 
@@ -750,6 +1432,30 @@ export default function AdminCharacterCreatorPage() {
     setOutfitHexInput(DEFAULT_CHARACTER.outfitColor);
     setOutfitHexError("");
 
+    setBalletWearHexInput(DEFAULT_CHARACTER.balletWearColor);
+    setBalletWearHexError("");
+
+    setBalletShortsHexInput(DEFAULT_CHARACTER.balletShortsColor);
+    setBalletShortsHexError("");
+
+    setJacketHexInput(DEFAULT_CHARACTER.jacketColor);
+    setJacketHexError("");
+
+    setInnerHexInput(DEFAULT_CHARACTER.innerColor);
+    setInnerHexError("");
+
+    setBottomHexInput(DEFAULT_CHARACTER.bottomColor);
+    setBottomHexError("");
+
+    setMusicalJacketHexInput(DEFAULT_CHARACTER.musicalJacketColor);
+    setMusicalJacketHexError("");
+
+    setMusicalInnerHexInput(DEFAULT_CHARACTER.musicalInnerColor);
+    setMusicalInnerHexError("");
+
+    setMusicalShortsHexInput(DEFAULT_CHARACTER.musicalShortsColor);
+    setMusicalShortsHexError("");
+
     setFestivalTopHexInput(DEFAULT_CHARACTER.festivalTopColor);
     setFestivalTopHexError("");
 
@@ -775,9 +1481,84 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
-    if (!normalizeHexColor(outfitHexInput)) {
+    if (isBalletOutfit) {
+      if (!normalizeHexColor(balletWearHexInput)) {
+        setBalletWearHexError(
+          "발레 의상 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+        );
+        return;
+      }
+
+      if (!normalizeHexColor(balletShortsHexInput)) {
+        setBalletShortsHexError(
+          "하의 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+        );
+        return;
+      }
+    }
+
+    if (isConcertOutfit) {
+      if (!normalizeHexColor(jacketHexInput)) {
+        setJacketHexError(
+          "재킷 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+        );
+        return;
+      }
+
+      if (!normalizeHexColor(innerHexInput)) {
+        setInnerHexError(
+          "이너 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+        );
+        return;
+      }
+
+      if (!normalizeHexColor(bottomHexInput)) {
+        setBottomHexError(
+          "하의 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+        );
+        return;
+      }
+    }
+
+    if (
+      !isBalletOutfit &&
+      !isConcertOutfit &&
+      !isMusicalOutfit &&
+      !isFestivalOutfit &&
+      !normalizeHexColor(outfitHexInput)
+    ) {
       setOutfitHexError(
         "의상 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalJacketHexInput)
+    ) {
+      setMusicalJacketHexError(
+        "자켓 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalInnerHexInput)
+    ) {
+      setMusicalInnerHexError(
+        "이너 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
+      );
+      return;
+    }
+
+    if (
+      isMusicalOutfit &&
+      !normalizeHexColor(musicalShortsHexInput)
+    ) {
+      setMusicalShortsHexError(
+        "반바지 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
       );
       return;
     }
@@ -1169,6 +1950,29 @@ export default function AdminCharacterCreatorPage() {
               </div>
             </CreatorSection>
 
+            <CreatorSection title="입 모양">
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                  {MOUTH_OPTIONS.map((mouth) => (
+                    <OptionCard
+                      key={mouth.value}
+                      selected={character.mouthStyle === mouth.value}
+                      onClick={() => update("mouthStyle", mouth.value)}
+                    >
+                      <div
+                        className="text-2xl font-bold text-slate-800"
+                        aria-hidden="true"
+                      >
+                        {mouth.icon}
+                      </div>
+
+                      <p className="mt-2 text-xs font-bold text-slate-800">
+                        {mouth.label}
+                      </p>
+                    </OptionCard>
+                  ))}
+                </div>
+            </CreatorSection>
+
             <CreatorSection title="의상 선택">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {OUTFIT_OPTIONS.map((outfit) => (
@@ -1198,7 +2002,387 @@ export default function AdminCharacterCreatorPage() {
                 ))}
               </div>
 
-              {isFestivalOutfit ? (
+              {isBalletOutfit ? (
+                <div className="mt-5 space-y-6">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">
+                      발레 의상 컬러
+                    </p>
+
+                    <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
+                      {OUTFIT_COLORS.map((color) => (
+                        <ColorButton
+                          key={color}
+                          color={color}
+                          selected={isSameHexColor(
+                            character.balletWearColor,
+                            color,
+                          )}
+                          onClick={() =>
+                            applyBalletWearColor(
+                              color,
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-800">
+                            사용자 지정 발레 의상 컬러
+                          </h3>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
+                          </p>
+                        </div>
+
+                        {isCustomBalletWearColor && (
+                          <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+                            CUSTOM 선택됨
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+                        <div>
+                          <label
+                            htmlFor="custom-ballet-wear-color-picker"
+                            className="mb-2 block text-xs font-bold text-slate-700"
+                          >
+                            컬러 피커
+                          </label>
+
+                          <input
+                            id="custom-ballet-wear-color-picker"
+                            type="color"
+                            value={
+                              character.balletWearColor
+                            }
+                            onChange={(event) =>
+                              applyBalletWearColor(
+                                event.target.value,
+                              )
+                            }
+                            className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                            aria-label="사용자 지정 발레 의상 컬러 선택"
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="custom-ballet-wear-hex"
+                            className="mb-2 block text-xs font-bold text-slate-700"
+                          >
+                            HEX 색상 코드
+                          </label>
+
+                          <input
+                            id="custom-ballet-wear-hex"
+                            type="text"
+                            value={
+                              balletWearHexInput
+                            }
+                            onChange={(event) =>
+                              handleBalletWearHexChange(
+                                event.target.value,
+                              )
+                            }
+                            onBlur={
+                              handleBalletWearHexBlur
+                            }
+                            placeholder="#60A5FA"
+                            maxLength={7}
+                            spellCheck={false}
+                            aria-invalid={Boolean(
+                              balletWearHexError,
+                            )}
+                            aria-describedby="custom-ballet-wear-hex-help custom-ballet-wear-hex-error"
+                            className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                              balletWearHexError
+                                ? "border-red-500 focus:border-red-500"
+                                : "border-slate-300 focus:border-primary"
+                            }`}
+                          />
+
+                          <p
+                            id="custom-ballet-wear-hex-help"
+                            className="mt-1 text-[11px] text-slate-500"
+                          >
+                            # 없이 6자리만 입력해도 자동으로 적용됩니다.
+                          </p>
+
+                          {balletWearHexError && (
+                            <p
+                              id="custom-ballet-wear-hex-error"
+                              className="mt-1 text-xs font-medium text-red-600"
+                            >
+                              {
+                                balletWearHexError
+                              }
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="mb-2 text-xs font-bold text-slate-700">
+                            현재 적용 색상
+                          </p>
+
+                          <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+                            <span
+                              className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                              style={{
+                                backgroundColor:
+                                  character.balletWearColor,
+                              }}
+                            />
+
+                            <code className="text-xs font-bold text-slate-700">
+                              {character.balletWearColor.toUpperCase()}
+                            </code>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">
+                      하의 컬러
+                    </p>
+
+                    <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
+                      {OUTFIT_COLORS.map((color) => (
+                        <ColorButton
+                          key={color}
+                          color={color}
+                          selected={isSameHexColor(
+                            character.balletShortsColor,
+                            color,
+                          )}
+                          onClick={() =>
+                            applyBalletShortsColor(
+                              color,
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-800">
+                            사용자 지정 하의 컬러
+                          </h3>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수 있습니다.
+                          </p>
+                        </div>
+
+                        {isCustomBalletShortsColor && (
+                          <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+                            CUSTOM 선택됨
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+                        <div>
+                          <label
+                            htmlFor="custom-ballet-shorts-color-picker"
+                            className="mb-2 block text-xs font-bold text-slate-700"
+                          >
+                            컬러 피커
+                          </label>
+
+                          <input
+                            id="custom-ballet-shorts-color-picker"
+                            type="color"
+                            value={
+                              character.balletShortsColor
+                            }
+                            onChange={(event) =>
+                              applyBalletShortsColor(
+                                event.target.value,
+                              )
+                            }
+                            className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                            aria-label="사용자 지정 하의 컬러 선택"
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="custom-ballet-shorts-hex"
+                            className="mb-2 block text-xs font-bold text-slate-700"
+                          >
+                            HEX 색상 코드
+                          </label>
+
+                          <input
+                            id="custom-ballet-shorts-hex"
+                            type="text"
+                            value={
+                              balletShortsHexInput
+                            }
+                            onChange={(event) =>
+                              handleBalletShortsHexChange(
+                                event.target.value,
+                              )
+                            }
+                            onBlur={
+                              handleBalletShortsHexBlur
+                            }
+                            placeholder="#60A5FA"
+                            maxLength={7}
+                            spellCheck={false}
+                            aria-invalid={Boolean(
+                              balletShortsHexError,
+                            )}
+                            aria-describedby="custom-ballet-shorts-hex-help custom-ballet-shorts-hex-error"
+                            className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                              balletShortsHexError
+                                ? "border-red-500 focus:border-red-500"
+                                : "border-slate-300 focus:border-primary"
+                            }`}
+                          />
+
+                          <p
+                            id="custom-ballet-shorts-hex-help"
+                            className="mt-1 text-[11px] text-slate-500"
+                          >
+                            # 없이 6자리만 입력해도 자동으로 적용됩니다.
+                          </p>
+
+                          {balletShortsHexError && (
+                            <p
+                              id="custom-ballet-shorts-hex-error"
+                              className="mt-1 text-xs font-medium text-red-600"
+                            >
+                              {
+                                balletShortsHexError
+                              }
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="mb-2 text-xs font-bold text-slate-700">
+                            현재 적용 색상
+                          </p>
+
+                          <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+                            <span
+                              className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                              style={{
+                                backgroundColor:
+                                  character.balletShortsColor,
+                              }}
+                            />
+
+                            <code className="text-xs font-bold text-slate-700">
+                              {character.balletShortsColor.toUpperCase()}
+                            </code>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : isConcertOutfit ? (
+                <div className="mt-5 space-y-5">
+                  <OutfitColorCustomizer
+                    idPrefix="concert-jacket"
+                    title="재킷 컬러"
+                    customTitle="사용자 지정 재킷 컬러"
+                    value={character.jacketColor}
+                    hexInput={jacketHexInput}
+                    hexError={jacketHexError}
+                    onApplyColor={applyJacketColor}
+                    onHexChange={handleJacketHexChange}
+                    onHexBlur={handleJacketHexBlur}
+                  />
+
+                  <OutfitColorCustomizer
+                    idPrefix="concert-inner"
+                    title="이너 컬러"
+                    customTitle="사용자 지정 이너 컬러"
+                    value={character.innerColor}
+                    hexInput={innerHexInput}
+                    hexError={innerHexError}
+                    onApplyColor={applyInnerColor}
+                    onHexChange={handleInnerHexChange}
+                    onHexBlur={handleInnerHexBlur}
+                  />
+
+                  <OutfitColorCustomizer
+                    idPrefix="concert-bottom"
+                    title="하의 컬러"
+                    customTitle="사용자 지정 하의 컬러"
+                    value={character.bottomColor}
+                    hexInput={bottomHexInput}
+                    hexError={bottomHexError}
+                    onApplyColor={applyBottomColor}
+                    onHexChange={handleBottomHexChange}
+                    onHexBlur={handleBottomHexBlur}
+                  />
+                </div>
+              ) : isMusicalOutfit ? (
+                <>
+                  <OutfitColorControl
+                    title="자켓 컬러"
+                    customTitle="사용자 지정 자켓 컬러"
+                    idPrefix="musical-jacket"
+                    currentColor={character.musicalJacketColor}
+                    hexInput={musicalJacketHexInput}
+                    hexError={musicalJacketHexError}
+                    presets={MUSICAL_JACKET_COLORS}
+                    isCustom={isCustomMusicalJacketColor}
+                    placeholder={DEFAULT_MUSICAL_JACKET_COLOR}
+                    onPresetClick={applyMusicalJacketColor}
+                    onColorPickerChange={applyMusicalJacketColor}
+                    onHexChange={handleMusicalJacketHexChange}
+                    onHexBlur={handleMusicalJacketHexBlur}
+                  />
+
+                  <OutfitColorControl
+                    title="이너 컬러"
+                    customTitle="사용자 지정 이너 컬러"
+                    idPrefix="musical-inner"
+                    currentColor={character.musicalInnerColor}
+                    hexInput={musicalInnerHexInput}
+                    hexError={musicalInnerHexError}
+                    presets={MUSICAL_INNER_COLORS}
+                    isCustom={isCustomMusicalInnerColor}
+                    placeholder={DEFAULT_MUSICAL_INNER_COLOR}
+                    onPresetClick={applyMusicalInnerColor}
+                    onColorPickerChange={applyMusicalInnerColor}
+                    onHexChange={handleMusicalInnerHexChange}
+                    onHexBlur={handleMusicalInnerHexBlur}
+                  />
+
+                  <OutfitColorControl
+                    title="반바지 컬러"
+                    customTitle="사용자 지정 반바지 컬러"
+                    idPrefix="musical-shorts"
+                    currentColor={character.musicalShortsColor}
+                    hexInput={musicalShortsHexInput}
+                    hexError={musicalShortsHexError}
+                    presets={MUSICAL_SHORTS_COLORS}
+                    isCustom={isCustomMusicalShortsColor}
+                    placeholder={DEFAULT_MUSICAL_SHORTS_COLOR}
+                    onPresetClick={applyMusicalShortsColor}
+                    onColorPickerChange={applyMusicalShortsColor}
+                    onHexChange={handleMusicalShortsHexChange}
+                    onHexBlur={handleMusicalShortsHexBlur}
+                  />
+                </>
+              ) : isFestivalOutfit ? (
                 <>
                   <OutfitColorControl
                     title="상의 컬러"
@@ -1473,6 +2657,14 @@ export default function AdminCharacterCreatorPage() {
                 skinColor={character.skinColor}
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
+                balletWearColor={character.balletWearColor}
+                balletShortsColor={character.balletShortsColor}
+                jacketColor={character.jacketColor}
+                innerColor={character.innerColor}
+                bottomColor={character.bottomColor}
+                musicalJacketColor={character.musicalJacketColor}
+                musicalInnerColor={character.musicalInnerColor}
+                musicalShortsColor={character.musicalShortsColor}
                 festivalTopColor={
                   character.festivalTopColor
                 }
@@ -1483,6 +2675,7 @@ export default function AdminCharacterCreatorPage() {
                 outfitModelId={character.outfitModelId}
                 hairStyle={character.hairStyle}
                 eyeStyle={character.eyeStyle}
+                mouthStyle={character.mouthStyle}
               />
             </div>
 
@@ -1493,6 +2686,7 @@ export default function AdminCharacterCreatorPage() {
                 {character.skinColor.toUpperCase()}
               </p>
               <p>헤어: {character.hairStyle}</p>
+              <p>입: {MOUTH_STYLE_LABELS[character.mouthStyle]}</p>
               <p>눈: {character.eyeStyle}</p>
               <p>
                 헤어 컬러:{" "}
@@ -1500,7 +2694,43 @@ export default function AdminCharacterCreatorPage() {
               </p>
               <p>의상: {character.outfitName}</p>
 
-              {isFestivalOutfit ? (
+              {isBalletOutfit ? (
+                <>
+                  <p>
+                    발레 의상:{" "}
+                    {character.balletWearColor.toUpperCase()}
+                  </p>
+
+                  <p>
+                    하의:{" "}
+                    {character.balletShortsColor.toUpperCase()}
+                  </p>
+                </>
+              ) : isConcertOutfit ? (
+                <>
+                  <p>
+                    재킷: {character.jacketColor.toUpperCase()}
+                  </p>
+                  <p>
+                    이너: {character.innerColor.toUpperCase()}
+                  </p>
+                  <p>
+                    하의: {character.bottomColor.toUpperCase()}
+                  </p>
+                </>
+              ) : isMusicalOutfit ? (
+                <>
+                  <p>
+                    자켓: {character.musicalJacketColor.toUpperCase()}
+                  </p>
+                  <p>
+                    이너: {character.musicalInnerColor.toUpperCase()}
+                  </p>
+                  <p>
+                    반바지: {character.musicalShortsColor.toUpperCase()}
+                  </p>
+                </>
+              ) : isFestivalOutfit ? (
                 <>
                   <p>
                     상의 컬러:{" "}
@@ -1569,6 +2799,150 @@ function CreatorSection({
       <h2 className="mb-4 text-sm font-bold">{title}</h2>
       {children}
     </section>
+  );
+}
+
+function OutfitColorCustomizer({
+  idPrefix,
+  title,
+  customTitle,
+  value,
+  hexInput,
+  hexError,
+  onApplyColor,
+  onHexChange,
+  onHexBlur,
+}: OutfitColorCustomizerProps) {
+  const selectedPreset = OUTFIT_COLORS.find((color) =>
+    isSameHexColor(color, value),
+  );
+
+  const isCustomColor = !selectedPreset;
+
+  return (
+    <div>
+      <p className="text-sm font-bold text-slate-800">
+        {title}
+      </p>
+
+      <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
+        {OUTFIT_COLORS.map((color) => (
+          <ColorButton
+            key={color}
+            color={color}
+            selected={isSameHexColor(value, color)}
+            onClick={() => onApplyColor(color)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">
+              {customTitle}
+            </h3>
+
+            <p className="mt-1 text-xs text-slate-500">
+              컬러 피커 또는 6자리 HEX 코드로 직접 지정할 수
+              있습니다.
+            </p>
+          </div>
+
+          {isCustomColor && (
+            <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white">
+              CUSTOM 선택됨
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-[72px_1fr_150px]">
+          <div>
+            <label
+              htmlFor={`${idPrefix}-color-picker`}
+              className="mb-2 block text-xs font-bold text-slate-700"
+            >
+              컬러 피커
+            </label>
+
+            <input
+              id={`${idPrefix}-color-picker`}
+              type="color"
+              value={value}
+              onChange={(event) =>
+                onApplyColor(event.target.value)
+              }
+              className="h-12 w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+              aria-label={`${title} 사용자 지정 색상 선택`}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor={`${idPrefix}-hex`}
+              className="mb-2 block text-xs font-bold text-slate-700"
+            >
+              HEX 색상 코드
+            </label>
+
+            <input
+              id={`${idPrefix}-hex`}
+              type="text"
+              value={hexInput}
+              onChange={(event) =>
+                onHexChange(event.target.value)
+              }
+              onBlur={onHexBlur}
+              placeholder="#60A5FA"
+              maxLength={7}
+              spellCheck={false}
+              aria-invalid={Boolean(hexError)}
+              aria-describedby={`${idPrefix}-hex-help ${idPrefix}-hex-error`}
+              className={`h-12 w-full rounded-lg border bg-white px-3 font-mono text-sm uppercase outline-none transition ${
+                hexError
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-slate-300 focus:border-primary"
+              }`}
+            />
+
+            <p
+              id={`${idPrefix}-hex-help`}
+              className="mt-1 text-[11px] text-slate-500"
+            >
+              # 없이 6자리만 입력해도 자동으로 적용됩니다.
+            </p>
+
+            {hexError && (
+              <p
+                id={`${idPrefix}-hex-error`}
+                className="mt-1 text-xs font-medium text-red-600"
+              >
+                {hexError}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-bold text-slate-700">
+              현재 적용 색상
+            </p>
+
+            <div className="flex h-12 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
+              <span
+                className="h-7 w-7 shrink-0 rounded border border-slate-200"
+                style={{
+                  backgroundColor: value,
+                }}
+              />
+
+              <code className="text-xs font-bold text-slate-700">
+                {value.toUpperCase()}
+              </code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

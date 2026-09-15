@@ -43,12 +43,12 @@ import {
   type BookingAdminSummaryResponse,
 } from "./adminBookingMapper";
 import {
-  mapAdminMonitoringSeats,
+  mapAdminMonitoring,
   mapAdminSeatDetail,
   type SeatAdminMonitoringResponse,
   type SeatAdminSeatDetailResponse,
 } from "./adminSeatMapper";
-import type { SeatWithStatus } from "@/types/domain/seat";
+import type { SeatMapData } from "@/types/domain/seat";
 
 // ── 대시보드 ───────────────────────────────────────────
 export async function fetchAdminDashboard(
@@ -152,7 +152,7 @@ export const LEGACY_HOLD_BOOKING_NUMBER = "-";
 // ── 좌석 모니터링 ──────────────────────────────────────
 export async function fetchAdminSeatMonitoring(
   performanceId: number,
-): Promise<{ seats: SeatWithStatus[] }> {
+): Promise<SeatMapData> {
   if (USE_MOCK) return mocks.mockGetAdminSeatMonitoring(performanceId);
 
   const res = await apiClient.get<SeatAdminMonitoringResponse>(
@@ -161,7 +161,7 @@ export async function fetchAdminSeatMonitoring(
   if (res.data == null) {
     throw new Error("좌석 정보를 불러올 수 없습니다.");
   }
-  return { seats: mapAdminMonitoringSeats(res.data) };
+  return mapAdminMonitoring(res.data);
 }
 
 export async function fetchAdminSeatDetail(

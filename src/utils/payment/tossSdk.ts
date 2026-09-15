@@ -29,7 +29,7 @@ if (!import.meta.env.VITE_TOSS_CLIENT_KEY) {
   );
 }
 
-/** 프론트 PaymentMethod(KAKAO/NAVER/TOSS) → Toss easyPay 조직 코드 매핑 */
+/** 프론트 PaymentMethod → Toss easyPay 조직 코드 매핑 (UI는 TOSS만 노출) */
 const EASY_PAY_CODE: Record<PaymentMethod, string> = {
   KAKAO: "KAKAOPAY",
   NAVER: "NAVERPAY",
@@ -47,7 +47,7 @@ function getTossPayments(): Promise<TossPaymentsSDK> {
 }
 
 export interface RequestTossPaymentParams {
-  /** 결제 수단 — 간편결제(카카오페이/네이버페이/토스페이) 중 하나 */
+  /** 결제 수단 — UI는 토스페이만 노출 (타입은 백엔드 enum 호환 유지) */
   provider: PaymentMethod;
   /**
    * 구매자를 식별하는 고유 키 (영문/숫자/`-_=.@` 중 1개 이상 포함, 2~50자).

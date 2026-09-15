@@ -27,6 +27,7 @@ import useSeatStore from "@/stores/reservation/seatStore";
 import type {
   SeatWithStatus,
   SeatCounts,
+  SeatMapData,
   SeatStatus,
   SeatUpdateEvent,
 } from "@/types/domain/seat";
@@ -76,7 +77,7 @@ function ensureSeatState(performanceId: number) {
 
 export async function mockGetSeats(
   performanceId: number,
-): Promise<SeatWithStatus[]> {
+): Promise<SeatMapData> {
   await mockDelay(400);
   ensureSeatState(performanceId);
 
@@ -89,7 +90,6 @@ export async function mockGetSeats(
         id: seatId,
         seatLayoutId: seatId,
         seatNumber: `${row}-${col}`,
-        // 파생 필드 (프론트 편의)
         row,
         col,
         status: statusMap.get(seatId)!,
@@ -98,7 +98,11 @@ export async function mockGetSeats(
     }
   });
 
-  return seats;
+  return {
+    layout: { totalRows: ROWS.length, maxCols: COLS },
+    layoutReady: true,
+    seats,
+  };
 }
 
 export async function mockGetSeatCounts(

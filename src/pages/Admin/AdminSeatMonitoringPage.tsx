@@ -451,10 +451,15 @@ export default function AdminSeatMonitoringPage() {
             <div className="text-center py-20 text-admin-text-secondary">
               좌석 정보 불러오는 중...
             </div>
+          ) : monitoring && !monitoring.layoutReady ? (
+            <div className="text-center py-20 text-admin-text-secondary">
+              좌석 배치가 아직 생성되지 않았습니다.
+            </div>
           ) : monitoring ? (
             <>
               <AdminSeatMap
                 seats={monitoring.seats}
+                layout={monitoring.layout}
                 selectedSeatId={selectedSeatId}
                 onSeatClick={handleSeatClick}
                 scale={0.7}
@@ -467,7 +472,7 @@ export default function AdminSeatMonitoringPage() {
                 <LegendRow swatch="bg-admin-seat-sold" label="판매 완료" />
                 <LegendRow
                   swatch="bg-admin-seat-holding"
-                  label="진행중 (타이머)"
+                  label="임시예매 (타이머)"
                 />
               </div>
             </>
