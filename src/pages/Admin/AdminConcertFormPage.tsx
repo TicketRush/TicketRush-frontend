@@ -18,6 +18,10 @@ import {
 } from "@/hooks/admin/useAdmin";
 import type { ConcertFormData } from "@/types/domain/admin";
 import type { Genre } from "@/types/domain/concert";
+import {
+  sanitizeConcertForm,
+  validateConcertForm,
+} from "@/utils/admin/concertFormValidation";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import {
   resolveStoredHairStyle,
@@ -28,11 +32,19 @@ import {
   type EyeStyle,
 } from "@/components/admin/character/characterEye";
 import {
+  MOUTH_STYLE_LABELS,
+  resolveStoredMouthStyle,
+  type MouthStyle,
+} from "@/components/admin/character/characterMouth";
+import {
   normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
+  DEFAULT_MUSICAL_INNER_COLOR,
+  DEFAULT_MUSICAL_JACKET_COLOR,
+  DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   getOutfitOption,
@@ -85,11 +97,20 @@ interface CharacterDraft {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  mouthStyle: MouthStyle;
   eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  balletWearColor: string;
+  balletShortsColor: string;
+  jacketColor: string;
+  innerColor: string;
+  bottomColor: string;
+  musicalJacketColor: string;
+  musicalInnerColor: string;
+  musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
   accessory: string;
@@ -111,11 +132,20 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "mouthStyle"
         | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "balletWearColor"
+        | "balletShortsColor"
+        | "jacketColor"
+        | "innerColor"
+        | "bottomColor"
+        | "musicalJacketColor"
+        | "musicalInnerColor"
+        | "musicalShortsColor"
         | "festivalTopColor"
         | "festivalBottomColor"
         | "background"
@@ -124,11 +154,20 @@ function loadSavedCharacter(): CharacterDraft | null {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      mouthStyle?: unknown;
       eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      balletWearColor?: unknown;
+      balletShortsColor?: unknown;
+      jacketColor?: unknown;
+      innerColor?: unknown;
+      bottomColor?: unknown;
+      musicalJacketColor?: unknown;
+      musicalInnerColor?: unknown;
+      musicalShortsColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
       background?: unknown;
@@ -147,6 +186,49 @@ function loadSavedCharacter(): CharacterDraft | null {
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
+    const legacyOutfitColor =
+      resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
+
+    const resolvedBalletWearColor =
+      typeof parsed.balletWearColor === "string"
+        ? normalizeHexColor(parsed.balletWearColor)
+        : null;
+
+    const resolvedBalletShortsColor =
+      typeof parsed.balletShortsColor === "string"
+        ? normalizeHexColor(parsed.balletShortsColor)
+        : null;
+
+    const resolvedJacketColor =
+      typeof parsed.jacketColor === "string"
+        ? normalizeHexColor(parsed.jacketColor)
+        : null;
+
+    const resolvedInnerColor =
+      typeof parsed.innerColor === "string"
+        ? normalizeHexColor(parsed.innerColor)
+        : null;
+
+    const resolvedBottomColor =
+      typeof parsed.bottomColor === "string"
+        ? normalizeHexColor(parsed.bottomColor)
+        : null;
+
+    const resolvedMusicalJacketColor =
+      typeof parsed.musicalJacketColor === "string"
+        ? normalizeHexColor(parsed.musicalJacketColor)
+        : null;
+
+    const resolvedMusicalInnerColor =
+      typeof parsed.musicalInnerColor === "string"
+        ? normalizeHexColor(parsed.musicalInnerColor)
+        : null;
+
+    const resolvedMusicalShortsColor =
+      typeof parsed.musicalShortsColor === "string"
+        ? normalizeHexColor(parsed.musicalShortsColor)
         : null;
 
     const resolvedFestivalTopColor =
@@ -175,11 +257,23 @@ function loadSavedCharacter(): CharacterDraft | null {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
       eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      balletWearColor: resolvedBalletWearColor ?? legacyOutfitColor,
+      balletShortsColor: resolvedBalletShortsColor ?? legacyOutfitColor,
+      jacketColor: resolvedJacketColor ?? legacyOutfitColor,
+      innerColor: resolvedInnerColor ?? legacyOutfitColor,
+      bottomColor: resolvedBottomColor ?? legacyOutfitColor,
+      musicalJacketColor:
+        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
+      musicalInnerColor:
+        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
+      musicalShortsColor:
+        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
       festivalTopColor:
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
@@ -409,39 +503,26 @@ export default function AdminConcertFormPage({ mode }: Props) {
     });
   }
 
-  function validateForm() {
-    if (!form.title.trim()) return "공연명을 입력해주세요.";
-    if (!form.performer.trim()) return "출연진을 입력해주세요.";
-    if (!form.genre) return "장르를 선택해주세요.";
-    if (!form.date) return "공연 날짜를 선택해주세요.";
-    if (!form.time) return "공연 시간을 선택해주세요.";
-
-    if (!form.durationMinutes || form.durationMinutes <= 0) {
-      return "공연 러닝타임을 입력해주세요.";
-    }
-
-    if (!form.venue.trim()) return "공연장명을 입력해주세요.";
-    if (!form.address.trim()) return "상세 주소를 입력해주세요.";
-    if (!form.price || form.price <= 0) return "티켓 가격을 입력해주세요.";
-    if (!totalSeats || totalSeats <= 0) return "총 좌석 수를 입력해주세요.";
-    if (!form.description.trim()) return "공연 상세 설명을 입력해주세요.";
-
-    if (mode === "create" && !selectedCharacter) {
-      return "3D 캐릭터를 제작해주세요.";
-    }
-
-    if (mode === "create" && !mainImage) {
-      return "대표 이미지를 업로드해주세요.";
-    }
-
-    return null;
-  }
-
   async function handleSubmit() {
-    const errorMessage = validateForm();
+    const sanitizedForm = sanitizeConcertForm(form);
+
+    const errorMessage = validateConcertForm({
+      form: sanitizedForm,
+      totalSeats,
+    });
 
     if (errorMessage) {
       toast.error(errorMessage);
+      return;
+    }
+
+    if (mode === "create" && !selectedCharacter) {
+      toast.error("3D 캐릭터를 제작해주세요.");
+      return;
+    }
+
+    if (mode === "create" && !mainImage) {
+      toast.error("대표 이미지를 업로드해주세요.");
       return;
     }
 
@@ -451,10 +532,10 @@ export default function AdminConcertFormPage({ mode }: Props) {
       // totalSeats, mainImage, galleryImages, model3d는 백엔드 스펙 확정 후
       // FormData 또는 별도 업로드 API로 연결 필요.
       if (mode === "create") {
-        await createMutation.mutateAsync(form);
+        await createMutation.mutateAsync(sanitizedForm);
         toast.success("공연이 등록되었습니다.");
       } else {
-        await updateMutation.mutateAsync(form);
+        await updateMutation.mutateAsync(sanitizedForm);
         toast.success("공연이 수정되었습니다.");
       }
 
@@ -995,6 +1076,9 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isBalletOutfit = character.outfitModelId === "ballet";
+  const isConcertOutfit = character.outfitModelId === "concert";
+  const isMusicalOutfit = character.outfitModelId === "musical";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
   return (
@@ -1008,12 +1092,21 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          balletWearColor={character.balletWearColor}
+          balletShortsColor={character.balletShortsColor}
+          jacketColor={character.jacketColor}
+          innerColor={character.innerColor}
+          bottomColor={character.bottomColor}
+          musicalJacketColor={character.musicalJacketColor}
+          musicalInnerColor={character.musicalInnerColor}
+          musicalShortsColor={character.musicalShortsColor}
           festivalTopColor={character.festivalTopColor}
           festivalBottomColor={character.festivalBottomColor}
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
           eyeStyle={character.eyeStyle}
+          mouthStyle={character.mouthStyle}
         />
       </div>
 
@@ -1032,6 +1125,35 @@ function CharacterCreatorLinkBox({
           의상: {character.outfitName} / 액세서리: {character.accessory} /
           포즈: {character.pose}
         </p>
+
+        <p className="mt-1 text-xs text-admin-text-secondary">
+          입: {MOUTH_STYLE_LABELS[character.mouthStyle]}
+        </p>
+
+        {isBalletOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            발레 의상:{" "}
+            {character.balletWearColor.toUpperCase()}{" "}
+            / 하의:{" "}
+            {character.balletShortsColor.toUpperCase()}
+          </p>
+        )}
+
+        {isConcertOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            재킷: {character.jacketColor.toUpperCase()} /
+            이너: {character.innerColor.toUpperCase()} /
+            하의: {character.bottomColor.toUpperCase()}
+          </p>
+        )}
+
+        {isMusicalOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            자켓: {character.musicalJacketColor.toUpperCase()} / 이너:{" "}
+            {character.musicalInnerColor.toUpperCase()} / 반바지:{" "}
+            {character.musicalShortsColor.toUpperCase()}
+          </p>
+        )}
 
         {isFestivalOutfit && (
           <p className="mt-1 text-xs text-admin-text-secondary">

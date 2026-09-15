@@ -11,6 +11,8 @@
 //   - 소셜 버튼에 LoginPage와 동일한 OAuth 시작 로직 연결
 //     * getOauthUrlApi(provider) → window.location.href 리다이렉트
 //     * 실패 시 toast, pendingProvider로 로딩·중복 클릭 방지
+// 변경 이력 (이슈 #250):
+//   - 인증번호 placeholder만 ●●●●●● (입력값은 평문 유지)
 // 변경 이력 (이슈 #251/#252):
 //   - 발송 버튼 고정 너비 + 입력 min-w-0 + Button 로딩 너비 유지 (#251)
 //   - mock 안내 토스트는 USE_MOCK일 때만 노출 (#252)
@@ -273,7 +275,7 @@ export default function SignupPage() {
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="xxxxxx"
+                placeholder="●●●●●●"
                 disabled={!verificationSent || isEmailVerified}
                 className="min-w-0 flex-1 px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-50 disabled:text-text-secondary"
                 {...register("verificationCode")}

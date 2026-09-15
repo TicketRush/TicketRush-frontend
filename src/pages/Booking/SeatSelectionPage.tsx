@@ -133,7 +133,7 @@ export default function SeatSelectionPage() {
         (seatCountsLoading || seatCountsFetching)));
 
   // #122: layouts → 좌석맵, counts → 하단 잔여/상태 통계
-  const { data: seats, isLoading, isError } = useSeats(
+  const { data: seatMap, isLoading, isError } = useSeats(
     performanceId,
     canEnter,
   );
@@ -143,8 +143,8 @@ export default function SeatSelectionPage() {
 
   // polling fallback 등으로 캐시가 갱신돼도 선택 좌석이 AVAILABLE이 아니면 해제
   useEffect(() => {
-    if (!selectedSeat || !seats) return;
-    const current = seats.find((s) => s.id === selectedSeat.id);
+    if (!selectedSeat || !seatMap?.seats) return;
+    const current = seatMap.seats.find((s) => s.id === selectedSeat.id);
     if (!current) {
       clearSelectedSeatIfTaken(selectedSeat.id, "SOLD", {
         preserve: shouldPreserveSelection(selectedSeat.id),
@@ -154,7 +154,7 @@ export default function SeatSelectionPage() {
     clearSelectedSeatIfTaken(selectedSeat.id, current.status, {
       preserve: shouldPreserveSelection(selectedSeat.id),
     });
-  }, [seats, selectedSeat, shouldPreserveSelection]);
+  }, [seatMap, selectedSeat, shouldPreserveSelection]);
 
   // 직접 URL 진입 시에도 결제 플로우용 store를 맞춤
   useEffect(() => {
@@ -225,7 +225,9 @@ export default function SeatSelectionPage() {
 
   const selectedSeatAvailable =
     !!selectedSeat &&
-    seats?.some((s) => s.id === selectedSeat.id && s.status === "AVAILABLE");
+    !!seatMap?.seats?.some(
+      (s) => s.id === selectedSeat.id && s.status === "AVAILABLE",
+    );
 
   function handleSeatClick(seat: SeatWithStatus) {
     toggleSeat({
@@ -411,9 +413,14 @@ export default function SeatSelectionPage() {
                   <AlertCircle size={20} />
                   좌석 정보를 불러올 수 없습니다.
                 </div>
+              ) : seatMap && !seatMap.layoutReady ? (
+                <div className="text-center text-text-secondary py-12">
+                  좌석 배치가 아직 생성되지 않았습니다.
+                </div>
               ) : (
                 <SeatMap
-                  seats={seats ?? []}
+                  seats={seatMap?.seats ?? []}
+                  layout={seatMap?.layout}
                   selectedSeatId={selectedSeatAvailable ? (selectedSeat?.id ?? null) : null}
                   onSeatClick={handleSeatClick}
                 />
@@ -432,8 +439,9 @@ export default function SeatSelectionPage() {
           value={stats.available}
           colorClass="text-seat-available"
         />
+        {/* holdCount = 공연 전체 HOLD. 내 임시예매만이 아님 (#260 후속 UX) */}
         <Stat
-          label="진행중"
+          label="임시예매"
           value={stats.holding}
           colorClass="text-seat-holding"
         />

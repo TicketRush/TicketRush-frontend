@@ -2,6 +2,9 @@
 //
 // 백엔드 스펙 반영 변경:
 //   - booking.seatNumber → booking.seatNumber
+// 변경 이력 (이슈 #285):
+//   - 환불·취소 확인을 window.confirm → 공통 Modal로 교체
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, MapPin, Ticket, AlertCircle } from "lucide-react";
 import { toast } from "react-toastify";
@@ -18,11 +21,14 @@ import {
 } from "@/utils/booking";
 import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
+import Modal from "@/components/common/Modal/Modal";
 
 interface BookingCardProps {
   booking: BookingListItem;
   tab: BookingTab;
 }
+
+type ConfirmKind = "refund" | "cancel" | null;
 
 const STATUS_BADGE: Record<
   BookingStatus,
@@ -82,6 +88,7 @@ const STATUS_BADGE: Record<
 export function BookingCard({ booking, tab }: BookingCardProps) {
   const navigate = useNavigate();
   const cancelBooking = useCancelBooking();
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null);
 
   const isRefundable = isRefundableBooking(booking);
 
@@ -89,30 +96,39 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   const isPastTab = tab === "past";
 
   const statusBadge = STATUS_BADGE[booking.status] ?? STATUS_BADGE.EXPIRED;
+  const confirmPending =
+    confirmKind === "cancel" && cancelBooking.isPending;
 
   // ─ 핸들러 ─
   const handleViewTicket = () => {
     navigate(`/reservations/mypage/${booking.bookingNumber}`);
   };
 
-  const handleRefund = () => {
-    // TODO: Sprint 9 환불 모달 연동 (Feat #27)
-    if (window.confirm("정말 환불을 신청하시겠습니까?")) {
-      // refundMutation.mutate(booking.bookingNumber);
-    }
-  };
+  function handleCloseConfirm() {
+    if (confirmPending) return;
+    setConfirmKind(null);
+  }
 
-  const handleCancelPending = async () => {
-    if (!window.confirm("결제 대기 예매를 취소할까요?")) return;
+  async function handleConfirmAction() {
+    if (confirmKind === "refund") {
+      // TODO: Sprint 9 환불 모달 연동 (Feat #27)
+      // refundMutation.mutate(booking.bookingNumber);
+      setConfirmKind(null);
+      return;
+    }
+
+    if (confirmKind !== "cancel") return;
+
     try {
       await cancelBooking.mutateAsync(booking.bookingNumber);
       toast.info("예매를 취소했습니다.");
+      setConfirmKind(null);
     } catch (error: unknown) {
       const err =
         error instanceof Error ? error : new Error("예매 취소에 실패했습니다.");
       toast.error(err.message);
     }
-  };
+  }
 
   const createdAtLabel = formatSeoulDateTime(booking.createdAt);
   const showDateLabel = formatPerformanceSchedule(
@@ -197,7 +213,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           </button>
           <button
             type="button"
-            onClick={handleCancelPending}
+            onClick={() => setConfirmKind("cancel")}
             disabled={cancelBooking.isPending}
             className="flex items-center justify-center gap-2
                        border border-[#FB2C36] text-[#FB2C36]
@@ -242,7 +258,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           {isRefundable ? (
             <button
               type="button"
-              onClick={handleRefund}
+              onClick={() => setConfirmKind("refund")}
               className="flex items-center justify-center gap-2
                          border border-[#FB2C36] text-[#FB2C36]
                          py-3 rounded-lg font-medium hover:bg-[#FB2C36]/5 transition-colors"
@@ -274,6 +290,49 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           )}
         </div>
       )}
+
+      <Modal
+        isOpen={confirmKind !== null}
+        onClose={handleCloseConfirm}
+        title={
+          confirmKind === "refund"
+            ? "정말 환불을 신청하시겠습니까?"
+            : "결제 대기 예매를 취소할까요?"
+        }
+        size="sm"
+        disableOverlayClose={confirmPending}
+        disableEscClose={confirmPending}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCloseConfirm}
+              disabled={confirmPending}
+              className="px-4 py-2 rounded border border-border text-text-secondary disabled:opacity-60"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirmAction()}
+              disabled={confirmPending}
+              className="px-4 py-2 rounded bg-[#FB2C36] text-white font-semibold disabled:opacity-60"
+            >
+              {confirmKind === "refund"
+                ? "환불 신청"
+                : confirmPending
+                  ? "취소 중..."
+                  : "예매 취소"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          {confirmKind === "refund"
+            ? "환불 신청 후 처리 결과는 예매 상태에서 확인할 수 있습니다."
+            : "취소하면 선택했던 좌석이 다시 예매 가능해집니다."}
+        </p>
+      </Modal>
     </article>
   );
 }

@@ -1,14 +1,116 @@
 import { describe, expect, it } from "vitest";
 import {
+  mapAdminMonitoring,
   mapAdminMonitoringSeats,
   mapAdminSeatDetail,
   markAdminSeatBookerLoadFailed,
   mergeAdminSeatDetailWithBooker,
 } from "./adminSeatMapper";
 
+describe("mapAdminMonitoring", () => {
+  it("키가 생략되면 빈 맵이다", () => {
+    expect(mapAdminMonitoring(undefined)).toEqual({
+      layout: null,
+      layoutReady: true,
+      seats: [],
+    });
+    // seats 없이 layout만 생략된 빈 객체 → 배치 미생성(BE NON_NULL)
+    expect(mapAdminMonitoring({})).toEqual({
+      layout: null,
+      layoutReady: false,
+      seats: [],
+    });
+  });
+
+  it("구 응답(layout 없음)은 seatNumber에서 row/col을 파생한다", () => {
+    const mapped = mapAdminMonitoring({
+      seats: [
+        {
+          seatId: 100,
+          seatLayoutId: 101,
+          seatNumber: "A-1",
+          seatStatus: "HOLD",
+        },
+      ],
+    });
+
+    expect(mapped.layoutReady).toBe(true);
+    expect(mapped.layout).toBeNull();
+    expect(mapped.seats[0]).toMatchObject({
+      id: 100,
+      seatLayoutId: 101,
+      seatNumber: "A-1",
+      row: "A",
+      col: 1,
+      status: "HOLD",
+    });
+  });
+
+  it("신 응답 layout·좌표를 반영한다", () => {
+    const mapped = mapAdminMonitoring({
+      layout: { totalRows: 10, maxCols: 12 },
+      seats: [
+        {
+          seatId: 1,
+          seatLayoutId: 1,
+          seatNumber: "S-1",
+          seatRow: 1,
+          seatCol: 1,
+          seatStatus: "AVAILABLE",
+        },
+      ],
+    });
+
+    expect(mapped.layout).toEqual({ totalRows: 10, maxCols: 12 });
+    expect(mapped.seats[0]).toMatchObject({ row: "A", col: 1 });
+  });
+
+  it("layout 키 생략 + seats=[]이면 배치 미생성이다 (BE NON_NULL)", () => {
+    expect(mapAdminMonitoring({ seats: [] })).toEqual({
+      layout: null,
+      layoutReady: false,
+      seats: [],
+    });
+  });
+
+  it("layout: null이면 배치 미생성이다", () => {
+    expect(mapAdminMonitoring({ layout: null, seats: [] })).toEqual({
+      layout: null,
+      layoutReady: false,
+      seats: [],
+    });
+  });
+
+  it("좌표 일부 누락 시 seatNumber 폴백이다", () => {
+    const mapped = mapAdminMonitoring({
+      layout: { totalRows: 2, maxCols: 2 },
+      seats: [
+        {
+          seatId: 1,
+          seatLayoutId: 1,
+          seatNumber: "A-1",
+          seatRow: 1,
+          seatCol: 1,
+          seatStatus: "AVAILABLE",
+        },
+        {
+          seatId: 2,
+          seatLayoutId: 1,
+          seatNumber: "B-2",
+          seatStatus: "SOLD",
+        },
+      ],
+    });
+
+    expect(mapped.seats[0]).toMatchObject({ row: "A", col: 1 });
+    expect(mapped.seats[1]).toMatchObject({ row: "B", col: 2, status: "SOLD" });
+  });
+});
+
 describe("mapAdminMonitoringSeats", () => {
   it("키가 생략되면 빈 맵이다", () => {
     expect(mapAdminMonitoringSeats(undefined)).toEqual([]);
+    // seats 없는 빈 객체는 미생성이라 seats=[]
     expect(mapAdminMonitoringSeats({})).toEqual([]);
   });
 
