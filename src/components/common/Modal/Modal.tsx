@@ -1,7 +1,7 @@
 // components/common/Modal/Modal.tsx
 import { type ReactNode, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
-import FocusTrap from "focus-trap-react";
+import { FocusTrap } from "focus-trap-react";
 import { X } from "lucide-react";
 import clsx from "clsx";
 
