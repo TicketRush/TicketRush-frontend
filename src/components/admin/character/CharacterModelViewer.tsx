@@ -32,6 +32,10 @@ interface CharacterModelViewerProps {
    */
   outfitColor: string;
 
+  /** Ballet part colors fall back to outfitColor when omitted. */
+  balletWearColor?: string;
+  balletShortsColor?: string;
+
   /** Concert part colors fall back to outfitColor when omitted. */
   jacketColor?: string;
   innerColor?: string;
@@ -82,6 +86,11 @@ const EYE_MODEL_URLS: Record<EyeStyle, string> = {
   angry: "/models/eyes/eye_angry.glb",
   closed: "/models/eyes/eye_closed.glb",
 };
+
+const BALLET_PART_NAMES = {
+  wear: "ballet_wear",
+  shorts: "ballet_shorts",
+} as const;
 
 const CONCERT_PART_NAMES = {
   jacket: "concert_jacket",
@@ -231,6 +240,86 @@ function findConcertPartColor(
   return null;
 }
 
+function findBalletPartColor(
+  object: THREE.Object3D,
+  balletWearColor: string,
+  balletShortsColor: string,
+) {
+  let current: THREE.Object3D | null = object;
+
+  while (current) {
+    if (
+      matchesPartName(
+        current.name,
+        BALLET_PART_NAMES.wear,
+      )
+    ) {
+      return balletWearColor;
+    }
+
+    if (
+      matchesPartName(
+        current.name,
+        BALLET_PART_NAMES.shorts,
+      )
+    ) {
+      return balletShortsColor;
+    }
+
+    current = current.parent;
+  }
+
+  return null;
+}
+
+/**
+ * 사용자가 선택한 HEX 색상이 기존 GLB의 Base Color나
+ * Base Color Texture와 곱해지지 않도록 새 Material을 생성합니다.
+ *
+ * 기존 Material의 표면 특성 중 필요한 값만 유지하고
+ * 기존 color/map은 사용하지 않습니다.
+ */
+function createMaterialWithColor(
+  material: THREE.Material,
+  color: string,
+): THREE.Material {
+  if (material instanceof THREE.MeshStandardMaterial) {
+    return new THREE.MeshStandardMaterial({
+      color,
+      roughness: material.roughness,
+      metalness: material.metalness,
+      opacity: material.opacity,
+      transparent: material.transparent,
+      alphaTest: material.alphaTest,
+      side: material.side,
+
+      /**
+       * Base Color Texture(map)는 일부러 복사하지 않습니다.
+       * map을 유지하면 선택 색상과 원본 텍스처 색상이 곱해집니다.
+       */
+      map: null,
+
+      /**
+       * 색상과 직접 관계없는 표면 디테일은 유지할 수 있습니다.
+       */
+      normalMap: material.normalMap,
+      normalScale: material.normalScale.clone(),
+      roughnessMap: material.roughnessMap,
+      metalnessMap: material.metalnessMap,
+
+      depthTest: material.depthTest,
+      depthWrite: material.depthWrite,
+    });
+  }
+
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.8,
+    metalness: 0,
+    side: material.side,
+  });
+}
+
 function cloneConcertMaterialWithColor(
   material: THREE.Material,
   color: string,
@@ -288,6 +377,8 @@ function OutfitModel({
   modelUrl,
   outfitModelId,
   outfitColor,
+  balletWearColor,
+  balletShortsColor,
   jacketColor,
   innerColor,
   bottomColor,
@@ -300,6 +391,8 @@ function OutfitModel({
   modelUrl: string;
   outfitModelId: OutfitModelId;
   outfitColor: string;
+  balletWearColor?: string;
+  balletShortsColor?: string;
   jacketColor?: string;
   innerColor?: string;
   bottomColor?: string;
@@ -317,13 +410,44 @@ function OutfitModel({
     if (
       outfitModelId !== "festival" &&
       outfitModelId !== "musical" &&
-      outfitModelId !== "concert"
+      outfitModelId !== "concert" &&
+      outfitModelId !== "ballet"
     ) {
       return clonedScene;
     }
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "ballet") {
+        const partColor = findBalletPartColor(
+          object,
+          balletWearColor ?? outfitColor,
+          balletShortsColor ?? outfitColor,
+        );
+
+        if (!partColor) {
+          return;
+        }
+
+        if (Array.isArray(object.material)) {
+          object.material = object.material.map(
+            (material) =>
+              createMaterialWithColor(
+                material,
+                partColor,
+              ),
+          );
+
+          return;
+        }
+
+        object.material = createMaterialWithColor(
+          object.material,
+          partColor,
+        );
         return;
       }
 
@@ -396,6 +520,8 @@ function OutfitModel({
     gltf.scene,
     outfitModelId,
     outfitColor,
+    balletWearColor,
+    balletShortsColor,
     jacketColor,
     innerColor,
     bottomColor,
@@ -415,6 +541,8 @@ function CharacterModel({
   hairColor,
   outfitModelId,
   outfitColor,
+  balletWearColor,
+  balletShortsColor,
   jacketColor,
   innerColor,
   bottomColor,
@@ -431,6 +559,8 @@ function CharacterModel({
   | "skinColor"
   | "hairColor"
   | "outfitColor"
+  | "balletWearColor"
+  | "balletShortsColor"
   | "jacketColor"
   | "innerColor"
   | "bottomColor"
@@ -470,6 +600,8 @@ function CharacterModel({
               modelUrl={outfitModelUrl}
               outfitModelId={outfitModelId}
               outfitColor={outfitColor}
+              balletWearColor={balletWearColor}
+              balletShortsColor={balletShortsColor}
               jacketColor={jacketColor}
               innerColor={innerColor}
               bottomColor={bottomColor}
@@ -492,6 +624,8 @@ export default function CharacterModelViewer({
   hairColor,
   outfitModelId,
   outfitColor,
+  balletWearColor,
+  balletShortsColor,
   jacketColor,
   innerColor,
   bottomColor,
@@ -517,6 +651,8 @@ export default function CharacterModelViewer({
             hairColor={hairColor}
             outfitModelId={outfitModelId}
             outfitColor={outfitColor}
+            balletWearColor={balletWearColor}
+            balletShortsColor={balletShortsColor}
             jacketColor={jacketColor}
             innerColor={innerColor}
             bottomColor={bottomColor}

@@ -93,6 +93,8 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  balletWearColor: string;
+  balletShortsColor: string;
   jacketColor: string;
   innerColor: string;
   bottomColor: string;
@@ -125,6 +127,8 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "balletWearColor"
+        | "balletShortsColor"
         | "jacketColor"
         | "innerColor"
         | "bottomColor"
@@ -144,6 +148,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      balletWearColor?: unknown;
+      balletShortsColor?: unknown;
       jacketColor?: unknown;
       innerColor?: unknown;
       bottomColor?: unknown;
@@ -172,6 +178,16 @@ function loadSavedCharacter(): CharacterDraft | null {
 
     const legacyOutfitColor =
       resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
+
+    const resolvedBalletWearColor =
+      typeof parsed.balletWearColor === "string"
+        ? normalizeHexColor(parsed.balletWearColor)
+        : null;
+
+    const resolvedBalletShortsColor =
+      typeof parsed.balletShortsColor === "string"
+        ? normalizeHexColor(parsed.balletShortsColor)
+        : null;
 
     const resolvedJacketColor =
       typeof parsed.jacketColor === "string"
@@ -234,6 +250,8 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      balletWearColor: resolvedBalletWearColor ?? legacyOutfitColor,
+      balletShortsColor: resolvedBalletShortsColor ?? legacyOutfitColor,
       jacketColor: resolvedJacketColor ?? legacyOutfitColor,
       innerColor: resolvedInnerColor ?? legacyOutfitColor,
       bottomColor: resolvedBottomColor ?? legacyOutfitColor,
@@ -1058,6 +1076,7 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isBalletOutfit = character.outfitModelId === "ballet";
   const isConcertOutfit = character.outfitModelId === "concert";
   const isMusicalOutfit = character.outfitModelId === "musical";
   const isFestivalOutfit = character.outfitModelId === "festival";
@@ -1073,6 +1092,8 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          balletWearColor={character.balletWearColor}
+          balletShortsColor={character.balletShortsColor}
           jacketColor={character.jacketColor}
           innerColor={character.innerColor}
           bottomColor={character.bottomColor}
@@ -1103,6 +1124,15 @@ function CharacterCreatorLinkBox({
           의상: {character.outfitName} / 액세서리: {character.accessory} /
           포즈: {character.pose}
         </p>
+
+        {isBalletOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            발레 의상:{" "}
+            {character.balletWearColor.toUpperCase()}{" "}
+            / 하의:{" "}
+            {character.balletShortsColor.toUpperCase()}
+          </p>
+        )}
 
         {isConcertOutfit && (
           <p className="mt-1 text-xs text-admin-text-secondary">
