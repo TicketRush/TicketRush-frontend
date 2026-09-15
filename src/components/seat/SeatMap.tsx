@@ -1,18 +1,22 @@
 // 좌석 맵 — 행별 그룹화 + 행/열 라벨
+// layout이 있으면 헤더·캡션 크기는 totalRows × maxCols (#279)
 import SeatItem from "./SeatItem";
-import type { SeatWithStatus } from "@/types/domain/seat";
+import type { SeatLayoutSize, SeatWithStatus } from "@/types/domain/seat";
 import { useMemo } from "react";
 
 interface SeatMapProps {
   seats: SeatWithStatus[];
   selectedSeatId: number | null;
   onSeatClick: (seat: SeatWithStatus) => void;
+  /** 백엔드 layout — 있으면 그리드 크기로 사용 (좌석 수·고정 10×12 비의존) */
+  layout?: SeatLayoutSize | null;
 }
 
 export default function SeatMap({
   seats,
   selectedSeatId,
   onSeatClick,
+  layout = null,
 }: SeatMapProps) {
   // 행별로 그룹화 (A행, B행, ...)
   const rows = useMemo(() => {
@@ -30,11 +34,15 @@ export default function SeatMap({
       }));
   }, [seats]);
 
-  // 가장 긴 행 기준 (헤더·캡션). 빈 배치는 헤더를 그리지 않는다.
-  const colCount = rows.reduce(
-    (max, row) => Math.max(max, row.seats.length),
-    0,
-  );
+  // layout 우선. 없으면 실제 최대 col (좌석 개수 아님 — 구멍 있는 행 대비)
+  const colCount =
+    layout?.maxCols ??
+    rows.reduce(
+      (max, row) =>
+        Math.max(max, ...row.seats.map((s) => s.col), 0),
+      0,
+    );
+  const rowCount = layout?.totalRows ?? rows.length;
 
   return (
     <div className="inline-block">
@@ -73,9 +81,9 @@ export default function SeatMap({
         ))}
       </div>
 
-      {rows.length > 0 && colCount > 0 && (
+      {rowCount > 0 && colCount > 0 && (
         <p className="text-center text-[10px] text-text-secondary mt-4">
-          [Seat Grid: {rows.length} rows × {colCount} columns]
+          [Seat Grid: {rowCount} rows × {colCount} columns]
         </p>
       )}
     </div>

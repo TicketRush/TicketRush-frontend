@@ -386,6 +386,8 @@ export async function mockAdminRefundBooking(
 export async function mockGetAdminSeatMonitoring(
   _performanceId: number,
 ): Promise<{
+  layout: { totalRows: number; maxCols: number };
+  layoutReady: true;
   stats: AdminSeatStats;
   seats: Array<{
     id: number;
@@ -438,6 +440,8 @@ export async function mockGetAdminSeatMonitoring(
   });
 
   return {
+    layout: { totalRows: ROWS.length, maxCols: COLS },
+    layoutReady: true,
     stats: {
       totalSeats: seats.length,
       availableSeats: available,

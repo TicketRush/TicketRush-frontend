@@ -21,11 +21,15 @@
 // - 2026-07-25 (이슈 #123):
 //   - named `seat-status-changed` + snake_case payload 파싱
 //   - onError/onOpen 콜백 (polling fallback 연동)
+// - 2026-09-15 (이슈 #279):
+//   - seat-layouts 신 계약 `{ layout, seats }` + seatRow/seatCol 이중 호환
+//   - layout === null → 배치 미생성(layoutReady=false)
+//   - 좌표 누락 시 seatNumber 폴백. SSE 페이로드는 변경 없음.
 import type {
   SeatCounts,
+  SeatMapData,
   SeatStatus,
   SeatUpdateEvent,
-  SeatWithStatus,
 } from "@/types/domain/seat";
 import {
   mockGetSeats,
@@ -33,7 +37,10 @@ import {
   mockSubscribeSeats,
 } from "./mocks/seats";
 import { mockDelay } from "./mocks/_helpers";
-import { safeParseSeatNumber } from "@/utils/seat/parseSeatNumber";
+import {
+  normalizeSeatMapResponse,
+  type BackendSeatLayoutsResult,
+} from "./seatMapMapper";
 import apiClient from "./instance";
 import { USE_MOCK } from "./useMock";
 
@@ -41,43 +48,10 @@ import { USE_MOCK } from "./useMock";
 // 백엔드 응답 타입 (원본 스펙)
 // -------------------------------------------------------
 
-/** 백엔드 SeatLayoutResponse (좌석 배치 조회 응답) */
-interface BackendSeatLayoutResponse {
-  seatId: number;
-  seatLayoutId: number;
-  seatNumber: string;
-  seatStatus: SeatStatus;
-  /** HOLD 좌석 Kafka delay 만료. 예매 결제 타이머(`expires_at`)와 다름 — 카운트다운에 쓰지 않음 (#167) */
-  holdExpiredAt?: string;
-}
-
 /** 백엔드 SeatNumberResponse (좌석 번호 조회 응답) */
 interface BackendSeatNumberResponse {
   seatId: number;
   seatNumber: string;
-}
-
-// -------------------------------------------------------
-// 매핑 함수
-// -------------------------------------------------------
-
-/**
- * 백엔드 SeatLayoutResponse → 프론트 SeatWithStatus.
- * seatNumber "A-1"에서 row("A"), col(1) 파생.
- *
- * safeParseSeatNumber 사용: 파싱 실패 시 { row: "?", col: 0 } fallback.
- * (전체 좌석맵이 깨지지 않도록 방어)
- */
-function mapSeatLayout(item: BackendSeatLayoutResponse): SeatWithStatus {
-  const parsed = safeParseSeatNumber(item.seatNumber);
-  return {
-    id: item.seatId,
-    seatLayoutId: item.seatLayoutId,
-    seatNumber: item.seatNumber,
-    row: parsed.row,
-    col: parsed.col,
-    status: item.seatStatus,
-  };
 }
 
 // -------------------------------------------------------
@@ -111,26 +85,31 @@ export async function fetchSeatCounts(
 // -------------------------------------------------------
 
 /**
- * 공연 좌석 배치 + 상태 조회 (이슈 #122).
+ * 공연 좌석 배치 + 상태 조회 (이슈 #122 / #279).
  * 백엔드: GET /api/v1/seat/{performanceId}/seat-layouts
  *
- * 응답: SeatLayoutResponse[]
- *   → 프론트에서는 seatNumber에서 row, col 파생 후 SeatWithStatus[] 반환
+ * 신: { layout: { totalRows, maxCols } | null, seats: [...] } (+ seatRow/seatCol)
+ * 구: 좌석 배열 → seatNumber 파싱 (이중 호환)
+ *
+ * layout === null → layoutReady=false (배치 미생성).
+ * 좌표 일부 누락 시 seatNumber 폴백.
  *
  * ⚠️ staleTime: 0 권장 (실시간 좌석 상태).
- * SSE와 병행 사용 시 이벤트 발생마다 캐시 patch.
+ * SSE와 병행 사용 시 이벤트 발생마다 캐시 seats[] patch.
  */
-export async function fetchSeats(
-  performanceId: number,
-): Promise<SeatWithStatus[]> {
+export async function fetchSeats(performanceId: number): Promise<SeatMapData> {
   if (USE_MOCK) {
     return mockGetSeats(performanceId);
   }
 
-  const res = await apiClient.get<BackendSeatLayoutResponse[]>(
+  const res = await apiClient.get<BackendSeatLayoutsResult>(
     `/api/v1/seat/${performanceId}/seat-layouts`,
   );
-  return (res.data ?? []).map(mapSeatLayout);
+  // envelope result가 null이면 빈 맵으로 조용히 넘기지 않음 (관리자 monitoring과 동일)
+  if (res.data == null) {
+    throw new Error("좌석 정보를 불러올 수 없습니다.");
+  }
+  return normalizeSeatMapResponse(res.data);
 }
 
 /** 이슈 #122 네이밍 별칭 — fetchSeats와 동일 (좌석 배치 실 API) */
