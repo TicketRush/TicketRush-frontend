@@ -32,6 +32,11 @@ import {
   type EyeStyle,
 } from "@/components/admin/character/characterEye";
 import {
+  MOUTH_STYLE_LABELS,
+  resolveStoredMouthStyle,
+  type MouthStyle,
+} from "@/components/admin/character/characterMouth";
+import {
   normalizeHexColor,
   resolveStoredSkinTone,
   type SkinToneSelection,
@@ -92,6 +97,7 @@ interface CharacterDraft {
   skinTone: SkinToneSelection;
   skinColor: string;
   hairStyle: HairStyle;
+  mouthStyle: MouthStyle;
   eyeStyle: EyeStyle;
   hairColor: string;
   outfitModelId: OutfitModelId;
@@ -126,6 +132,7 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "skinTone"
         | "skinColor"
         | "hairStyle"
+        | "mouthStyle"
         | "eyeStyle"
         | "hairColor"
         | "outfitModelId"
@@ -147,6 +154,7 @@ function loadSavedCharacter(): CharacterDraft | null {
       skinTone?: unknown;
       skinColor?: unknown;
       hairStyle?: unknown;
+      mouthStyle?: unknown;
       eyeStyle?: unknown;
       hairColor?: unknown;
       outfitModelId?: unknown;
@@ -249,6 +257,7 @@ function loadSavedCharacter(): CharacterDraft | null {
       ...parsed,
       ...resolvedSkin,
       hairStyle: resolveStoredHairStyle(parsed.hairStyle),
+      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
       eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
       hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
       outfitModelId: resolvedOutfitModelId,
@@ -1097,6 +1106,7 @@ function CharacterCreatorLinkBox({
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
           eyeStyle={character.eyeStyle}
+          mouthStyle={character.mouthStyle}
         />
       </div>
 
@@ -1114,6 +1124,10 @@ function CharacterCreatorLinkBox({
         <p className="mt-1 text-xs text-admin-text-secondary">
           의상: {character.outfitName} / 액세서리: {character.accessory} /
           포즈: {character.pose}
+        </p>
+
+        <p className="mt-1 text-xs text-admin-text-secondary">
+          입: {MOUTH_STYLE_LABELS[character.mouthStyle]}
         </p>
 
         {isBalletOutfit && (

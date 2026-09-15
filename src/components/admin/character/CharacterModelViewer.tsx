@@ -1,4 +1,11 @@
-import { Suspense, useMemo } from "react";
+import {
+  Component,
+  Suspense,
+  useMemo,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
+
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
@@ -17,7 +24,10 @@ import {
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
 
+import type { MouthStyle } from "@/components/admin/character/characterMouth";
+
 export type { HairStyle } from "@/components/admin/character/characterHair";
+export type { MouthStyle } from "@/components/admin/character/characterMouth";
 export type { EyeStyle } from "@/components/admin/character/characterEye";
 export type { OutfitModelId } from "@/components/admin/character/characterOutfit";
 
@@ -67,6 +77,7 @@ interface CharacterModelViewerProps {
   outfitModelId: OutfitModelId;
 
   hairStyle: HairStyle;
+  mouthStyle?: MouthStyle;
   eyeStyle: EyeStyle;
 }
 
@@ -85,6 +96,15 @@ const EYE_MODEL_URLS: Record<EyeStyle, string> = {
   squeeze: "/models/eyes/eye_squeeze.glb",
   angry: "/models/eyes/eye_angry.glb",
   closed: "/models/eyes/eye_closed.glb",
+};
+
+const MOUTH_MODEL_URLS: Record<MouthStyle, string> = {
+  DEFAULT: "/models/mouths/mouth_default.glb",
+  SMILE: "/models/mouths/mouth_smile.glb",
+  OPEN_SMILE: "/models/mouths/mouth_open_smile.glb",
+  PUCKER: "/models/mouths/mouth_pucker.glb",
+  CAT: "/models/mouths/mouth_cat.glb",
+  ROUND: "/models/mouths/mouth_round.glb",
 };
 
 const BALLET_PART_NAMES = {
@@ -127,6 +147,19 @@ function isSameHexColor(first: string, second: string) {
   return first.toUpperCase() === second.toUpperCase();
 }
 
+function isBaseMouthObject(objectName: string) {
+  const name = objectName.toLowerCase();
+
+  return (
+    name === "mouth" ||
+    name === "mouths" ||
+    name.startsWith("mouth_") ||
+    name.startsWith("mouths_") ||
+    name.endsWith("_mouth") ||
+    name.endsWith("_mouths")
+  );
+}
+
 function CharacterBody({
   modelUrl = "/models/chibi-base.glb",
   skinColor,
@@ -141,7 +174,7 @@ function CharacterBody({
         return;
       }
 
-      if (isBaseEyeObject(object.name)) {
+      if (isBaseEyeObject(object.name) || isBaseMouthObject(object.name)) {
         object.visible = false;
         return;
       }
@@ -196,6 +229,85 @@ function EyeModel({
   }, [gltf.scene]);
 
   return <primitive object={scene} />;
+}
+
+function MouthAsset({ mouthStyle }: { mouthStyle: MouthStyle }) {
+  const mouthModelUrl = MOUTH_MODEL_URLS[mouthStyle];
+  const gltf = useGLTF(mouthModelUrl);
+
+  const scene = useMemo(() => {
+    return gltf.scene.clone(true);
+  }, [gltf.scene]);
+
+  return <primitive object={scene} />;
+}
+
+interface MouthErrorBoundaryProps {
+  children: ReactNode;
+  mouthStyle: MouthStyle;
+}
+
+interface MouthErrorBoundaryState {
+  hasError: boolean;
+}
+
+class MouthErrorBoundary extends Component<
+  MouthErrorBoundaryProps,
+  MouthErrorBoundaryState
+> {
+  state: MouthErrorBoundaryState = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError(): MouthErrorBoundaryState {
+    return {
+      hasError: true,
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("입 모델을 불러오지 못했습니다.", error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: MouthErrorBoundaryProps) {
+    if (
+      prevProps.mouthStyle !== this.props.mouthStyle &&
+      this.state.hasError
+    ) {
+      this.setState({
+        hasError: false,
+      });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.mouthStyle === "DEFAULT") {
+        return null;
+      }
+
+      return (
+        <MouthErrorBoundary mouthStyle="DEFAULT">
+          <MouthAsset mouthStyle="DEFAULT" />
+        </MouthErrorBoundary>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function MouthModel({
+  mouthStyle = "DEFAULT",
+}: Pick<CharacterModelViewerProps, "mouthStyle">) {
+  return (
+    <MouthErrorBoundary
+      key={mouthStyle}
+      mouthStyle={mouthStyle}
+    >
+      <MouthAsset mouthStyle={mouthStyle} />
+    </MouthErrorBoundary>
+  );
 }
 
 function matchesPartName(objectName: string, partName: string) {
@@ -548,6 +660,7 @@ function CharacterModel({
   bottomColor,
   hairStyle,
   eyeStyle,
+  mouthStyle = "DEFAULT",
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
   musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
@@ -566,6 +679,7 @@ function CharacterModel({
   | "bottomColor"
   | "outfitModelId"
   | "hairStyle"
+  | "mouthStyle"
   | "eyeStyle"
   | "musicalJacketColor"
   | "musicalInnerColor"
@@ -593,6 +707,8 @@ function CharacterModel({
         />
 
         <EyeModel eyeStyle={eyeStyle} />
+
+        <MouthModel mouthStyle={mouthStyle} />
 
         {outfitModelUrl && (
           <Suspense fallback={null}>
@@ -631,6 +747,7 @@ export default function CharacterModelViewer({
   bottomColor,
   hairStyle,
   eyeStyle,
+  mouthStyle = "DEFAULT",
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
   musicalInnerColor = DEFAULT_MUSICAL_INNER_COLOR,
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
@@ -658,6 +775,7 @@ export default function CharacterModelViewer({
             bottomColor={bottomColor}
             hairStyle={hairStyle}
             eyeStyle={eyeStyle}
+            mouthStyle={mouthStyle}
             musicalJacketColor={musicalJacketColor}
             musicalInnerColor={musicalInnerColor}
             musicalShortsColor={musicalShortsColor}
@@ -695,3 +813,10 @@ Object.values(OUTFIT_MODEL_URLS).forEach((modelUrl) => {
     useGLTF.preload(modelUrl);
   }
 });
+
+useGLTF.preload("/models/mouths/mouth_default.glb");
+useGLTF.preload("/models/mouths/mouth_smile.glb");
+useGLTF.preload("/models/mouths/mouth_open_smile.glb");
+useGLTF.preload("/models/mouths/mouth_pucker.glb");
+useGLTF.preload("/models/mouths/mouth_cat.glb");
+useGLTF.preload("/models/mouths/mouth_round.glb");
