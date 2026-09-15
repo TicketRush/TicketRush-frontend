@@ -1,10 +1,11 @@
 // src/components/mypage/ProfileCard.tsx
 import { User as UserIcon } from "lucide-react";
+import { formatSeoulDate } from "@/utils/datetime/formatSeoulInstant";
 
 interface ProfileCardProps {
   name: string;
   email: string;
-  joinedAt: string; // ISO 8601
+  joinedAt: string; // ISO 8601 Instant (UTC)
   totalBookings: number;
 }
 
@@ -21,9 +22,7 @@ export function ProfileCard({
   joinedAt,
   totalBookings,
 }: ProfileCardProps) {
-  // ⚠️ joinedAt이 API 실패 등으로 비어있을 수 있어 방어적으로 처리
-  // (undefined.split()으로 페이지 전체가 죽는 것 방지)
-  const formattedJoinDate = joinedAt ? joinedAt.split("T")[0] : "-"; // YYYY-MM-DD
+  const formattedJoinDate = formatSeoulDate(joinedAt);
 
   return (
     <div

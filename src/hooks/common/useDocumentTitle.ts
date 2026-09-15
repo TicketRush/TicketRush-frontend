@@ -7,12 +7,7 @@ export function useDocumentTitle(
   options: { exact?: boolean } = {},
 ) {
   useEffect(() => {
-    const prevTitle = document.title;
     document.title = options.exact ? title : `${title} | ${APP_NAME}`;
-
-    return () => {
-      document.title = prevTitle;
-    };
   }, [title, options.exact]);
 }
 

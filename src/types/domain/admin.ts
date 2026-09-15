@@ -132,7 +132,7 @@ export interface AdminBookingItem {
   concertTitle: string | null;
   /** YYYY-MM-DD. 보강 실패 시 null */
   concertDate: string | null;
-  /** BE `yyyy-MM-dd HH:mm:ss` (createdAt) */
+  /** BE Instant(UTC, createdAt). naive 또는 ISO (#246) */
   bookedAt: string;
   userName: string | null;
   userEmail: string | null;
@@ -182,7 +182,7 @@ export interface AdminSeatDetail {
   reservedBy?: string;
   /** 예매 단건 GET 실패. `-`와 구분한다 */
   bookerLoadFailed?: boolean;
-  /** HOLD: holdStartedAt. SOLD: 예매 단건 bookedAt. BE `yyyy-MM-dd HH:mm:ss` */
+  /** HOLD: holdStartedAt. SOLD: 예매 단건 bookedAt. Instant(UTC) (#246) */
   reservedAt?: string;
   /** HOLD일 때 remainingSeconds. 비HOLD는 없음 */
   holdRemainingSec?: number;

@@ -13,6 +13,7 @@
  *
  * ⚠️ 소셜 로그인의 provider (KAKAO/NAVER/GOOGLE)와 다름.
  *   결제는 TOSS(토스 페이먼츠) 추가되어 있고 GOOGLE 없음.
+ * ⚠️ 결제 UI는 TOSS만 노출. KAKAO/NAVER는 이력·API 응답 호환용으로 유지.
  */
 export type PaymentMethod = "KAKAO" | "NAVER" | "TOSS";
 

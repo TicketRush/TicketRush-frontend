@@ -65,7 +65,7 @@ interface BackendMyBookingSummary {
   confirmedAt?: string | null;
   refundFailedAt?: string | null;
   updatedAt?: string;
-  /** PENDING 결제 마감 시각 — BE `yyyy-MM-dd HH:mm:ss`. 그 외 상태는 생략 (#559) */
+  /** PENDING 결제 마감 시각 — BE Instant(UTC naive 또는 ISO `Z`). 그 외 상태는 생략 (#559/#246) */
   expiresAt?: string | null;
   performanceTitle?: string;
   performanceDate?: string;
