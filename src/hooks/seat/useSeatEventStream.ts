@@ -12,7 +12,7 @@ import { subscribeSeatStream } from "@/api/seats";
 import { queryKeys } from "@/constants/queryKeys";
 import useSeatStore from "@/stores/reservation/seatStore";
 import { clearSelectedSeatIfTaken } from "@/utils/seat/clearSelectedSeatIfTaken";
-import type { SeatWithStatus, SeatUpdateEvent } from "@/types/domain/seat";
+import type { SeatMapData, SeatUpdateEvent } from "@/types/domain/seat";
 
 const POLL_INTERVAL_MS = 5_000;
 /** onerror 직후 바로 polling 하지 않고, 짧은 재연결 기회를 준 뒤 fallback */
@@ -49,15 +49,18 @@ export function useSeatEventStream(
     let fallbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const applySeatUpdate = (event: SeatUpdateEvent) => {
-      queryClient.setQueryData<SeatWithStatus[]>(
+      queryClient.setQueryData<SeatMapData>(
         queryKeys.seats.byPerformance(performanceId),
         (old) => {
-          if (!old) return old;
-          return old.map((seat) =>
-            seat.id === event.seatId
-              ? { ...seat, status: event.status }
-              : seat,
-          );
+          if (!old?.seats || !Array.isArray(old.seats)) return old;
+          return {
+            ...old,
+            seats: old.seats.map((seat) =>
+              seat.id === event.seatId
+                ? { ...seat, status: event.status }
+                : seat,
+            ),
+          };
         },
       );
 
@@ -139,20 +142,23 @@ export function useSeatEventStream(
       if (!selected) return;
       if (shouldPreserveSelection?.(selected.id)) return;
 
-      const seats = queryClient.getQueryData<SeatWithStatus[]>(
+      const seatMap = queryClient.getQueryData<SeatMapData>(
         queryKeys.seats.byPerformance(performanceId),
       );
-      const current = seats?.find((s) => s.id === selected.id);
+      const current = seatMap?.seats.find((s) => s.id === selected.id);
       // 캐시에 아직 없거나 이미 HOLD/SOLD면 스킵
       if (current && current.status !== "AVAILABLE") return;
 
-      queryClient.setQueryData<SeatWithStatus[]>(
+      queryClient.setQueryData<SeatMapData>(
         queryKeys.seats.byPerformance(performanceId),
         (old) => {
-          if (!old) return old;
-          return old.map((seat) =>
-            seat.id === selected.id ? { ...seat, status: "HOLD" } : seat,
-          );
+          if (!old?.seats || !Array.isArray(old.seats)) return old;
+          return {
+            ...old,
+            seats: old.seats.map((seat) =>
+              seat.id === selected.id ? { ...seat, status: "HOLD" } : seat,
+            ),
+          };
         },
       );
 
