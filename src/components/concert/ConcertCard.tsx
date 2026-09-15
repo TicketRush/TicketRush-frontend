@@ -24,6 +24,7 @@ import type { ConcertSummary } from "@/types/domain/concert";
 import { getBookingCtaLabel } from "@/utils/concert/getBookingCtaLabel";
 import { canBookConcert } from "@/utils/concert/canBookConcert";
 import { hasSeatCounts } from "@/utils/concert/hasSeatCounts";
+import { formatShowDateLabel } from "@/utils/concert/formatShowDateLabel";
 import GenreBadge from "./GenreBadge";
 import SeatGauge from "./SeatGauge";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -75,9 +76,8 @@ function ConcertCard({ concert }: ConcertCardProps) {
   }
 
   const formattedPrice = concert.price.toLocaleString("ko-KR");
-
-  const d = new Date(concert.showDate);
-  const formattedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // showDate는 서울 달력 문자열 — Date 파싱하면 비-KST에서 하루 밀릴 수 있음 (#265)
+  const formattedDate = formatShowDateLabel(concert.showDate);
 
   const venueDisplay = concert.venue ?? concert.address ?? "";
 

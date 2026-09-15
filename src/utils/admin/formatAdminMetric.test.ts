@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   UNAVAILABLE_METRIC,
+  formatAdminBooker,
   formatAdminCount,
+  formatAdminDateTime,
   formatAdminOccupancy,
   formatAdminSeats,
   formatAdminShowSchedule,
+  formatAdminText,
   formatAdminWon,
 } from "./formatAdminMetric";
 
@@ -21,6 +24,26 @@ describe("formatAdminMetric", () => {
     expect(formatAdminWon(147000)).toBe(`₩${(147000).toLocaleString()}`);
     expect(formatAdminOccupancy(0.317)).toBe("32%");
     expect(formatAdminSeats(38, 120)).toBe("38/120");
+  });
+
+  it("빈 문자열과 보강 실패 값은 - 로 둔다", () => {
+    expect(formatAdminText(undefined)).toBe(UNAVAILABLE_METRIC);
+    expect(formatAdminText("  ")).toBe(UNAVAILABLE_METRIC);
+    expect(formatAdminText("김소희")).toBe("김소희");
+  });
+
+  it("백엔드 Instant를 Asia/Seoul YYYY-MM-DD HH:mm으로 돌린다", () => {
+    expect(formatAdminDateTime(null)).toBe(UNAVAILABLE_METRIC);
+    expect(formatAdminDateTime("2026-05-22 10:30:00")).toBe("2026-05-22 19:30");
+    expect(formatAdminDateTime("2026-05-22T10:30:00.000Z")).toBe(
+      "2026-05-22 19:30",
+    );
+  });
+
+  it("예매자 이름·이메일을 조합한다", () => {
+    expect(formatAdminBooker("김철수", "a@b.com")).toBe("김철수 (a@b.com)");
+    expect(formatAdminBooker(null, "a@b.com")).toBe("a@b.com");
+    expect(formatAdminBooker(undefined, undefined)).toBeUndefined();
   });
 
   it("공연 시각이 있으면 날짜 뒤에 HH:mm만 붙인다", () => {

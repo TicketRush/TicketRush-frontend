@@ -1,15 +1,17 @@
+import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
+
 /**
  * 상세 UPCOMING 오픈 안내용 시각 포맷.
- * 백엔드 ISO(UTC `Z` / offset 포함)를 Asia/Seoul 벽시계로 표시한다.
- * offset 없는 naive 문자열은 `Date` 파싱 규칙(환경 로컬)에 따른 뒤 Seoul로 포맷한다.
+ * 백엔드 Instant(UTC `Z` / offset / naive UTC)를 Asia/Seoul 벽시계로 표시한다.
  */
 export function formatBookingOpenAt(
   iso: string,
   timeZone: string = "Asia/Seoul",
 ): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
+  const ms = parseBackendDateTime(iso);
+  if (ms == null) return "";
 
+  const d = new Date(ms);
   const parts = new Intl.DateTimeFormat("ko-KR", {
     timeZone,
     year: "numeric",

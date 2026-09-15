@@ -6,11 +6,17 @@ import { AlertCircle } from "lucide-react";
 interface TimeoutModalProps {
   onClose: () => void;
   closePending?: boolean;
+  /**
+   * 서버 PENDING 해제가 아직 안 됐을 때(true).
+   * false/생략이면 「자동 해제됨」 카피 (#260 후속).
+   */
+  releasePending?: boolean;
 }
 
 export default function TimeoutModal({
   onClose,
   closePending = false,
+  releasePending = false,
 }: TimeoutModalProps) {
   const titleId = useId();
   const descId = useId();
@@ -61,9 +67,19 @@ export default function TimeoutModal({
               id={descId}
               className="text-base text-[#4A5565] leading-6 mt-3"
             >
-              선택하신 좌석의 임시 예약이 자동으로 해제되었습니다.
-              <br />
-              다시 예매를 진행하시려면 좌석 선택에서 다시 선택해주세요.
+              {releasePending ? (
+                <>
+                  임시 예약 해제에 실패했을 수 있습니다.
+                  <br />
+                  「좌석으로 돌아가기」를 누르면 다시 정리한 뒤 이동합니다.
+                </>
+              ) : (
+                <>
+                  선택하신 좌석의 임시 예약이 자동으로 해제되었습니다.
+                  <br />
+                  다시 예매를 진행하시려면 좌석 선택에서 다시 선택해주세요.
+                </>
+              )}
             </p>
 
             <div className="relative mt-6 rounded-[10px] border border-[#D1D5DC] bg-gray-50 px-4 pt-8 pb-4">
