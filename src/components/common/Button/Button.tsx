@@ -53,9 +53,10 @@ const sizeStyles = {
 } as const;
 
 const stateStyles = {
-  // border-none을 두면 outline/secondary/소셜 테두리가 비활성일 때 다시 사라진다.
+  // 배경만 회색으로 바꾸면 카카오/네이버처럼 브랜드 border가 남아 선만 보이는
+  // 상태가 된다. border도 disabled-bg에 맞춰 덮어 테두리만 남지 않게 한다 (#249).
   disabled:
-    "!bg-disabled-bg !text-text-disabled !shadow-none cursor-not-allowed opacity-100",
+    "!bg-disabled-bg !text-text-disabled !border-disabled-bg !shadow-none cursor-not-allowed opacity-100",
 };
 
 // Spinner 컴포넌트 (로딩 UI)
@@ -86,7 +87,10 @@ export default function Button({
         variantStyles[variant], // 버튼 종류
         sizeStyles[size], // 크기
         fullWidth && "w-full", // full width 옵션
-        isDisabled && stateStyles.disabled, // 비활성 상태
+        // 로딩 중에는 브랜드 색을 유지하고 스피너만 보여 준다.
+        // disabled 회색을 씌우면 소셜 버튼이 테두리만 남은 것처럼 보인다 (#249).
+        isDisabled && !loading && stateStyles.disabled,
+        loading && "cursor-not-allowed",
         className, // 외부 커스터마이징 허용
       )}
       disabled={isDisabled}
