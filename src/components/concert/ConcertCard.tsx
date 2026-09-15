@@ -17,6 +17,9 @@
 // - 2026-08-31 (이슈 #203):
 //   - 목록 게이지를 GET /performance 의 totalSeats/remainingSeats로 전환
 //   - 카드별 useSeatCounts(N+1) 제거. 키 없는 ON_SALE은 fail-open 「예매하기」
+// - 2026-09-15 (이슈 #296):
+//   - 그리드 내 h-full + flex로 카드 높이·CTA 정렬 통일
+//   - 출연/장소/일시 미입력 시 빈 줄 대신 「미정」으로 자리 유지
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Calendar } from "lucide-react";
@@ -32,6 +35,14 @@ import samplePoster from "@/assets/images/sample-poster.svg";
 /** 썸네일 우상단 소프트 칩 — Figma 마감임박과 동일 포맷 */
 const THUMB_BADGE_BASE =
   "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold";
+
+/** 목록 카드 메타 미입력 시 자리 유지용 (#296). 상세 문구는 #297과 동일 */
+const UNSET_LABEL = "미정";
+
+function trimOrNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed || null;
+}
 
 interface ConcertCardProps {
   concert: ConcertSummary;
@@ -78,8 +89,17 @@ function ConcertCard({ concert }: ConcertCardProps) {
   const formattedPrice = concert.price.toLocaleString("ko-KR");
   // showDate는 서울 달력 문자열 — Date 파싱하면 비-KST에서 하루 밀릴 수 있음 (#265)
   const formattedDate = formatShowDateLabel(concert.showDate);
+  const showTime = trimOrNull(concert.showTime);
+  const scheduleLabel =
+    formattedDate === "-" && !showTime
+      ? UNSET_LABEL
+      : [formattedDate !== "-" ? formattedDate : null, showTime]
+          .filter(Boolean)
+          .join(" ") || UNSET_LABEL;
 
-  const venueDisplay = concert.venue ?? concert.address ?? "";
+  const performer = trimOrNull(concert.performer);
+  const venueDisplay =
+    trimOrNull(concert.venue) ?? trimOrNull(concert.address);
 
   function handleClick() {
     navigate(`/concerts/${concert.id}`);
@@ -87,7 +107,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
 
   return (
     <article
-      className="group rounded-xl overflow-hidden bg-white shadow-card hover:shadow-md transition-shadow duration-200 cursor-pointer"
+      className="group h-full flex flex-col rounded-xl overflow-hidden bg-white shadow-card hover:shadow-md transition-shadow duration-200 cursor-pointer"
       onClick={handleClick}
       role="link"
       tabIndex={0}
@@ -98,7 +118,7 @@ function ConcertCard({ concert }: ConcertCardProps) {
         }
       }}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-b from-poster-fallback to-poster-fallback-end">
+      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-b from-poster-fallback to-poster-fallback-end shrink-0">
         <img
           src={concert.imageMainUrl || samplePoster}
           alt={`${concert.title} 포스터`}
@@ -126,21 +146,35 @@ function ConcertCard({ concert }: ConcertCardProps) {
         </div>
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="p-4 flex flex-col flex-1 gap-2">
         <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug min-h-[2.5rem]">
           {concert.title}
         </h3>
-        <p className="text-xs text-gray-500 truncate">{concert.performer}</p>
+        <p
+          className={`text-xs truncate ${
+            performer ? "text-gray-500" : "text-placeholder"
+          }`}
+        >
+          {performer ?? UNSET_LABEL}
+        </p>
 
         <div className="space-y-1 text-xs text-gray-600">
           <p className="flex items-center gap-1.5 truncate">
             <MapPin size={14} className="shrink-0 text-gray-400" />
-            <span className="truncate">{venueDisplay}</span>
+            <span
+              className={`truncate ${venueDisplay ? "" : "text-placeholder"}`}
+            >
+              {venueDisplay ?? UNSET_LABEL}
+            </span>
           </p>
           <p className="flex items-center gap-1.5">
             <Calendar size={14} className="shrink-0 text-gray-400" />
-            <span>
-              {formattedDate} {concert.showTime}
+            <span
+              className={
+                scheduleLabel === UNSET_LABEL ? "text-placeholder" : undefined
+              }
+            >
+              {scheduleLabel}
             </span>
           </p>
         </div>
@@ -150,24 +184,26 @@ function ConcertCard({ concert }: ConcertCardProps) {
           <p className="text-base font-bold text-primary">₩{formattedPrice}</p>
         </div>
 
-        <SeatGauge remaining={remaining} total={total} />
+        <div className="mt-auto space-y-2">
+          <SeatGauge remaining={remaining} total={total} />
 
-        <button
-          type="button"
-          className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${
-            canBook
-              ? "bg-primary text-white hover:opacity-90"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-          }`}
-          disabled={!canBook}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!canBook) return;
-            handleClick();
-          }}
-        >
-          {buttonLabel}
-        </button>
+          <button
+            type="button"
+            className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${
+              canBook
+                ? "bg-primary text-white hover:opacity-90"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+            disabled={!canBook}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!canBook) return;
+              handleClick();
+            }}
+          >
+            {buttonLabel}
+          </button>
+        </div>
       </div>
     </article>
   );
