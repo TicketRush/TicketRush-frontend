@@ -45,7 +45,11 @@ export async function mockSocialLogin(
 
   mockSessionRole = "MEMBER";
   mockSessionName = `${req.provider}_TestUser`;
-  mockSessionEmail = `${req.provider.toLowerCase()}_user@example.com`;
+  // 카카오는 이메일 미제공 계약 — getMe도 빈 값으로 맞춰 빈 행 UX를 재현한다 (#217)
+  mockSessionEmail =
+    req.provider === "KAKAO"
+      ? ""
+      : `${req.provider.toLowerCase()}_user@example.com`;
 
   return {
     userId: 1,

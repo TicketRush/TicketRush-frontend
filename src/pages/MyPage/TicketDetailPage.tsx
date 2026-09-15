@@ -224,11 +224,14 @@ export default function TicketDetailPage() {
               label="이름"
               value={user?.name ?? "-"}
             />
-            <PersonRow
-              icon={<Mail size={20} />}
-              label="이메일"
-              value={user?.email ?? "-"}
-            />
+            {/* 빈 문자열은 ?? 로 잡히지 않아 라벨만 남는다 — trim 후 없으면 행 숨김 (#217) */}
+            {user?.email?.trim() ? (
+              <PersonRow
+                icon={<Mail size={20} />}
+                label="이메일"
+                value={user.email}
+              />
+            ) : null}
             <PersonRow
               icon={<Calendar size={20} />}
               label="예매일"
