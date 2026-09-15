@@ -24,6 +24,7 @@ import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { useRestorePendingTimer } from "@/hooks/booking/useRestorePendingTimer";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
 
 export default function ReservationConfirmPage() {
@@ -34,6 +35,12 @@ export default function ReservationConfirmPage() {
   const selectedSeat = useSeatStore((s) => s.selectedSeat);
   const currentConcert = useConcertStore((s) => s.currentConcert);
   const bookingNumber = usePaymentStore((s) => s.bookingNumber);
+  useDocumentTitle(
+    currentConcert?.title
+      ? `${currentConcert.title} · 예매 확인`
+      : "예매 확인",
+  );
+
   const { remainingMs } = useTimerDisplay();
 
   const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);

@@ -1,4 +1,4 @@
-import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
+import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
 
 export const UNAVAILABLE_METRIC = "-";
 
@@ -7,14 +7,9 @@ export function formatAdminText(value: string | null | undefined): string {
   return trimmed ? trimmed : UNAVAILABLE_METRIC;
 }
 
-/** BE `yyyy-MM-dd HH:mm:ss` 또는 ISO → `YYYY-MM-DD HH:mm`. */
+/** BE Instant(UTC naive / ISO) → Asia/Seoul `YYYY-MM-DD HH:mm`. */
 export function formatAdminDateTime(value: string | null | undefined): string {
-  if (value == null || value.trim() === "") return UNAVAILABLE_METRIC;
-  const ms = parseBackendDateTime(value);
-  if (ms == null) return UNAVAILABLE_METRIC;
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return formatSeoulDateTime(value, UNAVAILABLE_METRIC);
 }
 
 /** 예매자 이름·이메일 조합. 둘 다 없으면 undefined(화면에서 "-"). */

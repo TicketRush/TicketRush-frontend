@@ -80,9 +80,9 @@ export interface BookingSummary {
   performanceId: number;
   seatId: number;
   status: BookingStatus;
-  /** BE `yyyy-MM-dd HH:mm:ss`. PENDING·부분 응답이면 키 생략 */
+  /** BE Instant(UTC). naive 또는 ISO. PENDING·부분 응답이면 키 생략 (#246) */
   confirmedAt?: string | null;
-  /** PENDING만 존재. BE `yyyy-MM-dd HH:mm:ss`, 그 외는 생략 (#559/#167) */
+  /** PENDING만. BE Instant(UTC). 그 외는 생략 (#559/#167/#246) */
   expiresAt?: string | null;
   performanceTitle?: string;
   performanceDate?: string;

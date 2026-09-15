@@ -13,6 +13,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSocialLogin } from "@/hooks/auth/useAuth";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import type { OauthProvider } from "@/types/domain/auth";
 
 const PROVIDER_MAP: Record<string, OauthProvider> = {
@@ -25,6 +26,8 @@ const PROVIDER_MAP: Record<string, OauthProvider> = {
 const exchangedCodes = new Set<string>();
 
 export default function OAuthCallbackPage() {
+  useDocumentTitle("로그인 처리 중");
+
   const { provider } = useParams<{ provider: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();

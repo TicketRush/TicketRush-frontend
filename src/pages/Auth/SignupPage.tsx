@@ -35,10 +35,13 @@ import userIcon from "@/assets/icons/user.svg";
 import emailIcon from "@/assets/icons/email.svg";
 import checkIcon from "@/assets/icons/check.svg";
 import lockIcon from "@/assets/icons/lock.svg";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 type SocialProvider = "kakao" | "naver" | "google";
 
 export default function SignupPage() {
+  useDocumentTitle("회원가입");
+
   const navigate = useNavigate();
   const location = useLocation();
 

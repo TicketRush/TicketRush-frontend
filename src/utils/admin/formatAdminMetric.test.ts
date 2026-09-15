@@ -32,9 +32,12 @@ describe("formatAdminMetric", () => {
     expect(formatAdminText("김소희")).toBe("김소희");
   });
 
-  it("백엔드 예매 일시를 로컬 YYYY-MM-DD HH:mm으로 돌린다", () => {
+  it("백엔드 Instant를 Asia/Seoul YYYY-MM-DD HH:mm으로 돌린다", () => {
     expect(formatAdminDateTime(null)).toBe(UNAVAILABLE_METRIC);
-    expect(formatAdminDateTime("2026-05-22 10:30:00")).toBe("2026-05-22 10:30");
+    expect(formatAdminDateTime("2026-05-22 10:30:00")).toBe("2026-05-22 19:30");
+    expect(formatAdminDateTime("2026-05-22T10:30:00.000Z")).toBe(
+      "2026-05-22 19:30",
+    );
   });
 
   it("예매자 이름·이메일을 조합한다", () => {

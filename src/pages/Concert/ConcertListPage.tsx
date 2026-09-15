@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { useConcerts } from "@/hooks/queries/useConcerts";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import ConcertCard from "@/components/concert/ConcertCard";
 import ConcertCardSkeleton from "@/components/concert/ConcertCardSkeleton";
 import BannerSlider from "@/components/concert/BannerSlider";
@@ -13,6 +15,10 @@ function ConcertGrid({ children }: { children: ReactNode }) {
 }
 
 export default function ConcertListPage() {
+  const { pathname } = useLocation();
+  const isHome = pathname === "/";
+  useDocumentTitle(isHome ? "TicketRush" : "공연 목록", { exact: isHome });
+
   const {
     data,
     isLoading,

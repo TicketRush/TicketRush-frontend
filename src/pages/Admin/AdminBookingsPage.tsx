@@ -35,6 +35,7 @@ import {
   parseAdminBookingHandoff,
   resolveAdminBookingHandoff,
 } from "@/utils/admin/resolveAdminBookingHandoff";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 type Tab = "ALL" | "CONFIRMED" | "PENDING" | "CANCELED";
 
@@ -72,6 +73,8 @@ function withRequestedRefunds(
 }
 
 export default function AdminBookingsPage() {
+  useDocumentTitle("예매 관리");
+
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>("ALL");
