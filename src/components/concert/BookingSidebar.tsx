@@ -239,7 +239,13 @@ export default function BookingSidebar({
 
         <div className="border-2 border-border rounded-lg p-3 bg-white flex items-center justify-between">
           <span className="text-xs text-text-secondary">관람 시간</span>
-          <span className="text-sm font-semibold">{duration}분</span>
+          <span
+            className={`text-sm font-semibold ${
+              duration > 0 ? "" : "text-placeholder font-medium"
+            }`}
+          >
+            {duration > 0 ? `${duration}분` : "미정"}
+          </span>
         </div>
 
         <button
