@@ -93,6 +93,9 @@ interface CharacterDraft {
   outfitModelId: OutfitModelId;
   outfitName: string;
   outfitColor: string;
+  jacketColor: string;
+  innerColor: string;
+  bottomColor: string;
   musicalJacketColor: string;
   musicalInnerColor: string;
   musicalShortsColor: string;
@@ -122,6 +125,9 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "outfitModelId"
         | "outfitName"
         | "outfitColor"
+        | "jacketColor"
+        | "innerColor"
+        | "bottomColor"
         | "musicalJacketColor"
         | "musicalInnerColor"
         | "musicalShortsColor"
@@ -138,6 +144,9 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId?: unknown;
       outfitName?: unknown;
       outfitColor?: unknown;
+      jacketColor?: unknown;
+      innerColor?: unknown;
+      bottomColor?: unknown;
       musicalJacketColor?: unknown;
       musicalInnerColor?: unknown;
       musicalShortsColor?: unknown;
@@ -159,6 +168,24 @@ function loadSavedCharacter(): CharacterDraft | null {
     const resolvedOutfitColor =
       typeof parsed.outfitColor === "string"
         ? normalizeHexColor(parsed.outfitColor)
+        : null;
+
+    const legacyOutfitColor =
+      resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
+
+    const resolvedJacketColor =
+      typeof parsed.jacketColor === "string"
+        ? normalizeHexColor(parsed.jacketColor)
+        : null;
+
+    const resolvedInnerColor =
+      typeof parsed.innerColor === "string"
+        ? normalizeHexColor(parsed.innerColor)
+        : null;
+
+    const resolvedBottomColor =
+      typeof parsed.bottomColor === "string"
+        ? normalizeHexColor(parsed.bottomColor)
         : null;
 
     const resolvedMusicalJacketColor =
@@ -207,6 +234,9 @@ function loadSavedCharacter(): CharacterDraft | null {
       outfitModelId: resolvedOutfitModelId,
       outfitName: resolvedOutfit.name,
       outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+      jacketColor: resolvedJacketColor ?? legacyOutfitColor,
+      innerColor: resolvedInnerColor ?? legacyOutfitColor,
+      bottomColor: resolvedBottomColor ?? legacyOutfitColor,
       musicalJacketColor:
         resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
       musicalInnerColor:
@@ -1028,6 +1058,7 @@ function CharacterCreatorLinkBox({
     );
   }
 
+  const isConcertOutfit = character.outfitModelId === "concert";
   const isMusicalOutfit = character.outfitModelId === "musical";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
@@ -1042,6 +1073,9 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          jacketColor={character.jacketColor}
+          innerColor={character.innerColor}
+          bottomColor={character.bottomColor}
           musicalJacketColor={character.musicalJacketColor}
           musicalInnerColor={character.musicalInnerColor}
           musicalShortsColor={character.musicalShortsColor}
@@ -1069,6 +1103,14 @@ function CharacterCreatorLinkBox({
           의상: {character.outfitName} / 액세서리: {character.accessory} /
           포즈: {character.pose}
         </p>
+
+        {isConcertOutfit && (
+          <p className="mt-1 text-xs text-admin-text-secondary">
+            재킷: {character.jacketColor.toUpperCase()} /
+            이너: {character.innerColor.toUpperCase()} /
+            하의: {character.bottomColor.toUpperCase()}
+          </p>
+        )}
 
         {isMusicalOutfit && (
           <p className="mt-1 text-xs text-admin-text-secondary">

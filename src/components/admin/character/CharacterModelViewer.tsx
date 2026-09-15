@@ -32,6 +32,11 @@ interface CharacterModelViewerProps {
    */
   outfitColor: string;
 
+  /** Concert part colors fall back to outfitColor when omitted. */
+  jacketColor?: string;
+  innerColor?: string;
+  bottomColor?: string;
+
   musicalJacketColor?: string;
   musicalInnerColor?: string;
   musicalShortsColor?: string;
@@ -77,6 +82,12 @@ const EYE_MODEL_URLS: Record<EyeStyle, string> = {
   angry: "/models/eyes/eye_angry.glb",
   closed: "/models/eyes/eye_closed.glb",
 };
+
+const CONCERT_PART_NAMES = {
+  jacket: "concert_jacket",
+  inner: "concert_inner",
+  bottom: "concert_shorts",
+} as const;
 
 function CharacterModelLoadingFallback() {
   return (
@@ -178,6 +189,69 @@ function EyeModel({
   return <primitive object={scene} />;
 }
 
+function matchesPartName(objectName: string, partName: string) {
+  const normalizedName = objectName.toLowerCase();
+  const normalizedPartName = partName.toLowerCase();
+
+  return (
+    normalizedName === normalizedPartName ||
+    normalizedName.startsWith(`${normalizedPartName}.`) ||
+    normalizedName.startsWith(`${normalizedPartName}_`)
+  );
+}
+
+/**
+ * Blender의 Object 이름과 실제 Mesh 이름이 다를 수도 있으므로,
+ * 현재 Mesh부터 부모 Object까지 올라가며 파츠 이름을 찾습니다.
+ */
+function findConcertPartColor(
+  object: THREE.Object3D,
+  jacketColor: string,
+  innerColor: string,
+  bottomColor: string,
+): string | null {
+  let current: THREE.Object3D | null = object;
+
+  while (current) {
+    if (matchesPartName(current.name, CONCERT_PART_NAMES.jacket)) {
+      return jacketColor;
+    }
+
+    if (matchesPartName(current.name, CONCERT_PART_NAMES.inner)) {
+      return innerColor;
+    }
+
+    if (matchesPartName(current.name, CONCERT_PART_NAMES.bottom)) {
+      return bottomColor;
+    }
+
+    current = current.parent;
+  }
+
+  return null;
+}
+
+function cloneConcertMaterialWithColor(
+  material: THREE.Material,
+  color: string,
+): THREE.Material {
+  const clonedMaterial = material.clone() as THREE.Material & {
+    color?: THREE.Color;
+  };
+
+  if (clonedMaterial.color instanceof THREE.Color) {
+    clonedMaterial.color.set(color);
+    clonedMaterial.needsUpdate = true;
+
+    return clonedMaterial;
+  }
+
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.8,
+  });
+}
+
 function cloneMaterialWithColor(
   material: THREE.Material,
   color: string,
@@ -213,6 +287,10 @@ function applyMeshColor(object: THREE.Mesh, color: string) {
 function OutfitModel({
   modelUrl,
   outfitModelId,
+  outfitColor,
+  jacketColor,
+  innerColor,
+  bottomColor,
   musicalJacketColor,
   musicalInnerColor,
   musicalShortsColor,
@@ -221,6 +299,10 @@ function OutfitModel({
 }: {
   modelUrl: string;
   outfitModelId: OutfitModelId;
+  outfitColor: string;
+  jacketColor?: string;
+  innerColor?: string;
+  bottomColor?: string;
   musicalJacketColor: string;
   musicalInnerColor: string;
   musicalShortsColor: string;
@@ -232,12 +314,42 @@ function OutfitModel({
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
 
-    if (outfitModelId !== "festival" && outfitModelId !== "musical") {
+    if (
+      outfitModelId !== "festival" &&
+      outfitModelId !== "musical" &&
+      outfitModelId !== "concert"
+    ) {
       return clonedScene;
     }
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "concert") {
+        const partColor = findConcertPartColor(
+          object,
+          jacketColor ?? outfitColor,
+          innerColor ?? outfitColor,
+          bottomColor ?? outfitColor,
+        );
+
+        if (!partColor) {
+          return;
+        }
+
+        if (Array.isArray(object.material)) {
+          object.material = object.material.map((material) =>
+            cloneConcertMaterialWithColor(material, partColor),
+          );
+          return;
+        }
+
+        object.material = cloneConcertMaterialWithColor(
+          object.material,
+          partColor,
+        );
         return;
       }
 
@@ -283,6 +395,10 @@ function OutfitModel({
   }, [
     gltf.scene,
     outfitModelId,
+    outfitColor,
+    jacketColor,
+    innerColor,
+    bottomColor,
     musicalJacketColor,
     musicalInnerColor,
     musicalShortsColor,
@@ -298,6 +414,10 @@ function CharacterModel({
   skinColor,
   hairColor,
   outfitModelId,
+  outfitColor,
+  jacketColor,
+  innerColor,
+  bottomColor,
   hairStyle,
   eyeStyle,
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
@@ -310,6 +430,10 @@ function CharacterModel({
   | "modelUrl"
   | "skinColor"
   | "hairColor"
+  | "outfitColor"
+  | "jacketColor"
+  | "innerColor"
+  | "bottomColor"
   | "outfitModelId"
   | "hairStyle"
   | "eyeStyle"
@@ -345,6 +469,10 @@ function CharacterModel({
             <OutfitModel
               modelUrl={outfitModelUrl}
               outfitModelId={outfitModelId}
+              outfitColor={outfitColor}
+              jacketColor={jacketColor}
+              innerColor={innerColor}
+              bottomColor={bottomColor}
               musicalJacketColor={musicalJacketColor}
               musicalInnerColor={musicalInnerColor}
               musicalShortsColor={musicalShortsColor}
@@ -363,6 +491,10 @@ export default function CharacterModelViewer({
   skinColor,
   hairColor,
   outfitModelId,
+  outfitColor,
+  jacketColor,
+  innerColor,
+  bottomColor,
   hairStyle,
   eyeStyle,
   musicalJacketColor = DEFAULT_MUSICAL_JACKET_COLOR,
@@ -384,6 +516,10 @@ export default function CharacterModelViewer({
             skinColor={skinColor}
             hairColor={hairColor}
             outfitModelId={outfitModelId}
+            outfitColor={outfitColor}
+            jacketColor={jacketColor}
+            innerColor={innerColor}
+            bottomColor={bottomColor}
             hairStyle={hairStyle}
             eyeStyle={eyeStyle}
             musicalJacketColor={musicalJacketColor}
