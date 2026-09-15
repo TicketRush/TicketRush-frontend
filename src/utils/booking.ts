@@ -3,53 +3,76 @@ import type {
   BookingStatus,
   BookingTab,
 } from "@/types/domain/booking";
+import { formatSeoulDate } from "@/utils/datetime/formatSeoulInstant";
 
-function toDateOnlyLabel(d: Date): string {
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
+/**
+ * 공연 달력(서울) 날짜·시각 → epoch ms.
+ * 한국은 DST가 없어 `+09:00`으로 고정한다 (#259).
+ */
+export function showScheduleToMs(
+  date: string,
+  time?: string,
+): number | null {
+  const d = date.trim();
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+
+  const t = time?.trim() ?? "";
+  const normalized = !t ? "00:00:00" : t.length === 5 ? `${t}:00` : t;
+  if (!/^\d{2}:\d{2}:\d{2}$/.test(normalized)) return null;
+
+  const ms = Date.parse(`${d}T${normalized}+09:00`);
+  return Number.isNaN(ms) ? null : ms;
 }
 
 /**
- * "2026-07-20" + "18:00" / "19:30:00" → Date 객체 (로컬 타임존).
- * 시간이 없으면 해당일 00:00.
+ * "2026-07-20" + "18:00" / "19:30:00" → Date (서울 벽시계 Instant).
+ * 시간이 없으면 해당일 서울 00:00.
  */
 export function toShowDateTime(date: string, time?: string): Date {
-  const d = date.trim();
-  if (!d) return new Date(NaN);
-  const t = time?.trim() ?? "";
-  if (!t) return new Date(`${d}T00:00:00`);
-  const normalized = t.length === 5 ? `${t}:00` : t;
-  return new Date(`${d}T${normalized}`);
+  const ms = showScheduleToMs(date, time);
+  return ms == null ? new Date(NaN) : new Date(ms);
 }
 
-/** 단일 예매 항목이 upcoming인지 past인지 판별 */
+/** 공연 달력 필드를 표시용 문자열로 (Instant 변환 없음) */
+export function formatPerformanceSchedule(
+  date: string,
+  time?: string,
+): string {
+  const d = date.trim();
+  if (!d) return "-";
+  const t = time?.trim() ?? "";
+  if (!t) return d;
+  return `${d} ${t.length >= 5 ? t.slice(0, 5) : t}`;
+}
+
+/** 단일 예매 항목이 upcoming인지 past인지 판별 (서울 달력 기준, #259) */
 export function getBookingTab(
   booking: Pick<BookingListItem, "performanceDate" | "performanceTime">,
   now: Date = new Date(),
 ): BookingTab {
   const date = booking.performanceDate?.trim() ?? "";
-  // 부분 응답으로 날짜가 생략되면 지난 공연으로 단정하지 않는다 (PENDING 결제 건 포함).
   if (!date) return "upcoming";
 
   const time = booking.performanceTime?.trim() ?? "";
   if (time) {
-    const showAt = toShowDateTime(date, time);
-    if (Number.isNaN(showAt.getTime())) return "upcoming";
-    return showAt.getTime() >= now.getTime() ? "upcoming" : "past";
+    const showAt = showScheduleToMs(date, time);
+    if (showAt == null) return "upcoming";
+    return showAt >= now.getTime() ? "upcoming" : "past";
   }
 
-  // /booking/me 는 performance_time이 없음 → 공연 날짜만으로 분기 (#168)
-  return date >= toDateOnlyLabel(now) ? "upcoming" : "past";
+  const todaySeoul = formatSeoulDate(now.getTime(), "");
+  if (!todaySeoul) return "upcoming";
+  return date >= todaySeoul ? "upcoming" : "past";
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-/** CONFIRMED이고 공연까지 7일 이상이면 환불 신청 가능. 목록에 시각이 없으면 날짜만 비교한다. */
+/** CONFIRMED이고 공연까지 7일 이상이면 환불 신청 가능 (#259). */
 export function isRefundableBooking(
-  booking: Pick<BookingListItem, "performanceDate" | "performanceTime" | "status">,
+  booking: Pick<
+    BookingListItem,
+    "performanceDate" | "performanceTime" | "status"
+  >,
   now: Date = new Date(),
 ): boolean {
   if (booking.status !== "CONFIRMED") return false;
@@ -58,20 +81,19 @@ export function isRefundableBooking(
 
   const time = booking.performanceTime?.trim() ?? "";
   if (time) {
-    const showAt = toShowDateTime(date, time);
-    if (Number.isNaN(showAt.getTime())) return false;
-    return (showAt.getTime() - now.getTime()) / MS_PER_DAY >= 7;
+    const showAt = showScheduleToMs(date, time);
+    if (showAt == null) return false;
+    return (showAt - now.getTime()) / MS_PER_DAY >= 7;
   }
 
-  const showDay = toShowDateTime(date);
-  const today = toShowDateTime(toDateOnlyLabel(now));
-  if (Number.isNaN(showDay.getTime()) || Number.isNaN(today.getTime())) {
-    return false;
-  }
-  return Math.round((showDay.getTime() - today.getTime()) / MS_PER_DAY) >= 7;
+  const todaySeoul = formatSeoulDate(now.getTime(), "");
+  if (!todaySeoul) return false;
+  const showMs = showScheduleToMs(date);
+  const todayMs = showScheduleToMs(todaySeoul);
+  if (showMs == null || todayMs == null) return false;
+  return Math.round((showMs - todayMs) / MS_PER_DAY) >= 7;
 }
 
-/** CONFIRMED만 입장 QR을 조회한다. PENDING·취소·만료는 TICKET_404를 내지 않는다. */
 export function canFetchTicketQr(status: BookingStatus): boolean {
   return status === "CONFIRMED";
 }
@@ -132,7 +154,6 @@ export function displayBookingText(value: string | null | undefined): string {
   return v ? v : "-";
 }
 
-/** 목록을 탭으로 필터링 */
 export function filterBookingsByTab(
   bookings: BookingListItem[],
   tab: BookingTab,

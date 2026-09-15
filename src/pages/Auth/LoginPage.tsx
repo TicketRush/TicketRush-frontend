@@ -19,10 +19,13 @@ import Button from "../../components/common/Button/Button";
 import Input from "../../components/common/Input/Input";
 import emailIcon from "@/assets/icons/email.svg";
 import lockIcon from "@/assets/icons/lock.svg";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 type SocialProvider = "kakao" | "naver" | "google";
 
 export default function LoginPage() {
+  useDocumentTitle("로그인");
+
   const navigate = useNavigate();
   const location = useLocation();
   const emailLogin = useEmailLogin();

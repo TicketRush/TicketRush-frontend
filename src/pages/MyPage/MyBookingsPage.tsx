@@ -1,6 +1,7 @@
 import { useState } from "react";
 import useAuthStore from "@/stores/global/authStore";
 import { useMyBookings } from "@/hooks/queries/useMyBookings";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import { ProfileCard } from "@/components/mypage/ProfileCard";
 import { BookingTabs } from "@/components/mypage/BookingTabs";
 import { BookingCard } from "@/components/mypage/BookingCard";
@@ -8,6 +9,8 @@ import { filterBookingsByTab } from "@/utils/booking";
 import type { BookingTab } from "@/types/domain/booking";
 
 export default function MyBookingsPage() {
+  useDocumentTitle("내 예매");
+
   const [tab, setTab] = useState<BookingTab>("upcoming");
   const user = useAuthStore((s) => s.user);
 

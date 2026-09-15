@@ -5,6 +5,7 @@ import { useTimerStore } from "@/stores/reservation/timerStore";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import type { Genre, ConcertStatus } from "@/types/domain/concert";
 import type { Seat } from "@/types/domain/seat";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 // concertStore.Concert 인터페이스에 맞춤
 const MOCK_CONCERT: {
@@ -51,6 +52,7 @@ const MOCK_SEAT: Seat = {
 export default function DevNavPage() {
   // 훅은 항상 호출되어야 하므로 가드보다 위에 둠
   const navigate = useNavigate();
+  useDocumentTitle("개발 네비");
 
   // 프로덕션 빌드 차단
   if (!import.meta.env.DEV) {
