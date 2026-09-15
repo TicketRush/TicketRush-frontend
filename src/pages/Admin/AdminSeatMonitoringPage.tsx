@@ -472,7 +472,7 @@ export default function AdminSeatMonitoringPage() {
                 <LegendRow swatch="bg-admin-seat-sold" label="판매 완료" />
                 <LegendRow
                   swatch="bg-admin-seat-holding"
-                  label="진행중 (타이머)"
+                  label="임시예매 (타이머)"
                 />
               </div>
             </>
