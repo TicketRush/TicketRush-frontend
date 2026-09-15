@@ -50,7 +50,6 @@ import {
   shouldFetchSeatCounts,
 } from "@/utils/concert/canBookConcert";
 import { getDetailGaugeSeats } from "@/utils/concert/getDetailGaugeSeats";
-import { formatShowDateLabel } from "@/utils/concert/formatShowDateLabel";
 import {
   formatShowScheduleLabel,
   trimOrNull,
@@ -170,7 +169,7 @@ export default function ConcertDetailPage() {
   const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
   const description = trimOrNull(data.description) ?? "";
   const performer = trimOrNull(data.performer);
-  const showDateLabel = formatShowDateLabel(data.showDate);
+  const showDate = trimOrNull(data.showDate);
   const scheduleLabel = formatShowScheduleLabel(
     data.showTime,
     data.durationMinutes,
@@ -267,7 +266,7 @@ export default function ConcertDetailPage() {
             <InfoBox
               icon={<Calendar size={20} className="text-primary" />}
               label="공연일"
-              value={showDateLabel === "-" ? "" : showDateLabel}
+              value={showDate ?? ""}
             />
             <InfoBox
               icon={<Clock size={20} className="text-primary" />}
