@@ -22,8 +22,11 @@ import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { useTimerExpiry } from "@/stores/reservation/timerStore";
 import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 export default function PaymentFailedPage() {
+  useDocumentTitle("결제 실패");
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

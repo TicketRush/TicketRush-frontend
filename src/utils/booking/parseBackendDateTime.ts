@@ -1,6 +1,9 @@
 /**
- * 백엔드 LocalDateTime JSON (`yyyy-MM-dd HH:mm:ss`, 오프셋 없음)을 epoch ms로 파싱한다.
- * ISO(`T` / `Z`)도 허용한다. 오프셋이 없으면 브라우저 로컬 벽시계로 해석한다.
+ * 백엔드 Instant JSON을 epoch ms로 파싱한다.
+ *
+ * - offset/Z 있는 ISO → Instant
+ * - 오프셋 없는 naive (`yyyy-MM-dd HH:mm:ss` / `T` 구분) → **UTC Instant**
+ *   (브라우저 로컬 벽시계로 해석하지 않음 — #246)
  */
 export function parseBackendDateTime(value: string): number | null {
   const trimmed = value.trim();
@@ -11,14 +14,14 @@ export function parseBackendDateTime(value: string): number | null {
   );
   if (naive && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
     const [, y, mo, d, h, mi, s] = naive;
-    return new Date(
+    return Date.UTC(
       Number(y),
       Number(mo) - 1,
       Number(d),
       Number(h),
       Number(mi),
       Number(s),
-    ).getTime();
+    );
   }
 
   const ms = Date.parse(trimmed);
@@ -32,15 +35,4 @@ export function remainingMsUntil(
   const t = parseBackendDateTime(expiresAt);
   if (t == null) return 0;
   return Math.max(0, t - nowMs);
-}
-
-/** BE datetime을 화면 표기용으로 변환. 없거나 파싱 실패면 "-" */
-export function formatBackendDateTimeLabel(
-  value: string | null | undefined,
-  locales: string = "ko-KR",
-): string {
-  if (!value) return "-";
-  const ms = parseBackendDateTime(value);
-  if (ms == null) return "-";
-  return new Date(ms).toLocaleString(locales);
 }

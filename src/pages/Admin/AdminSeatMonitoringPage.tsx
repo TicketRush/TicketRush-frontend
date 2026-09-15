@@ -30,6 +30,7 @@ import {
   formatAdminShowSchedule,
   formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const MONITORING_PAGE_SIZE = 50;
 
@@ -51,6 +52,8 @@ const GENRE_LABELS: Record<Genre, string> = {
 };
 
 export default function AdminSeatMonitoringPage() {
+  useDocumentTitle("좌석 모니터링");
+
   const navigate = useNavigate();
   const [selectedConcertId, setSelectedConcertId] = useState<number | null>(
     null,

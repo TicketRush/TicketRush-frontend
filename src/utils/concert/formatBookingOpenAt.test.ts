@@ -15,6 +15,12 @@ describe("formatBookingOpenAt", () => {
     );
   });
 
+  it("naive UTC도 Z와 같은 Seoul 시각으로 포맷한다", () => {
+    expect(formatBookingOpenAt("2026-09-15 03:00:00")).toBe(
+      "2026년 09월 15일(화) 12:00",
+    );
+  });
+
   it("잘못된 값은 빈 문자열을 반환한다", () => {
     expect(formatBookingOpenAt("not-a-date")).toBe("");
   });

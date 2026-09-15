@@ -33,6 +33,7 @@ import {
   TicketPoster,
   TicketQrCard,
 } from "@/components/ticket/TicketUi";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 export default function PaymentCompletePage() {
   // App.tsx: path="/reservations/:reservationId"
@@ -42,6 +43,7 @@ export default function PaymentCompletePage() {
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useBookingDetail(bookingNumber);
+  useDocumentTitle(data?.performanceTitle ?? "티켓 상세");
   const posterUrl = useBookingPoster(
     data?.performanceId,
     data?.performanceImageMainUrl,

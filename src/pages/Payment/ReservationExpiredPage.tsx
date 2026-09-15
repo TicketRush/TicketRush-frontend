@@ -7,14 +7,19 @@ import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
 import { isPaymentInFlight } from "@/utils/booking/isPaymentInFlight";
+import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 export default function ReservationExpiredPage() {
+  useDocumentTitle("예매 만료");
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const performanceId = id ? Number(id) : 0;
   const releaseMutation = useReleaseSeat(performanceId);
   const { handleTimeout } = useReservationLifecycle();
   const [closePending, setClosePending] = useState(false);
+  /** PENDING이 클라/서버에 남아 해제 재시도가 필요할 때 */
+  const [releasePending, setReleasePending] = useState(false);
 
   const handleTimeoutRef = useRef(handleTimeout);
   handleTimeoutRef.current = handleTimeout;
@@ -22,31 +27,72 @@ export default function ReservationExpiredPage() {
   releaseMutationRef.current = releaseMutation;
   const didCancelRef = useRef(false);
 
+  async function cancelRemainingPending() {
+    const { bookingNumber, seatId, status } = usePaymentStore.getState();
+    if (!bookingNumber || isPaymentInFlight(status)) return true;
+
+    return handleTimeoutRef.current({
+      onReleaseSeat: () =>
+        releaseMutationRef.current.mutateAsync({
+          bookingNumber,
+          seatId: seatId ?? undefined,
+        }),
+      silent: true,
+    });
+  }
+
+  function syncReleasePendingFlag() {
+    const { bookingNumber, status } = usePaymentStore.getState();
+    setReleasePending(!!bookingNumber && !isPaymentInFlight(status));
+  }
+
   // 남은 PENDING을 마운트 시 조용히 취소해 「이미 해제」 카피와 맞춘다.
-  // CTA는 이동만 한다. 의존성 비움: 스토어가 비워진 뒤 재실행되면 안 된다.
   useEffect(() => {
     if (didCancelRef.current) return;
-    const { bookingNumber, seatId, status } = usePaymentStore.getState();
-    if (!bookingNumber || isPaymentInFlight(status)) return;
+    const { bookingNumber, status } = usePaymentStore.getState();
+    if (!bookingNumber || isPaymentInFlight(status)) {
+      setReleasePending(false);
+      return;
+    }
     didCancelRef.current = true;
+    setReleasePending(true);
 
     setClosePending(true);
-    void handleTimeoutRef
-      .current({
-        onReleaseSeat: () =>
-          releaseMutationRef.current.mutateAsync({
-            bookingNumber,
-            seatId: seatId ?? undefined,
-          }),
-        silent: true,
+    void cancelRemainingPending()
+      .then((ok) => {
+        if (ok) setReleasePending(false);
+        else syncReleasePendingFlag();
       })
       .finally(() => setClosePending(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleClose = useCallback(() => {
+  // CTA로 좌석에 돌아갈 때 stale PENDING이 있으면 한 번 더 취소 (#260)
+  const handleClose = useCallback(async () => {
     if (closePending) return;
+
+    const { bookingNumber, status } = usePaymentStore.getState();
+    if (bookingNumber && !isPaymentInFlight(status)) {
+      setClosePending(true);
+      try {
+        const ok = await cancelRemainingPending();
+        if (!ok) syncReleasePendingFlag();
+        else setReleasePending(false);
+      } finally {
+        setClosePending(false);
+      }
+    } else {
+      setReleasePending(false);
+    }
+
     navigate(`/concerts/${id}/seats`);
   }, [closePending, id, navigate]);
 
-  return <TimeoutModal onClose={handleClose} closePending={closePending} />;
+  return (
+    <TimeoutModal
+      onClose={handleClose}
+      closePending={closePending}
+      releasePending={releasePending}
+    />
+  );
 }

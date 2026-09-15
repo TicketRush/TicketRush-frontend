@@ -11,12 +11,12 @@ import type {
   BookingTab,
 } from "@/types/domain/booking";
 import {
-  toShowDateTime,
   formatPaymentAmount,
   displayBookingText,
+  formatPerformanceSchedule,
   isRefundableBooking,
 } from "@/utils/booking";
-import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
+import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
 
 interface BookingCardProps {
@@ -83,12 +83,6 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   const navigate = useNavigate();
   const cancelBooking = useCancelBooking();
 
-  // 공연 시작시각 = performanceDate + performanceTime
-  const showDateTime = toShowDateTime(
-    booking.performanceDate,
-    booking.performanceTime,
-  );
-
   const isRefundable = isRefundableBooking(booking);
 
   // ─ 지난 공연 여부 ─
@@ -120,23 +114,11 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
     }
   };
 
-  // ─ 포맷팅 ─
-  const formatShowDateTime = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-
-  const createdAtLabel = (() => {
-    if (!booking.createdAt) return "-";
-    const ms = parseBackendDateTime(booking.createdAt);
-    if (ms == null) return "-";
-    return formatShowDateTime(new Date(ms));
-  })();
-
-  const showDateLabel = (() => {
-    if (!booking.performanceDate) return "-";
-    if (!booking.performanceTime?.trim()) return booking.performanceDate;
-    if (Number.isNaN(showDateTime.getTime())) return booking.performanceDate;
-    return formatShowDateTime(showDateTime);
-  })();
+  const createdAtLabel = formatSeoulDateTime(booking.createdAt);
+  const showDateLabel = formatPerformanceSchedule(
+    booking.performanceDate,
+    booking.performanceTime,
+  );
 
   const isTerminal =
     booking.status === "CANCELED" ||
