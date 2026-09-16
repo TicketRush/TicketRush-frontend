@@ -19,6 +19,7 @@ import {
   DEFAULT_FESTIVAL_TOP_COLOR,
   MUSICAL_OUTFIT_PART_NAMES,
   FESTIVAL_OUTFIT_PART_NAMES,
+  FANMEET_OUTFIT_PART_NAMES,
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
   type OutfitModelId,
@@ -44,6 +45,8 @@ interface CharacterModelViewerProps {
   /**
    * 기존 단일 의상 색상 값입니다.
    * 다른 의상 및 기존 호출부 호환을 위해 유지합니다.
+   *
+   * 팬미팅 의상에서는 카디건과 스커트에 적용합니다.
    */
   outfitColor: string;
 
@@ -361,25 +364,15 @@ function findBalletPartColor(
   object: THREE.Object3D,
   balletWearColor: string,
   balletShortsColor: string,
-) {
+): string | null {
   let current: THREE.Object3D | null = object;
 
   while (current) {
-    if (
-      matchesPartName(
-        current.name,
-        BALLET_PART_NAMES.wear,
-      )
-    ) {
+    if (matchesPartName(current.name, BALLET_PART_NAMES.wear)) {
       return balletWearColor;
     }
 
-    if (
-      matchesPartName(
-        current.name,
-        BALLET_PART_NAMES.shorts,
-      )
-    ) {
+    if (matchesPartName(current.name, BALLET_PART_NAMES.shorts)) {
       return balletShortsColor;
     }
 
@@ -387,6 +380,38 @@ function findBalletPartColor(
   }
 
   return null;
+}
+
+/**
+ * 팬미팅 의상에서 사용자 지정 의상 색상을 적용할 파츠인지 확인합니다.
+ *
+ * 카디건과 스커트만 outfitColor를 적용하고,
+ * 이너와 속바지는 GLB에 저장된 원래 Material을 유지합니다.
+ *
+ * Blender의 Object 이름과 실제 Mesh 이름이 다를 수 있으므로
+ * 현재 Mesh부터 부모 Object까지 올라가며 이름을 확인합니다.
+ */
+function isFanmeetColorablePart(object: THREE.Object3D) {
+  let current: THREE.Object3D | null = object;
+
+  while (current) {
+    if (
+      matchesPartName(
+        current.name,
+        FANMEET_OUTFIT_PART_NAMES.cardigan,
+      ) ||
+      matchesPartName(
+        current.name,
+        FANMEET_OUTFIT_PART_NAMES.skirt,
+      )
+    ) {
+      return true;
+    }
+
+    current = current.parent;
+  }
+
+  return false;
 }
 
 /**
@@ -490,6 +515,27 @@ function applyMeshColor(object: THREE.Mesh, color: string) {
   object.material = cloneMaterialWithColor(object.material, color);
 }
 
+/**
+ * GLB의 원래 Base Color / Base Color Texture에 영향받지 않고
+ * 지정한 색상을 그대로 적용합니다.
+ */
+function applyMeshColorWithoutBaseTexture(
+  object: THREE.Mesh,
+  color: string,
+) {
+  if (Array.isArray(object.material)) {
+    object.material = object.material.map((material) =>
+      createMaterialWithColor(material, color),
+    );
+    return;
+  }
+
+  object.material = createMaterialWithColor(
+    object.material,
+    color,
+  );
+}
+
 function OutfitModel({
   modelUrl,
   outfitModelId,
@@ -528,13 +574,26 @@ function OutfitModel({
       outfitModelId !== "festival" &&
       outfitModelId !== "musical" &&
       outfitModelId !== "concert" &&
-      outfitModelId !== "ballet"
+      outfitModelId !== "ballet" &&
+      outfitModelId !== "theater"
     ) {
       return clonedScene;
     }
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "theater") {
+        if (!isFanmeetColorablePart(object)) {
+          return;
+        }
+
+        applyMeshColorWithoutBaseTexture(
+          object,
+          outfitColor,
+        );
         return;
       }
 
@@ -699,6 +758,7 @@ function CharacterModel({
   | "festivalBottomColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
+
   const outfit = outfitModelUrl ? (
     <OutfitModel
       modelUrl={outfitModelUrl}
@@ -719,9 +779,18 @@ function CharacterModel({
 
   return (
     <Center
-      cacheKey={centered
-        ? [modelUrl, hairStyle, eyeStyle, mouthStyle, outfitModelId, modelScale].join(":")
-        : 0}
+      cacheKey={
+        centered
+          ? [
+              modelUrl,
+              hairStyle,
+              eyeStyle,
+              mouthStyle,
+              outfitModelId,
+              modelScale,
+            ].join(":")
+          : 0
+      }
     >
       <group
         scale={modelScale}
@@ -742,8 +811,12 @@ function CharacterModel({
 
         <MouthModel mouthStyle={mouthStyle} />
 
-        {centered ? outfit : (
-          <Suspense fallback={null}>{outfit}</Suspense>
+        {centered ? (
+          outfit
+        ) : (
+          <Suspense fallback={null}>
+            {outfit}
+          </Suspense>
         )}
       </group>
     </Center>
@@ -775,10 +848,21 @@ export default function CharacterModelViewer({
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
-      <Canvas camera={{ position: centered ? [0, 0, 6] : [0, 1.2, 6], fov: 35 }}>
+      <Canvas
+        camera={{
+          position: centered ? [0, 0, 6] : [0, 1.2, 6],
+          fov: 35,
+        }}
+      >
         <ambientLight intensity={1.7} />
-        <directionalLight position={[3, 5, 5]} intensity={2.2} />
-        <directionalLight position={[-3, 2, 2]} intensity={0.8} />
+        <directionalLight
+          position={[3, 5, 5]}
+          intensity={2.2}
+        />
+        <directionalLight
+          position={[-3, 2, 2]}
+          intensity={0.8}
+        />
 
         <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
