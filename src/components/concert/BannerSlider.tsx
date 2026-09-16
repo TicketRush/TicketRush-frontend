@@ -14,7 +14,7 @@ const GRADIENTS = [
 
 export default function BannerSlider() {
   const navigate = useNavigate();
-  const { data: banners, isLoading, isError } = useBanners();
+  const { data: banners, isPending, isError, isFetching } = useBanners();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -32,7 +32,9 @@ export default function BannerSlider() {
   // 슬라이드 수가 바뀌었을 때 인덱스 초과 방지
   const safeIndex = totalSlides > 0 ? currentIndex % totalSlides : 0;
 
-  if (isLoading) {
+  // 재시도 대기·에러 후 refetch 중에도 스켈레톤 유지
+  const showLoading = isPending || (isFetching && !banners);
+  if (showLoading) {
     return (
       <div className="w-full h-48 bg-gray-100 rounded-2xl animate-pulse" />
     );
