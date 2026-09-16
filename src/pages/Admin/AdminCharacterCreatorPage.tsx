@@ -28,6 +28,10 @@ import {
   DEFAULT_MUSICAL_JACKET_COLOR,
   DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FANMEET_CARDIGAN_COLOR,
+  DEFAULT_FANMEET_INNER_COLOR,
+  DEFAULT_FANMEET_SHORTS_COLOR,
+  DEFAULT_FANMEET_SKIRT_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   DEFAULT_OUTFIT_MODEL_ID,
   OUTFIT_OPTIONS,
@@ -59,6 +63,10 @@ interface CharacterConfig {
   musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
+  fanmeetCardiganColor: string;
+  fanmeetInnerColor: string;
+  fanmeetShortsColor: string;
+  fanmeetSkirtColor: string;
   accessory: string;
   pose: Pose;
   background: string;
@@ -221,6 +229,11 @@ const FESTIVAL_BOTTOM_COLORS = [
   ),
 ];
 
+const FANMEET_CARDIGAN_COLORS = createPartColorPresets(DEFAULT_FANMEET_CARDIGAN_COLOR);
+const FANMEET_INNER_COLORS = createPartColorPresets(DEFAULT_FANMEET_INNER_COLOR);
+const FANMEET_SHORTS_COLORS = createPartColorPresets(DEFAULT_FANMEET_SHORTS_COLOR);
+const FANMEET_SKIRT_COLORS = createPartColorPresets(DEFAULT_FANMEET_SKIRT_COLOR);
+
 const ACCESSORIES = [
   { value: "none", label: "제거", icon: "❌" },
   { value: "sunglasses", label: "선글라스", icon: "🕶️" },
@@ -276,6 +289,10 @@ const DEFAULT_CHARACTER: CharacterConfig = {
   musicalShortsColor: DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor: DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor: DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  fanmeetCardiganColor: DEFAULT_FANMEET_CARDIGAN_COLOR,
+  fanmeetInnerColor: DEFAULT_FANMEET_INNER_COLOR,
+  fanmeetShortsColor: DEFAULT_FANMEET_SHORTS_COLOR,
+  fanmeetSkirtColor: DEFAULT_FANMEET_SKIRT_COLOR,
   accessory: "none",
   pose: "standing",
   background: "#E9DDFF",
@@ -315,6 +332,10 @@ function loadSavedCharacter(): CharacterConfig {
         | "musicalShortsColor"
         | "festivalTopColor"
         | "festivalBottomColor"
+        | "fanmeetCardiganColor"
+        | "fanmeetInnerColor"
+        | "fanmeetShortsColor"
+        | "fanmeetSkirtColor"
         | "background"
       >
     > & {
@@ -337,6 +358,10 @@ function loadSavedCharacter(): CharacterConfig {
       musicalShortsColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
+      fanmeetCardiganColor?: unknown;
+      fanmeetInnerColor?: unknown;
+      fanmeetShortsColor?: unknown;
+      fanmeetSkirtColor?: unknown;
       background?: unknown;
     };
 
@@ -408,6 +433,26 @@ function loadSavedCharacter(): CharacterConfig {
         ? normalizeHexColor(parsed.festivalBottomColor)
         : null;
 
+    const resolvedFanmeetCardiganColor =
+      typeof parsed.fanmeetCardiganColor === "string"
+        ? normalizeHexColor(parsed.fanmeetCardiganColor)
+        : null;
+
+    const resolvedFanmeetInnerColor =
+      typeof parsed.fanmeetInnerColor === "string"
+        ? normalizeHexColor(parsed.fanmeetInnerColor)
+        : null;
+
+    const resolvedFanmeetShortsColor =
+      typeof parsed.fanmeetShortsColor === "string"
+        ? normalizeHexColor(parsed.fanmeetShortsColor)
+        : null;
+
+    const resolvedFanmeetSkirtColor =
+      typeof parsed.fanmeetSkirtColor === "string"
+        ? normalizeHexColor(parsed.fanmeetSkirtColor)
+        : null;
+
     const resolvedBackground =
       typeof parsed.background === "string"
         ? normalizeHexColor(parsed.background)
@@ -446,6 +491,10 @@ function loadSavedCharacter(): CharacterConfig {
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
         resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
+      fanmeetCardiganColor: resolvedFanmeetCardiganColor ?? DEFAULT_FANMEET_CARDIGAN_COLOR,
+      fanmeetInnerColor: resolvedFanmeetInnerColor ?? DEFAULT_FANMEET_INNER_COLOR,
+      fanmeetShortsColor: resolvedFanmeetShortsColor ?? DEFAULT_FANMEET_SHORTS_COLOR,
+      fanmeetSkirtColor: resolvedFanmeetSkirtColor ?? DEFAULT_FANMEET_SKIRT_COLOR,
       background: resolvedBackground ?? DEFAULT_CHARACTER.background,
     } as CharacterConfig;
   } catch {
@@ -555,6 +604,18 @@ export default function AdminCharacterCreatorPage() {
   const [festivalBottomHexError, setFestivalBottomHexError] =
     useState("");
 
+  const [fanmeetCardiganHexInput, setFanmeetCardiganHexInput] = useState(() => character.fanmeetCardiganColor);
+  const [fanmeetCardiganHexError, setFanmeetCardiganHexError] = useState("");
+
+  const [fanmeetInnerHexInput, setFanmeetInnerHexInput] = useState(() => character.fanmeetInnerColor);
+  const [fanmeetInnerHexError, setFanmeetInnerHexError] = useState("");
+
+  const [fanmeetShortsHexInput, setFanmeetShortsHexInput] = useState(() => character.fanmeetShortsColor);
+  const [fanmeetShortsHexError, setFanmeetShortsHexError] = useState("");
+
+  const [fanmeetSkirtHexInput, setFanmeetSkirtHexInput] = useState(() => character.fanmeetSkirtColor);
+  const [fanmeetSkirtHexError, setFanmeetSkirtHexError] = useState("");
+
   const [backgroundHexInput, setBackgroundHexInput] = useState(
     () => character.background,
   );
@@ -619,6 +680,7 @@ export default function AdminCharacterCreatorPage() {
   const isBalletOutfit = character.outfitModelId === "ballet";
   const isConcertOutfit = character.outfitModelId === "concert";
   const isMusicalOutfit = character.outfitModelId === "musical";
+  const isFanmeetOutfit = character.outfitModelId === "theater";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
   function update<K extends keyof CharacterConfig>(
@@ -1366,6 +1428,222 @@ export default function AdminCharacterCreatorPage() {
     setFestivalBottomHexError("");
   }
 
+  function applyFanmeetCardiganColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("fanmeetCardiganColor", normalized);
+    setFanmeetCardiganHexInput(normalized);
+    setFanmeetCardiganHexError("");
+
+    return true;
+  }
+
+  function handleFanmeetCardiganHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setFanmeetCardiganHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyFanmeetCardiganColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setFanmeetCardiganHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setFanmeetCardiganHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setFanmeetCardiganHexError("");
+  }
+
+  function handleFanmeetCardiganHexBlur() {
+    const normalized = normalizeHexColor(fanmeetCardiganHexInput);
+
+    if (normalized) {
+      applyFanmeetCardiganColor(normalized);
+      return;
+    }
+
+    setFanmeetCardiganHexInput(character.fanmeetCardiganColor);
+    setFanmeetCardiganHexError("");
+  }
+
+  function applyFanmeetInnerColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("fanmeetInnerColor", normalized);
+    setFanmeetInnerHexInput(normalized);
+    setFanmeetInnerHexError("");
+
+    return true;
+  }
+
+  function handleFanmeetInnerHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setFanmeetInnerHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyFanmeetInnerColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setFanmeetInnerHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setFanmeetInnerHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setFanmeetInnerHexError("");
+  }
+
+  function handleFanmeetInnerHexBlur() {
+    const normalized = normalizeHexColor(fanmeetInnerHexInput);
+
+    if (normalized) {
+      applyFanmeetInnerColor(normalized);
+      return;
+    }
+
+    setFanmeetInnerHexInput(character.fanmeetInnerColor);
+    setFanmeetInnerHexError("");
+  }
+
+  function applyFanmeetShortsColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("fanmeetShortsColor", normalized);
+    setFanmeetShortsHexInput(normalized);
+    setFanmeetShortsHexError("");
+
+    return true;
+  }
+
+  function handleFanmeetShortsHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setFanmeetShortsHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyFanmeetShortsColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setFanmeetShortsHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setFanmeetShortsHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setFanmeetShortsHexError("");
+  }
+
+  function handleFanmeetShortsHexBlur() {
+    const normalized = normalizeHexColor(fanmeetShortsHexInput);
+
+    if (normalized) {
+      applyFanmeetShortsColor(normalized);
+      return;
+    }
+
+    setFanmeetShortsHexInput(character.fanmeetShortsColor);
+    setFanmeetShortsHexError("");
+  }
+
+  function applyFanmeetSkirtColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("fanmeetSkirtColor", normalized);
+    setFanmeetSkirtHexInput(normalized);
+    setFanmeetSkirtHexError("");
+
+    return true;
+  }
+
+  function handleFanmeetSkirtHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setFanmeetSkirtHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyFanmeetSkirtColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setFanmeetSkirtHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setFanmeetSkirtHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setFanmeetSkirtHexError("");
+  }
+
+  function handleFanmeetSkirtHexBlur() {
+    const normalized = normalizeHexColor(fanmeetSkirtHexInput);
+
+    if (normalized) {
+      applyFanmeetSkirtColor(normalized);
+      return;
+    }
+
+    setFanmeetSkirtHexInput(character.fanmeetSkirtColor);
+    setFanmeetSkirtHexError("");
+  }
+
   function applyBackgroundColor(value: string) {
     const normalized = normalizeHexColor(value);
 
@@ -1462,6 +1740,18 @@ export default function AdminCharacterCreatorPage() {
     setFestivalBottomHexInput(DEFAULT_CHARACTER.festivalBottomColor);
     setFestivalBottomHexError("");
 
+    setFanmeetCardiganHexInput(DEFAULT_CHARACTER.fanmeetCardiganColor);
+    setFanmeetCardiganHexError("");
+
+    setFanmeetInnerHexInput(DEFAULT_CHARACTER.fanmeetInnerColor);
+    setFanmeetInnerHexError("");
+
+    setFanmeetShortsHexInput(DEFAULT_CHARACTER.fanmeetShortsColor);
+    setFanmeetShortsHexError("");
+
+    setFanmeetSkirtHexInput(DEFAULT_CHARACTER.fanmeetSkirtColor);
+    setFanmeetSkirtHexError("");
+
     setBackgroundHexInput(DEFAULT_CHARACTER.background);
     setBackgroundHexError("");
   }
@@ -1525,6 +1815,7 @@ export default function AdminCharacterCreatorPage() {
       !isConcertOutfit &&
       !isMusicalOutfit &&
       !isFestivalOutfit &&
+      !isFanmeetOutfit &&
       !normalizeHexColor(outfitHexInput)
     ) {
       setOutfitHexError(
@@ -1580,6 +1871,26 @@ export default function AdminCharacterCreatorPage() {
       setFestivalBottomHexError(
         "하의 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
       );
+      return;
+    }
+
+    if (isFanmeetOutfit && !normalizeHexColor(fanmeetCardiganHexInput)) {
+      setFanmeetCardiganHexError("카디건 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
+      return;
+    }
+
+    if (isFanmeetOutfit && !normalizeHexColor(fanmeetInnerHexInput)) {
+      setFanmeetInnerHexError("이너 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
+      return;
+    }
+
+    if (isFanmeetOutfit && !normalizeHexColor(fanmeetShortsHexInput)) {
+      setFanmeetShortsHexError("속바지 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
+      return;
+    }
+
+    if (isFanmeetOutfit && !normalizeHexColor(fanmeetSkirtHexInput)) {
+      setFanmeetSkirtHexError("스커트 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
       return;
     }
 
@@ -2382,6 +2693,69 @@ export default function AdminCharacterCreatorPage() {
                     onHexBlur={handleMusicalShortsHexBlur}
                   />
                 </>
+              ) : isFanmeetOutfit ? (
+                <>
+                  <OutfitColorControl
+                    title="카디건 컬러"
+                    customTitle="사용자 지정 카디건 컬러"
+                    idPrefix="fanmeet-cardigan"
+                    currentColor={character.fanmeetCardiganColor}
+                    hexInput={fanmeetCardiganHexInput}
+                    hexError={fanmeetCardiganHexError}
+                    presets={FANMEET_CARDIGAN_COLORS}
+                    isCustom={!FANMEET_CARDIGAN_COLORS.some((color) => isSameHexColor(color, character.fanmeetCardiganColor))}
+                    placeholder={DEFAULT_FANMEET_CARDIGAN_COLOR}
+                    onPresetClick={applyFanmeetCardiganColor}
+                    onColorPickerChange={applyFanmeetCardiganColor}
+                    onHexChange={handleFanmeetCardiganHexChange}
+                    onHexBlur={handleFanmeetCardiganHexBlur}
+                  />
+                  <OutfitColorControl
+                    title="이너 컬러"
+                    customTitle="사용자 지정 이너 컬러"
+                    idPrefix="fanmeet-inner"
+                    currentColor={character.fanmeetInnerColor}
+                    hexInput={fanmeetInnerHexInput}
+                    hexError={fanmeetInnerHexError}
+                    presets={FANMEET_INNER_COLORS}
+                    isCustom={!FANMEET_INNER_COLORS.some((color) => isSameHexColor(color, character.fanmeetInnerColor))}
+                    placeholder={DEFAULT_FANMEET_INNER_COLOR}
+                    onPresetClick={applyFanmeetInnerColor}
+                    onColorPickerChange={applyFanmeetInnerColor}
+                    onHexChange={handleFanmeetInnerHexChange}
+                    onHexBlur={handleFanmeetInnerHexBlur}
+                  />
+                  <OutfitColorControl
+                    title="속바지 컬러"
+                    customTitle="사용자 지정 속바지 컬러"
+                    idPrefix="fanmeet-shorts"
+                    currentColor={character.fanmeetShortsColor}
+                    hexInput={fanmeetShortsHexInput}
+                    hexError={fanmeetShortsHexError}
+                    presets={FANMEET_SHORTS_COLORS}
+                    isCustom={!FANMEET_SHORTS_COLORS.some((color) => isSameHexColor(color, character.fanmeetShortsColor))}
+                    placeholder={DEFAULT_FANMEET_SHORTS_COLOR}
+                    onPresetClick={applyFanmeetShortsColor}
+                    onColorPickerChange={applyFanmeetShortsColor}
+                    onHexChange={handleFanmeetShortsHexChange}
+                    onHexBlur={handleFanmeetShortsHexBlur}
+                  />
+                  <OutfitColorControl
+                    title="스커트 컬러"
+                    customTitle="사용자 지정 스커트 컬러"
+                    idPrefix="fanmeet-skirt"
+                    currentColor={character.fanmeetSkirtColor}
+                    hexInput={fanmeetSkirtHexInput}
+                    hexError={fanmeetSkirtHexError}
+                    presets={FANMEET_SKIRT_COLORS}
+                    isCustom={!FANMEET_SKIRT_COLORS.some((color) => isSameHexColor(color, character.fanmeetSkirtColor))}
+                    placeholder={DEFAULT_FANMEET_SKIRT_COLOR}
+                    onPresetClick={applyFanmeetSkirtColor}
+                    onColorPickerChange={applyFanmeetSkirtColor}
+                    onHexChange={handleFanmeetSkirtHexChange}
+                    onHexBlur={handleFanmeetSkirtHexBlur}
+                  />
+                </>
               ) : isFestivalOutfit ? (
                 <>
                   <OutfitColorControl
@@ -2671,6 +3045,10 @@ export default function AdminCharacterCreatorPage() {
                 festivalBottomColor={
                   character.festivalBottomColor
                 }
+                fanmeetCardiganColor={character.fanmeetCardiganColor}
+                fanmeetInnerColor={character.fanmeetInnerColor}
+                fanmeetShortsColor={character.fanmeetShortsColor}
+                fanmeetSkirtColor={character.fanmeetSkirtColor}
                 outfitName={character.outfitName}
                 outfitModelId={character.outfitModelId}
                 hairStyle={character.hairStyle}
@@ -2729,6 +3107,13 @@ export default function AdminCharacterCreatorPage() {
                   <p>
                     반바지: {character.musicalShortsColor.toUpperCase()}
                   </p>
+                </>
+              ) : isFanmeetOutfit ? (
+                <>
+                  <p>카디건: {character.fanmeetCardiganColor.toUpperCase()}</p>
+                  <p>이너: {character.fanmeetInnerColor.toUpperCase()}</p>
+                  <p>속바지: {character.fanmeetShortsColor.toUpperCase()}</p>
+                  <p>스커트: {character.fanmeetSkirtColor.toUpperCase()}</p>
                 </>
               ) : isFestivalOutfit ? (
                 <>

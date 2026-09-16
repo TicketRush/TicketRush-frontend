@@ -38,6 +38,12 @@ export const FESTIVAL_OUTFIT_PART_NAMES = {
  *
  * Blender에서 설정한 이름과 동일하게 유지합니다.
  */
+// fanmeet_outfit.glb baseColorFactor (linear RGB), converted to sRGB HEX.
+export const DEFAULT_FANMEET_CARDIGAN_COLOR = "#FFF51C";
+export const DEFAULT_FANMEET_INNER_COLOR = "#DFE068";
+export const DEFAULT_FANMEET_SHORTS_COLOR = "#FFBC42";
+export const DEFAULT_FANMEET_SKIRT_COLOR = "#9700FF";
+
 export const FANMEET_OUTFIT_PART_NAMES = {
   cardigan: "fanmeet_cardigan",
   inner: "fanmeet_inner",

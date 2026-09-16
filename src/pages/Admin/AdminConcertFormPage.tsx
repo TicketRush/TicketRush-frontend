@@ -46,6 +46,10 @@ import {
   DEFAULT_MUSICAL_JACKET_COLOR,
   DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FANMEET_CARDIGAN_COLOR,
+  DEFAULT_FANMEET_INNER_COLOR,
+  DEFAULT_FANMEET_SHORTS_COLOR,
+  DEFAULT_FANMEET_SKIRT_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   getOutfitOption,
   resolveStoredOutfitModelId,
@@ -113,6 +117,10 @@ interface CharacterDraft {
   musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
+  fanmeetCardiganColor: string;
+  fanmeetInnerColor: string;
+  fanmeetShortsColor: string;
+  fanmeetSkirtColor: string;
   accessory: string;
   pose: CharacterPose;
   background: string;
@@ -148,6 +156,10 @@ function loadSavedCharacter(): CharacterDraft | null {
         | "musicalShortsColor"
         | "festivalTopColor"
         | "festivalBottomColor"
+        | "fanmeetCardiganColor"
+        | "fanmeetInnerColor"
+        | "fanmeetShortsColor"
+        | "fanmeetSkirtColor"
         | "background"
       >
     > & {
@@ -170,6 +182,10 @@ function loadSavedCharacter(): CharacterDraft | null {
       musicalShortsColor?: unknown;
       festivalTopColor?: unknown;
       festivalBottomColor?: unknown;
+      fanmeetCardiganColor?: unknown;
+      fanmeetInnerColor?: unknown;
+      fanmeetShortsColor?: unknown;
+      fanmeetSkirtColor?: unknown;
       background?: unknown;
     };
 
@@ -241,6 +257,26 @@ function loadSavedCharacter(): CharacterDraft | null {
         ? normalizeHexColor(parsed.festivalBottomColor)
         : null;
 
+    const resolvedFanmeetCardiganColor =
+      typeof parsed.fanmeetCardiganColor === "string"
+        ? normalizeHexColor(parsed.fanmeetCardiganColor)
+        : null;
+
+    const resolvedFanmeetInnerColor =
+      typeof parsed.fanmeetInnerColor === "string"
+        ? normalizeHexColor(parsed.fanmeetInnerColor)
+        : null;
+
+    const resolvedFanmeetShortsColor =
+      typeof parsed.fanmeetShortsColor === "string"
+        ? normalizeHexColor(parsed.fanmeetShortsColor)
+        : null;
+
+    const resolvedFanmeetSkirtColor =
+      typeof parsed.fanmeetSkirtColor === "string"
+        ? normalizeHexColor(parsed.fanmeetSkirtColor)
+        : null;
+
     const resolvedBackground =
       typeof parsed.background === "string"
         ? normalizeHexColor(parsed.background)
@@ -278,6 +314,10 @@ function loadSavedCharacter(): CharacterDraft | null {
         resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
       festivalBottomColor:
         resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
+      fanmeetCardiganColor: resolvedFanmeetCardiganColor ?? DEFAULT_FANMEET_CARDIGAN_COLOR,
+      fanmeetInnerColor: resolvedFanmeetInnerColor ?? DEFAULT_FANMEET_INNER_COLOR,
+      fanmeetShortsColor: resolvedFanmeetShortsColor ?? DEFAULT_FANMEET_SHORTS_COLOR,
+      fanmeetSkirtColor: resolvedFanmeetSkirtColor ?? DEFAULT_FANMEET_SKIRT_COLOR,
       background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
     } as CharacterDraft;
   } catch {
@@ -1102,6 +1142,10 @@ function CharacterCreatorLinkBox({
           musicalShortsColor={character.musicalShortsColor}
           festivalTopColor={character.festivalTopColor}
           festivalBottomColor={character.festivalBottomColor}
+          fanmeetCardiganColor={character.fanmeetCardiganColor}
+          fanmeetInnerColor={character.fanmeetInnerColor}
+          fanmeetShortsColor={character.fanmeetShortsColor}
+          fanmeetSkirtColor={character.fanmeetSkirtColor}
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}
