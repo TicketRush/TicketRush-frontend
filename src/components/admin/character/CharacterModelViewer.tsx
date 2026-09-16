@@ -16,6 +16,10 @@ import {
   DEFAULT_MUSICAL_JACKET_COLOR,
   DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FANMEET_CARDIGAN_COLOR,
+  DEFAULT_FANMEET_INNER_COLOR,
+  DEFAULT_FANMEET_SHORTS_COLOR,
+  DEFAULT_FANMEET_SKIRT_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   MUSICAL_OUTFIT_PART_NAMES,
   FESTIVAL_OUTFIT_PART_NAMES,
@@ -72,6 +76,10 @@ interface CharacterModelViewerProps {
    * 페스티벌 의상 하의 색상입니다.
    */
   festivalBottomColor?: string;
+  fanmeetCardiganColor?: string;
+  fanmeetInnerColor?: string;
+  fanmeetShortsColor?: string;
+  fanmeetSkirtColor?: string;
 
   /**
    * 화면 표시용 의상 이름입니다.
@@ -382,36 +390,21 @@ function findBalletPartColor(
   return null;
 }
 
-/**
- * 팬미팅 의상에서 사용자 지정 의상 색상을 적용할 파츠인지 확인합니다.
- *
- * 카디건과 스커트만 outfitColor를 적용하고,
- * 이너와 속바지는 GLB에 저장된 원래 Material을 유지합니다.
- *
- * Blender의 Object 이름과 실제 Mesh 이름이 다를 수 있으므로
- * 현재 Mesh부터 부모 Object까지 올라가며 이름을 확인합니다.
- */
-function isFanmeetColorablePart(object: THREE.Object3D) {
+/** Match the mesh or its parent object, including Blender name suffixes. */
+function findFanmeetPartColor(
+  object: THREE.Object3D,
+  colors: Record<keyof typeof FANMEET_OUTFIT_PART_NAMES, string>,
+): string | null {
   let current: THREE.Object3D | null = object;
-
   while (current) {
-    if (
-      matchesPartName(
-        current.name,
-        FANMEET_OUTFIT_PART_NAMES.cardigan,
-      ) ||
-      matchesPartName(
-        current.name,
-        FANMEET_OUTFIT_PART_NAMES.skirt,
-      )
-    ) {
-      return true;
+    for (const part of Object.keys(FANMEET_OUTFIT_PART_NAMES) as (keyof typeof FANMEET_OUTFIT_PART_NAMES)[]) {
+      if (matchesPartName(current.name, FANMEET_OUTFIT_PART_NAMES[part])) {
+        return colors[part];
+      }
     }
-
     current = current.parent;
   }
-
-  return false;
+  return null;
 }
 
 /**
@@ -550,6 +543,10 @@ function OutfitModel({
   musicalShortsColor,
   festivalTopColor,
   festivalBottomColor,
+  fanmeetCardiganColor,
+  fanmeetInnerColor,
+  fanmeetShortsColor,
+  fanmeetSkirtColor,
 }: {
   modelUrl: string;
   outfitModelId: OutfitModelId;
@@ -564,6 +561,10 @@ function OutfitModel({
   musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
+  fanmeetCardiganColor: string;
+  fanmeetInnerColor: string;
+  fanmeetShortsColor: string;
+  fanmeetSkirtColor: string;
 }) {
   const gltf = useGLTF(modelUrl);
 
@@ -586,14 +587,13 @@ function OutfitModel({
       }
 
       if (outfitModelId === "theater") {
-        if (!isFanmeetColorablePart(object)) {
-          return;
-        }
-
-        applyMeshColorWithoutBaseTexture(
-          object,
-          outfitColor,
-        );
+        const partColor = findFanmeetPartColor(object, {
+          cardigan: fanmeetCardiganColor,
+          inner: fanmeetInnerColor,
+          shorts: fanmeetShortsColor,
+          skirt: fanmeetSkirtColor,
+        });
+        if (partColor) applyMeshColorWithoutBaseTexture(object, partColor);
         return;
       }
 
@@ -706,6 +706,10 @@ function OutfitModel({
     musicalShortsColor,
     festivalTopColor,
     festivalBottomColor,
+    fanmeetCardiganColor,
+    fanmeetInnerColor,
+    fanmeetShortsColor,
+    fanmeetSkirtColor,
   ]);
 
   return <primitive object={scene} />;
@@ -733,6 +737,10 @@ function CharacterModel({
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  fanmeetCardiganColor = DEFAULT_FANMEET_CARDIGAN_COLOR,
+  fanmeetInnerColor = DEFAULT_FANMEET_INNER_COLOR,
+  fanmeetShortsColor = DEFAULT_FANMEET_SHORTS_COLOR,
+  fanmeetSkirtColor = DEFAULT_FANMEET_SKIRT_COLOR,
 }: Pick<
   CharacterModelViewerProps,
   | "modelPosition"
@@ -756,6 +764,10 @@ function CharacterModel({
   | "musicalShortsColor"
   | "festivalTopColor"
   | "festivalBottomColor"
+  | "fanmeetCardiganColor"
+  | "fanmeetInnerColor"
+  | "fanmeetShortsColor"
+  | "fanmeetSkirtColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
 
@@ -774,6 +786,10 @@ function CharacterModel({
       musicalShortsColor={musicalShortsColor}
       festivalTopColor={festivalTopColor}
       festivalBottomColor={festivalBottomColor}
+      fanmeetCardiganColor={fanmeetCardiganColor}
+      fanmeetInnerColor={fanmeetInnerColor}
+      fanmeetShortsColor={fanmeetShortsColor}
+      fanmeetSkirtColor={fanmeetSkirtColor}
     />
   ) : null;
 
@@ -845,6 +861,10 @@ export default function CharacterModelViewer({
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  fanmeetCardiganColor = DEFAULT_FANMEET_CARDIGAN_COLOR,
+  fanmeetInnerColor = DEFAULT_FANMEET_INNER_COLOR,
+  fanmeetShortsColor = DEFAULT_FANMEET_SHORTS_COLOR,
+  fanmeetSkirtColor = DEFAULT_FANMEET_SKIRT_COLOR,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
@@ -887,6 +907,10 @@ export default function CharacterModelViewer({
             musicalShortsColor={musicalShortsColor}
             festivalTopColor={festivalTopColor}
             festivalBottomColor={festivalBottomColor}
+            fanmeetCardiganColor={fanmeetCardiganColor}
+            fanmeetInnerColor={fanmeetInnerColor}
+            fanmeetShortsColor={fanmeetShortsColor}
+            fanmeetSkirtColor={fanmeetSkirtColor}
           />
         </Suspense>
 
