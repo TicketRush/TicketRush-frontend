@@ -11,6 +11,7 @@
 // 예매 내역(#174 / BE #561): GET /booking/admin/bookings|stats, POST .../refund.
 // 보강 필드(공연·예매자·좌석)와 미결제 paymentAmount는 생략 또는 null이다.
 
+import type { CharacterConfig } from "./character";
 import type { Genre, ConcertStatus, ConcertFacility } from "./concert";
 import type { BookingStatus } from "./booking";
 import type { SeatStatus } from "./seat";
@@ -198,6 +199,8 @@ export interface AdminSeatDetail {
  *   - posterUrl → imageMainUrl
  */
 export interface ConcertFormData {
+  characterConfig?: CharacterConfig | null;
+  characterMessage?: string;
   title: string;
   performer: string;
   genre: Genre;

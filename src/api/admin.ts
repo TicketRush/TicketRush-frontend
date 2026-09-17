@@ -16,6 +16,10 @@
 //   GET    /api/v1/booking/admin/bookings/{bookingNumber} — 예매자 조합
 
 import * as mocks from "./mocks/admin";
+import {
+  createConcertFormData,
+  type CreateConcertInput,
+} from "./adminConcertCreate";
 import type {
   AdminBookingListParams,
   AdminBookingListResponse,
@@ -195,11 +199,20 @@ export async function adminReleaseSeatApi(
 }
 
 // ── 공연 CRUD ──────────────────────────────────────────
-export async function createConcertApi(data: ConcertFormData) {
-  if (USE_MOCK) return mocks.mockCreateConcert(data);
-  // const res = await apiClient.post("/api/v1/performance/admin", data);
-  // return res.data;
-  throw new Error("Real API not implemented");
+export async function createConcertApi(input: CreateConcertInput) {
+  const data = createConcertFormData(input);
+  if (USE_MOCK) return mocks.mockCreateConcert(input.form);
+  const res = await apiClient.post<{ performanceId: number }>(
+    "/api/v1/performance/admin",
+    data,
+    {
+      // JSON Blob is already snake_case; character_config keys are opaque.
+      // Skip FormData key conversion: mainImage/model3d/gallery are literal part names.
+      // Keep the existing auth and response interceptors.
+      transformRequest: [(body) => body],
+    },
+  );
+  return res.data;
 }
 
 export async function updateConcertApi(id: number, data: ConcertFormData) {

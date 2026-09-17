@@ -17,40 +17,20 @@ import {
   useUpdateConcert,
 } from "@/hooks/admin/useAdmin";
 import type { ConcertFormData } from "@/types/domain/admin";
+import { MAX_CHARACTER_MESSAGE_LENGTH } from "@/api/adminConcertCreate";
 import type { Genre } from "@/types/domain/concert";
 import {
   sanitizeConcertForm,
   validateConcertForm,
 } from "@/utils/admin/concertFormValidation";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
+import { MOUTH_STYLE_LABELS } from "@/components/admin/character/characterMouth";
+import type { CharacterDraft } from "@/types/domain/character";
 import {
-  resolveStoredHairStyle,
-  type HairStyle,
-} from "@/components/admin/character/characterHair";
-import {
-  resolveStoredEyeStyle,
-  type EyeStyle,
-} from "@/components/admin/character/characterEye";
-import {
-  MOUTH_STYLE_LABELS,
-  resolveStoredMouthStyle,
-  type MouthStyle,
-} from "@/components/admin/character/characterMouth";
-import {
-  normalizeHexColor,
-  resolveStoredSkinTone,
-  type SkinToneSelection,
-} from "@/components/admin/character/characterSkin";
-import {
-  DEFAULT_MUSICAL_INNER_COLOR,
-  DEFAULT_MUSICAL_JACKET_COLOR,
-  DEFAULT_MUSICAL_SHORTS_COLOR,
-  DEFAULT_FESTIVAL_BOTTOM_COLOR,
-  DEFAULT_FESTIVAL_TOP_COLOR,
-  getOutfitOption,
-  resolveStoredOutfitModelId,
-  type OutfitModelId,
-} from "@/components/admin/character/characterOutfit";
+  loadSavedCharacter,
+  createCharacterConfig,
+  validateCharacterConfig,
+} from "@/utils/character/characterConfig";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 
@@ -82,208 +62,9 @@ const INITIAL_FORM: ConcertFormData = {
 
 const CONCERT_FORM_DRAFT_KEY = "ticketRush:admin-concert-form-draft";
 const CONCERT_FORM_SCROLL_KEY = "ticketRush:admin-concert-form-scroll";
-const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
-const DEFAULT_HAIR_COLOR = "#151515";
-const DEFAULT_OUTFIT_COLOR = "#60A5FA";
-const DEFAULT_BACKGROUND_COLOR = "#E9DDFF";
 
 interface Props {
   mode: "create" | "edit";
-}
-
-type CharacterPose = "standing" | "wave" | "heart" | "dance" | "sing";
-
-interface CharacterDraft {
-  skinTone: SkinToneSelection;
-  skinColor: string;
-  hairStyle: HairStyle;
-  mouthStyle: MouthStyle;
-  eyeStyle: EyeStyle;
-  hairColor: string;
-  outfitModelId: OutfitModelId;
-  outfitName: string;
-  outfitColor: string;
-  balletWearColor: string;
-  balletShortsColor: string;
-  jacketColor: string;
-  innerColor: string;
-  bottomColor: string;
-  musicalJacketColor: string;
-  musicalInnerColor: string;
-  musicalShortsColor: string;
-  festivalTopColor: string;
-  festivalBottomColor: string;
-  accessory: string;
-  pose: CharacterPose;
-  background: string;
-}
-
-function loadSavedCharacter(): CharacterDraft | null {
-  const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
-
-  if (!savedCharacter) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(savedCharacter) as Partial<
-      Omit<
-        CharacterDraft,
-        | "skinTone"
-        | "skinColor"
-        | "hairStyle"
-        | "mouthStyle"
-        | "eyeStyle"
-        | "hairColor"
-        | "outfitModelId"
-        | "outfitName"
-        | "outfitColor"
-        | "balletWearColor"
-        | "balletShortsColor"
-        | "jacketColor"
-        | "innerColor"
-        | "bottomColor"
-        | "musicalJacketColor"
-        | "musicalInnerColor"
-        | "musicalShortsColor"
-        | "festivalTopColor"
-        | "festivalBottomColor"
-        | "background"
-      >
-    > & {
-      skinTone?: unknown;
-      skinColor?: unknown;
-      hairStyle?: unknown;
-      mouthStyle?: unknown;
-      eyeStyle?: unknown;
-      hairColor?: unknown;
-      outfitModelId?: unknown;
-      outfitName?: unknown;
-      outfitColor?: unknown;
-      balletWearColor?: unknown;
-      balletShortsColor?: unknown;
-      jacketColor?: unknown;
-      innerColor?: unknown;
-      bottomColor?: unknown;
-      musicalJacketColor?: unknown;
-      musicalInnerColor?: unknown;
-      musicalShortsColor?: unknown;
-      festivalTopColor?: unknown;
-      festivalBottomColor?: unknown;
-      background?: unknown;
-    };
-
-    const resolvedSkin = resolveStoredSkinTone(
-      parsed.skinTone,
-      parsed.skinColor,
-    );
-
-    const resolvedHairColor =
-      typeof parsed.hairColor === "string"
-        ? normalizeHexColor(parsed.hairColor)
-        : null;
-
-    const resolvedOutfitColor =
-      typeof parsed.outfitColor === "string"
-        ? normalizeHexColor(parsed.outfitColor)
-        : null;
-
-    const legacyOutfitColor =
-      resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
-
-    const resolvedBalletWearColor =
-      typeof parsed.balletWearColor === "string"
-        ? normalizeHexColor(parsed.balletWearColor)
-        : null;
-
-    const resolvedBalletShortsColor =
-      typeof parsed.balletShortsColor === "string"
-        ? normalizeHexColor(parsed.balletShortsColor)
-        : null;
-
-    const resolvedJacketColor =
-      typeof parsed.jacketColor === "string"
-        ? normalizeHexColor(parsed.jacketColor)
-        : null;
-
-    const resolvedInnerColor =
-      typeof parsed.innerColor === "string"
-        ? normalizeHexColor(parsed.innerColor)
-        : null;
-
-    const resolvedBottomColor =
-      typeof parsed.bottomColor === "string"
-        ? normalizeHexColor(parsed.bottomColor)
-        : null;
-
-    const resolvedMusicalJacketColor =
-      typeof parsed.musicalJacketColor === "string"
-        ? normalizeHexColor(parsed.musicalJacketColor)
-        : null;
-
-    const resolvedMusicalInnerColor =
-      typeof parsed.musicalInnerColor === "string"
-        ? normalizeHexColor(parsed.musicalInnerColor)
-        : null;
-
-    const resolvedMusicalShortsColor =
-      typeof parsed.musicalShortsColor === "string"
-        ? normalizeHexColor(parsed.musicalShortsColor)
-        : null;
-
-    const resolvedFestivalTopColor =
-      typeof parsed.festivalTopColor === "string"
-        ? normalizeHexColor(parsed.festivalTopColor)
-        : null;
-
-    const resolvedFestivalBottomColor =
-      typeof parsed.festivalBottomColor === "string"
-        ? normalizeHexColor(parsed.festivalBottomColor)
-        : null;
-
-    const resolvedBackground =
-      typeof parsed.background === "string"
-        ? normalizeHexColor(parsed.background)
-        : null;
-
-    const resolvedOutfitModelId = resolveStoredOutfitModelId(
-      parsed.outfitModelId,
-      parsed.outfitName,
-    );
-
-    const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
-
-    return {
-      ...parsed,
-      ...resolvedSkin,
-      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
-      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
-      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
-      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
-      outfitModelId: resolvedOutfitModelId,
-      outfitName: resolvedOutfit.name,
-      outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
-      balletWearColor: resolvedBalletWearColor ?? legacyOutfitColor,
-      balletShortsColor: resolvedBalletShortsColor ?? legacyOutfitColor,
-      jacketColor: resolvedJacketColor ?? legacyOutfitColor,
-      innerColor: resolvedInnerColor ?? legacyOutfitColor,
-      bottomColor: resolvedBottomColor ?? legacyOutfitColor,
-      musicalJacketColor:
-        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
-      musicalInnerColor:
-        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
-      musicalShortsColor:
-        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
-      festivalTopColor:
-        resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
-      festivalBottomColor:
-        resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
-      background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
-    } as CharacterDraft;
-  } catch {
-    localStorage.removeItem(CHARACTER_STORAGE_KEY);
-    return null;
-  }
 }
 
 export default function AdminConcertFormPage({ mode }: Props) {
@@ -300,7 +81,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
 
   const [form, setForm] = useState<ConcertFormData>(INITIAL_FORM);
 
-  // TODO: 백엔드 공연 등록/수정 API 스펙 확정 후 ConcertFormData에 반영 필요
+  // Files and the creation-only seat count are separate from the editable form.
   const [totalSeats, setTotalSeats] = useState(0);
   const [mainImage, setMainImage] = useState<File | null>(null);
   const [galleryImages, setGalleryImages] = useState<File[]>([]);
@@ -516,8 +297,14 @@ export default function AdminConcertFormPage({ mode }: Props) {
       return;
     }
 
-    if (mode === "create" && !selectedCharacter) {
-      toast.error("3D 캐릭터를 제작해주세요.");
+    const characterConfig = selectedCharacter
+      ? createCharacterConfig(selectedCharacter)
+      : undefined;
+    const characterError = mode === "create"
+      ? validateCharacterConfig(characterConfig, true)
+      : null;
+    if (characterError) {
+      toast.error(characterError);
       return;
     }
 
@@ -527,12 +314,17 @@ export default function AdminConcertFormPage({ mode }: Props) {
     }
 
     try {
-      // TODO:
-      // 현재 createConcertApi/updateConcertApi는 ConcertFormData만 받음.
-      // totalSeats, mainImage, galleryImages, model3d는 백엔드 스펙 확정 후
-      // FormData 또는 별도 업로드 API로 연결 필요.
-      if (mode === "create") {
-        await createMutation.mutateAsync(sanitizedForm);
+      if (mode === "create" && mainImage) {
+        await createMutation.mutateAsync({
+          form: {
+            ...sanitizedForm,
+            characterConfig,
+            characterMessage: sanitizedForm.characterMessage?.trim() || undefined,
+          },
+          totalSeats,
+          mainImage,
+          gallery: galleryImages,
+        });
         toast.success("공연이 등록되었습니다.");
       } else {
         await updateMutation.mutateAsync(sanitizedForm);
@@ -774,6 +566,18 @@ export default function AdminConcertFormPage({ mode }: Props) {
             />
           </Field>
 
+          {mode === "create" && (
+            <Field label="캐릭터 한마디 (선택, 최대 50자)">
+              <FormInput
+                value={form.characterMessage ?? ""}
+                maxLength={MAX_CHARACTER_MESSAGE_LENGTH}
+                onChange={(value) => update("characterMessage", value)}
+                onKeyDown={handleEnterMoveNext}
+                placeholder="공연장에서 만나요!"
+              />
+            </Field>
+          )}
+
           <Field label="대표 이미지" required>
             <UploadBox
               text={mainImage ? mainImage.name : "대표 이미지 업로드"}
@@ -897,12 +701,14 @@ function FormInput({
   onKeyDown,
   type = "text",
   placeholder,
+  maxLength,
 }: {
   value: string;
   onChange: (value: string) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   type?: string;
   placeholder?: string;
+  maxLength?: number;
 }) {
   return (
     <input
@@ -912,6 +718,7 @@ function FormInput({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
+      maxLength={maxLength}
       className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );
