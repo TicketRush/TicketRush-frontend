@@ -70,8 +70,15 @@ export function createConcertFormData(input: CreateConcertInput): FormData {
       type: "application/json",
     }),
   );
-  data.append("mainImage", input.mainImage);
-  if (input.model3d) data.append("model3d", input.model3d);
-  input.gallery.forEach((file) => data.append("gallery", file));
+  appendConcertFiles(data, input);
   return data;
+}
+
+export function appendConcertFiles(
+  data: FormData,
+  files: { mainImage?: File | null; model3d?: File | null; gallery?: File[] },
+) {
+  if (files.mainImage) data.append("mainImage", files.mainImage);
+  if (files.model3d) data.append("model3d", files.model3d);
+  files.gallery?.forEach((file) => data.append("gallery", file));
 }

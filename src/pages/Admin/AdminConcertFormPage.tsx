@@ -16,6 +16,7 @@ import {
   useCreateConcert,
   useUpdateConcert,
 } from "@/hooks/admin/useAdmin";
+import type { ConcertEditData } from "@/api/adminConcertEdit";
 import type { ConcertFormData } from "@/types/domain/admin";
 import { MAX_CHARACTER_MESSAGE_LENGTH } from "@/api/adminConcertCreate";
 import type { Genre } from "@/types/domain/concert";
@@ -27,6 +28,8 @@ import CharacterModelViewer from "@/components/admin/character/CharacterModelVie
 import { MOUTH_STYLE_LABELS } from "@/components/admin/character/characterMouth";
 import type { CharacterDraft } from "@/types/domain/character";
 import {
+  CHARACTER_STORAGE_KEY,
+  restoreCharacterDraft,
   loadSavedCharacter,
   createCharacterConfig,
   validateCharacterConfig,
@@ -67,55 +70,75 @@ interface Props {
   mode: "create" | "edit";
 }
 
+interface ConcertDraft {
+  form: ConcertFormData;
+  totalSeats: number;
+  mainImage?: File | null;
+  model3d?: File | null;
+  galleryImages?: File[];
+}
+
 export default function AdminConcertFormPage({ mode }: Props) {
   useDocumentTitle(mode === "edit" ? "공연 수정" : "공연 등록");
-
-  const navigate = useNavigate();
-  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const concertId = mode === "edit" && id ? Number(id) : undefined;
+  const query = useConcertForEdit(concertId);
+  if (mode === "edit") {
+    if (!concertId || !Number.isSafeInteger(concertId) || concertId <= 0) {
+      return <p role="alert" className="p-6">올바른 공연 ID가 아닙니다.</p>;
+    }
+    if (query.isPending || (!query.isFetchedAfterMount && query.isFetching)) {
+      return <p role="status" className="p-6">공연 정보를 불러오는 중입니다.</p>;
+    }
+    if (!query.data) return (
+      <div role="alert" className="p-6">
+        <p>{query.error?.message ?? "공연 정보를 불러올 수 없습니다."}</p>
+        <button onClick={() => query.refetch()}>다시 시도</button>
+      </div>
+    );
+  }
+  return (
+    <ConcertForm
+      key={mode + (concertId ?? "new")}
+      mode={mode}
+      concertId={concertId}
+      initialData={query.data}
+    />
+  );
+}
 
-  const { data: existingData } = useConcertForEdit(concertId);
+function ConcertForm({ mode, concertId, initialData }: Props & {
+  concertId?: number;
+  initialData?: ConcertEditData;
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const createMutation = useCreateConcert();
   const updateMutation = useUpdateConcert(concertId ?? 0);
-
-  const [form, setForm] = useState<ConcertFormData>(INITIAL_FORM);
-
-  // Files and the creation-only seat count are separate from the editable form.
-  const [totalSeats, setTotalSeats] = useState(0);
-  const [mainImage, setMainImage] = useState<File | null>(null);
-  const [galleryImages, setGalleryImages] = useState<File[]>([]);
-  const [selectedCharacter, setSelectedCharacter] =
-    useState<CharacterDraft | null>(() => loadSavedCharacter());
-
-  useEffect(() => {
-    if (existingData) {
-      setForm(existingData);
-    }
-  }, [existingData]);
-
-  useEffect(() => {
-    const savedDraft = sessionStorage.getItem(CONCERT_FORM_DRAFT_KEY);
-
-    if (!savedDraft) return;
-
+  // Snapshot once: background refetches must not overwrite an in-progress edit.
+  const [original] = useState(() => initialData?.form);
+  const [draft] = useState(() => {
+    const returned = location.state?.concertDraft;
+    if (returned?.pathname === location.pathname) return returned as ConcertDraft;
+    if (mode === "edit") return null;
     try {
-      const parsed = JSON.parse(savedDraft) as {
-        form?: ConcertFormData;
-        totalSeats?: number;
-      };
-
-      if (parsed.form) {
-        setForm(parsed.form);
-      }
-
-      if (typeof parsed.totalSeats === "number") {
-        setTotalSeats(parsed.totalSeats);
-      }
+      return JSON.parse(sessionStorage.getItem(CONCERT_FORM_DRAFT_KEY) ?? "null") as ConcertDraft | null;
     } catch {
-      sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
+      return null;
     }
-  }, []);
+  });
+  const [form, setForm] = useState<ConcertFormData>(() => ({
+    ...(draft?.form ?? original ?? INITIAL_FORM),
+    ...(draft && location.state?.concertDraft?.pathname === location.pathname && location.state?.characterConfig
+      ? { characterConfig: location.state.characterConfig } : {}),
+  }));
+  const [totalSeats, setTotalSeats] = useState(draft?.totalSeats ?? initialData?.totalSeats ?? 0);
+  const [mainImage, setMainImage] = useState<File | null>(draft?.mainImage ?? null);
+  const [model3d, setModel3d] = useState<File | null>(draft?.model3d ?? null);
+  const [galleryImages, setGalleryImages] = useState<File[]>(draft?.galleryImages ?? []);
+  const [selectedCharacter] = useState<CharacterDraft | null>(() =>
+    mode === "edit" ? restoreCharacterDraft(form.characterConfig) : loadSavedCharacter(),
+  );
 
   useEffect(() => {
     const savedScroll = sessionStorage.getItem(CONCERT_FORM_SCROLL_KEY);
@@ -169,9 +192,6 @@ export default function AdminConcertFormPage({ mode }: Props) {
     }
   }, [location.pathname]);
 
-  useEffect(() => {
-    setSelectedCharacter(loadSavedCharacter());
-  }, [location.key]);
 
   function update<K extends keyof ConcertFormData>(
     key: K,
@@ -238,7 +258,16 @@ export default function AdminConcertFormPage({ mode }: Props) {
   }
 
   function goToCharacterCreator() {
-    sessionStorage.setItem(
+    if (mode === "edit") {
+      try {
+        if (form.characterConfig) localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(form.characterConfig));
+        else localStorage.removeItem(CHARACTER_STORAGE_KEY);
+      } catch {
+        toast.error("캐릭터 설정을 불러오지 못했습니다.");
+        return;
+      }
+    }
+    if (mode === "create") sessionStorage.setItem(
       CONCERT_FORM_DRAFT_KEY,
       JSON.stringify({
         form,
@@ -258,6 +287,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
       `/admin/character-creator?returnTo=${encodeURIComponent(
         location.pathname,
       )}`,
+      { state: { concertDraft: { pathname: location.pathname, form, totalSeats, mainImage, model3d, galleryImages } } },
     );
   }
 
@@ -290,6 +320,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
     const errorMessage = validateConcertForm({
       form: sanitizedForm,
       totalSeats,
+      original,
     });
 
     if (errorMessage) {
@@ -297,12 +328,10 @@ export default function AdminConcertFormPage({ mode }: Props) {
       return;
     }
 
-    const characterConfig = selectedCharacter
-      ? createCharacterConfig(selectedCharacter)
-      : undefined;
-    const characterError = mode === "create"
-      ? validateCharacterConfig(characterConfig, true)
-      : null;
+    const characterConfig = mode === "edit"
+      ? form.characterConfig
+      : selectedCharacter ? createCharacterConfig(selectedCharacter) : undefined;
+    const characterError = validateCharacterConfig(characterConfig, mode === "create");
     if (characterError) {
       toast.error(characterError);
       return;
@@ -327,10 +356,17 @@ export default function AdminConcertFormPage({ mode }: Props) {
         });
         toast.success("공연이 등록되었습니다.");
       } else {
-        await updateMutation.mutateAsync(sanitizedForm);
+        await updateMutation.mutateAsync({
+          form: sanitizedForm,
+          original: original!,
+          mainImage,
+          model3d,
+          gallery: galleryImages,
+        });
         toast.success("공연이 수정되었습니다.");
       }
 
+      sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
       navigate("/admin");
     } catch (error: unknown) {
       const err =
@@ -440,9 +476,17 @@ export default function AdminConcertFormPage({ mode }: Props) {
           </div>
         </Section>
 
+        {mode === "edit" && <Section title="예매 일정">
+          <Field label="예매 오픈 시각 (한국 시간)">
+            <FormInput type="datetime-local" value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
+            <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>
+          </Field>
+        </Section>}
+
         <Section title="장소 정보">
           <Field label="공연장명" required>
             <FormInput
+              disabled={mode === "edit"}
               value={form.venue}
               onChange={(v) => update("venue", v)}
               onKeyDown={handleEnterMoveNext}
@@ -475,6 +519,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
             <Field label="총 좌석 수" required>
               <FormInput
                 type="number"
+                disabled={mode === "edit"}
                 value={totalSeats === 0 ? "" : String(totalSeats)}
                 onChange={(v) => setTotalSeats(Number(v || 0))}
                 onKeyDown={handleEnterMoveNext}
@@ -495,7 +540,7 @@ export default function AdminConcertFormPage({ mode }: Props) {
             />
           </Field>
 
-          <Field label="관람 안내">
+          {mode === "create" && <Field label="관람 안내">
             <div className="space-y-2">
               {form.notices.map((notice, index) => (
                 <div key={index} className="flex gap-2">
@@ -524,10 +569,12 @@ export default function AdminConcertFormPage({ mode }: Props) {
                 + 관람 안내 추가
               </button>
             </div>
-          </Field>
+          </Field>}
         </Section>
 
         <Section title="편의 시설">
+          {mode === "edit" && <p className="text-xs">편의 시설은 수정할 수 없습니다.</p>}
+          <fieldset disabled={mode === "edit"}>
           <div className="space-y-2">
             {form.facilities.map((facility, index) => (
               <div key={index} className="flex gap-2">
@@ -556,17 +603,17 @@ export default function AdminConcertFormPage({ mode }: Props) {
               + 편의 시설 추가
             </button>
           </div>
+          </fieldset>
         </Section>
 
         <Section title="이미지 업로드">
-          <Field label="3D 캐릭터/오브젝트 모델" required>
+          <Field label="3D 캐릭터/오브젝트 모델" required={mode === "create"}>
             <CharacterCreatorLinkBox
               character={selectedCharacter}
               onClick={goToCharacterCreator}
             />
           </Field>
 
-          {mode === "create" && (
             <Field label="캐릭터 한마디 (선택, 최대 50자)">
               <FormInput
                 value={form.characterMessage ?? ""}
@@ -576,25 +623,32 @@ export default function AdminConcertFormPage({ mode }: Props) {
                 placeholder="공연장에서 만나요!"
               />
             </Field>
-          )}
 
+          {mode === "edit" && form.image3dUrl && <a href={form.image3dUrl} target="_blank" rel="noreferrer">현재 3D 모델 보기</a>}
+          {mode === "edit" && <Field label="3D 모델 파일 교체 (선택)">
+            <UploadBox text={model3d?.name ?? "새 3D 모델 선택"} description="선택하지 않으면 기존 모델이 유지됩니다." accept=".glb,.obj" onFilesSelected={(files) => setModel3d(files[0] ?? null)} />
+            {model3d && <button type="button" onClick={() => setModel3d(null)}>파일 선택 취소</button>}
+          </Field>}
           <Field label="대표 이미지" required>
+            {mode === "edit" && form.imageMainUrl && <img src={form.imageMainUrl} alt="현재 대표 이미지" className="mb-2 h-32 object-contain" />}
             <UploadBox
               text={mainImage ? mainImage.name : "대표 이미지 업로드"}
               description="클릭하거나 파일을 끌어다 놓으세요."
               accept="image/*"
               onFilesSelected={handleMainImageFiles}
             />
+            {mode === "edit" && mainImage && <button type="button" onClick={() => setMainImage(null)}>파일 선택 취소</button>}
           </Field>
 
           <Field label="갤러리 이미지 최대 3개">
+            {mode === "edit" && <div className="flex gap-2">{form.imageGalleryUrls?.map((url) => <img key={url} src={url} alt="현재 갤러리 이미지" className="h-24 object-contain" />)}</div>}
             <UploadBox
               text={
                 galleryImages.length > 0
                   ? `${galleryImages.length}개 선택됨`
                   : "갤러리 이미지 업로드"
               }
-              description="최대 3개까지 업로드할 수 있습니다."
+              description={mode === "edit" ? "새 파일을 선택하면 기존 갤러리 전체를 교체합니다. 선택하지 않으면 유지됩니다." : "최대 3개까지 업로드할 수 있습니다."}
               accept="image/*"
               multiple
               onFilesSelected={handleGalleryImageFiles}
@@ -702,6 +756,7 @@ function FormInput({
   type = "text",
   placeholder,
   maxLength,
+  disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -709,6 +764,7 @@ function FormInput({
   type?: string;
   placeholder?: string;
   maxLength?: number;
+  disabled?: boolean;
 }) {
   return (
     <input
@@ -718,6 +774,7 @@ function FormInput({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
+      disabled={disabled}
       maxLength={maxLength}
       className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
