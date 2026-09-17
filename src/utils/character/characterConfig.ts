@@ -190,6 +190,25 @@ export function loadSavedCharacter(): CharacterDraft | null {
   }
 }
 
+/** Public cards must not invent a character from an invalid or incomplete identity. */
+export function restoreCharacterForDisplay(value: unknown): CharacterDraft | null {
+  const restored = restoreCharacterDraft(value);
+  if (!restored) return null;
+  const saved = value as Record<string, unknown>;
+  for (const key of ["outfitModelId", "hairStyle", "eyeStyle", "mouthStyle"] as const) {
+    if (saved[key] !== restored[key]) return null;
+  }
+  for (const key of ["skinColor", "hairColor", "outfitColor", "background"] as const) {
+    if (typeof saved[key] !== "string" || !normalizeHexColor(saved[key])) return null;
+  }
+  // Missing legacy part colors use the same defaults as the creator; malformed ones do not.
+  for (const [key, color] of Object.entries(saved)) {
+    if (key in restored && key.endsWith("Color") &&
+      (typeof color !== "string" || !normalizeHexColor(color))) return null;
+  }
+  return restored;
+}
+
 /** Explicit projection prevents UI-only fields from leaking into the API. */
 export function createCharacterConfig(
   character: Omit<CharacterConfig, "schemaVersion">,

@@ -26,7 +26,7 @@
 // - 2026-09-15 (이슈 #297):
 //   - InfoBox·출연 등 핵심 메타 미입력 시 「미정」 (섹션형 필드는 기존처럼 숨김)
 import { useNavigate, useParams, Navigate } from "react-router-dom";
-import { useEffect, useRef, type ComponentProps, type SyntheticEvent } from "react";
+import { useEffect, useRef, type SyntheticEvent } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -43,7 +43,9 @@ import Button from "@/components/common/Button/Button";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
-import { DEFAULT_FESTIVAL_TOP_COLOR, DEFAULT_FESTIVAL_BOTTOM_COLOR } from "@/components/admin/character/characterOutfit";
+import ErrorBoundary from "@/components/common/ErrorBoundary/ErrorBoundary";
+import type { CharacterDraft } from "@/types/domain/character";
+import { restoreCharacterForDisplay } from "@/utils/character/characterConfig";
 import { useConcertStore } from "@/stores/reservation/concertStore";
 import {
   canBookConcert,
@@ -58,27 +60,6 @@ import {
 
 const POSTER_FALLBACK =
   "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
-
-type DetailCharacterConfig = ComponentProps<typeof CharacterModelViewer> & {
-  background: string;
-};
-
-const MOCK_CHARACTER_CONFIG: DetailCharacterConfig = {
-  skinColor: "#F7C6A8",
-  hairColor: "#151515",
-  hairStyle: "short",
-  eyeStyle: "squeeze",
-  mouthStyle: "SMILE",
-  festivalTopColor: DEFAULT_FESTIVAL_TOP_COLOR,
-  festivalBottomColor: DEFAULT_FESTIVAL_BOTTOM_COLOR,
-  outfitModelId: "festival",
-  outfitName: "페스티벌",
-  outfitColor: "#60A5FA",
-  background: "#FFF3D6",
-};
-
-const MOCK_CHARACTER_MESSAGE =
-  "공연장에서 만나요! 함께 즐겨요 🎵";
 
 function hideBrokenImage(e: SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = "none";
@@ -175,8 +156,9 @@ export default function ConcertDetailPage() {
     data.durationMinutes,
   );
 
-  const characterConfig = import.meta.env.DEV ? MOCK_CHARACTER_CONFIG : null;
-  const characterMessage = import.meta.env.DEV ? MOCK_CHARACTER_MESSAGE : "";
+  const characterConfig = restoreCharacterForDisplay(data.characterConfig);
+  const characterMessage = typeof data.characterMessage === "string"
+    ? data.characterMessage.trim() : "";
 
   function handleBooking() {
     setConcert({
@@ -343,7 +325,9 @@ export default function ConcertDetailPage() {
         {characterConfig ? (
           <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-16 [&>div]:lg:static">
             {bookingSidebar}
-            <CharacterPreviewCard characterConfig={characterConfig} message={characterMessage} />
+            <ErrorBoundary key={data.id} fallback={<></>}>
+              <CharacterPreviewCard characterConfig={characterConfig} message={characterMessage} />
+            </ErrorBoundary>
           </div>
         ) : bookingSidebar}
       </div>
@@ -363,7 +347,7 @@ function CharacterPreviewCard({
   characterConfig,
 }: {
   message: string;
-  characterConfig: DetailCharacterConfig;
+  characterConfig: CharacterDraft;
 }) {
   const floatingRef =
     useRef<HTMLDivElement>(null);
@@ -434,7 +418,7 @@ function CharacterPreviewCard({
           공연 3D 캐릭터
         </p>
 
-        <div className="relative mx-auto max-w-[260px] rounded-2xl border-2 border-primary/20 bg-primary/5 px-4 py-3 text-center">
+        {message && <div className="relative mx-auto max-w-[260px] rounded-2xl border-2 border-primary/20 bg-primary/5 px-4 py-3 text-center">
           <p className="break-words text-sm font-semibold leading-relaxed text-text">
             {message}
           </p>
@@ -443,7 +427,7 @@ function CharacterPreviewCard({
             aria-hidden="true"
             className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-primary/20 bg-primary/5"
           />
-        </div>
+        </div>}
       </div>
 
       <div
