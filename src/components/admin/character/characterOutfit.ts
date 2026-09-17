@@ -34,6 +34,24 @@ export const FESTIVAL_OUTFIT_PART_NAMES = {
 } as const;
 
 /**
+ * 팬미팅 의상 GLB 내부 오브젝트 이름입니다.
+ *
+ * Blender에서 설정한 이름과 동일하게 유지합니다.
+ */
+// fanmeet_outfit.glb baseColorFactor (linear RGB), converted to sRGB HEX.
+export const DEFAULT_FANMEET_CARDIGAN_COLOR = "#FFF51C";
+export const DEFAULT_FANMEET_INNER_COLOR = "#DFE068";
+export const DEFAULT_FANMEET_SHORTS_COLOR = "#FFBC42";
+export const DEFAULT_FANMEET_SKIRT_COLOR = "#9700FF";
+
+export const FANMEET_OUTFIT_PART_NAMES = {
+  cardigan: "fanmeet_cardigan",
+  inner: "fanmeet_inner",
+  shorts: "fanmeet_shorts",
+  skirt: "fanmeet_skirt",
+} as const;
+
+/**
  * 공연 등록 화면의 공연 장르 순서와 동일하게 정렬합니다.
  *
  * 공연 장르 ↔ 기존 의상 모델 매핑
@@ -46,7 +64,8 @@ export const FESTIVAL_OUTFIT_PART_NAMES = {
  * 팬미팅   ↔ theater
  * 발레     ↔ ballet
  *
- * 기존 OutfitModelId와 GLB 경로는 호환성을 위해 유지합니다.
+ * 기존 OutfitModelId는 저장 데이터와의 호환성을 위해 유지합니다.
+ * 팬미팅 역시 기존 stable id인 "theater"를 그대로 사용합니다.
  */
 export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
   {
@@ -89,7 +108,7 @@ export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
     name: "팬미팅",
     description: "팬미팅 무대 의상",
     icon: "💖",
-    modelUrl: null,
+    modelUrl: "/models/outfits/fanmeet_outfit.glb",
   },
   {
     id: "ballet",

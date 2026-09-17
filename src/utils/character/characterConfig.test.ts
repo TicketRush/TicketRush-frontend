@@ -32,6 +32,10 @@ const draft = restoreCharacterDraft({
   musicalShortsColor: "#090909",
   festivalTopColor: "#101010",
   festivalBottomColor: "#111111",
+  fanmeetCardiganColor: "#131313",
+  fanmeetInnerColor: "#141414",
+  fanmeetShortsColor: "#151515",
+  fanmeetSkirtColor: "#161616",
   background: "#121212",
   pose: "dance",
   accessory: "mic",
@@ -41,6 +45,54 @@ const config = createCharacterConfig(draft);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("character config and legacy restoration", () => {
+  it("restores fanmeet parts from legacy and versioned localStorage", () => {
+    const fanmeet = { ...draft, outfitModelId: "theater" };
+    const restored = restoreCharacterDraft(fanmeet)!;
+    expect(restored).toMatchObject({
+      outfitModelId: "theater",
+      outfitName: "팬미팅",
+      fanmeetCardiganColor: "#131313",
+      fanmeetInnerColor: "#141414",
+      fanmeetShortsColor: "#151515",
+      fanmeetSkirtColor: "#161616",
+    });
+    const saved = createCharacterConfig(restored);
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify(saved),
+    });
+    expect(loadSavedCharacter()).toEqual(restored);
+    expect(createCharacterConfig(loadSavedCharacter()!)).toEqual(saved);
+  });
+
+  it("defaults missing or invalid fanmeet colors and normalizes valid HEX", () => {
+    const defaults = {
+      fanmeetCardiganColor: "#FFF51C",
+      fanmeetInnerColor: "#DFE068",
+      fanmeetShortsColor: "#FFBC42",
+      fanmeetSkirtColor: "#9700FF",
+    };
+    expect(restoreCharacterDraft({ outfitModelId: "theater" })).toMatchObject(defaults);
+    expect(restoreCharacterDraft({
+      outfitModelId: "theater",
+      fanmeetCardiganColor: "invalid",
+      fanmeetInnerColor: null,
+      fanmeetShortsColor: 123,
+      fanmeetSkirtColor: {},
+    })).toMatchObject(defaults);
+    expect(restoreCharacterDraft({
+      outfitModelId: "theater",
+      fanmeetCardiganColor: "abcdef",
+      fanmeetInnerColor: "#abcdef",
+      fanmeetShortsColor: "123abc",
+      fanmeetSkirtColor: "#123abc",
+    })).toMatchObject({
+      fanmeetCardiganColor: "#ABCDEF",
+      fanmeetInnerColor: "#ABCDEF",
+      fanmeetShortsColor: "#123ABC",
+      fanmeetSkirtColor: "#123ABC",
+    });
+  });
+
   it("preserves every selected setting through JSON storage without display names", () => {
     const { outfitName, ...settings } = draft;
     expect(outfitName).toBe("페스티벌");

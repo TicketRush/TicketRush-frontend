@@ -11,6 +11,10 @@ import {
   DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
+  DEFAULT_FANMEET_CARDIGAN_COLOR,
+  DEFAULT_FANMEET_INNER_COLOR,
+  DEFAULT_FANMEET_SHORTS_COLOR,
+  DEFAULT_FANMEET_SKIRT_COLOR,
   getOutfitOption,
   resolveStoredOutfitModelId,
 } from "@/components/admin/character/characterOutfit";
@@ -115,6 +119,23 @@ export function restoreCharacterDraft(value: unknown): CharacterDraft | null {
       ? normalizeHexColor(parsed.festivalBottomColor)
       : null;
 
+  const resolvedFanmeetCardiganColor =
+    typeof parsed.fanmeetCardiganColor === "string"
+      ? normalizeHexColor(parsed.fanmeetCardiganColor)
+      : null;
+  const resolvedFanmeetInnerColor =
+    typeof parsed.fanmeetInnerColor === "string"
+      ? normalizeHexColor(parsed.fanmeetInnerColor)
+      : null;
+  const resolvedFanmeetShortsColor =
+    typeof parsed.fanmeetShortsColor === "string"
+      ? normalizeHexColor(parsed.fanmeetShortsColor)
+      : null;
+  const resolvedFanmeetSkirtColor =
+    typeof parsed.fanmeetSkirtColor === "string"
+      ? normalizeHexColor(parsed.fanmeetSkirtColor)
+      : null;
+
   const resolvedBackground =
     typeof parsed.background === "string"
       ? normalizeHexColor(parsed.background)
@@ -150,6 +171,11 @@ export function restoreCharacterDraft(value: unknown): CharacterDraft | null {
     festivalBottomColor:
       resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
     background: resolvedBackground ?? DEFAULT_BACKGROUND_COLOR,
+    fanmeetCardiganColor:
+      resolvedFanmeetCardiganColor ?? DEFAULT_FANMEET_CARDIGAN_COLOR,
+    fanmeetInnerColor: resolvedFanmeetInnerColor ?? DEFAULT_FANMEET_INNER_COLOR,
+    fanmeetShortsColor: resolvedFanmeetShortsColor ?? DEFAULT_FANMEET_SHORTS_COLOR,
+    fanmeetSkirtColor: resolvedFanmeetSkirtColor ?? DEFAULT_FANMEET_SKIRT_COLOR,
     accessory: typeof parsed.accessory === "string" ? parsed.accessory : "none",
     pose: resolvePose(parsed.pose),
   };
@@ -188,6 +214,10 @@ export function createCharacterConfig(
     musicalShortsColor: character.musicalShortsColor,
     festivalTopColor: character.festivalTopColor,
     festivalBottomColor: character.festivalBottomColor,
+    fanmeetCardiganColor: character.fanmeetCardiganColor,
+    fanmeetInnerColor: character.fanmeetInnerColor,
+    fanmeetShortsColor: character.fanmeetShortsColor,
+    fanmeetSkirtColor: character.fanmeetSkirtColor,
     accessory: character.accessory,
     pose: character.pose,
     background: character.background,

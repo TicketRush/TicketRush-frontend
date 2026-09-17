@@ -165,8 +165,13 @@ describe("createConcertApi with the real axios interceptors", () => {
   it("preserves opaque character keys and nested values through request transforms", async () => {
     const value = input();
     const characterConfig = {
-      ...value.form.characterConfig!,
-      fanmeetCardiganColor: "#ABCDEF",
+      ...createCharacterConfig(restoreCharacterDraft({
+        outfitModelId: "theater",
+        fanmeetCardiganColor: "#ABCDEF",
+        fanmeetInnerColor: "#123456",
+        fanmeetShortsColor: "#654321",
+        fanmeetSkirtColor: "#FEDCBA",
+      })!),
       customSettings: { accentColor: "#123456", original_key: "unchanged" },
     };
     value.form.characterConfig = characterConfig;
@@ -177,6 +182,13 @@ describe("createConcertApi with the real axios interceptors", () => {
       await adapter.mock.calls[0][0].data.get("request").text(),
     );
     expect(request.character_config).toEqual(characterConfig);
+    expect(request.character_config).toMatchObject({
+      outfitModelId: "theater",
+      fanmeetCardiganColor: "#ABCDEF",
+      fanmeetInnerColor: "#123456",
+      fanmeetShortsColor: "#654321",
+      fanmeetSkirtColor: "#FEDCBA",
+    });
     expect(request).not.toHaveProperty("characterConfig");
   });
 

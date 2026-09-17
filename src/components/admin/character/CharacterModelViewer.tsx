@@ -16,9 +16,14 @@ import {
   DEFAULT_MUSICAL_JACKET_COLOR,
   DEFAULT_MUSICAL_SHORTS_COLOR,
   DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  DEFAULT_FANMEET_CARDIGAN_COLOR,
+  DEFAULT_FANMEET_INNER_COLOR,
+  DEFAULT_FANMEET_SHORTS_COLOR,
+  DEFAULT_FANMEET_SKIRT_COLOR,
   DEFAULT_FESTIVAL_TOP_COLOR,
   MUSICAL_OUTFIT_PART_NAMES,
   FESTIVAL_OUTFIT_PART_NAMES,
+  FANMEET_OUTFIT_PART_NAMES,
   getOutfitModelUrl,
   OUTFIT_MODEL_URLS,
   type OutfitModelId,
@@ -44,6 +49,8 @@ interface CharacterModelViewerProps {
   /**
    * 기존 단일 의상 색상 값입니다.
    * 다른 의상 및 기존 호출부 호환을 위해 유지합니다.
+   *
+   * 팬미팅 의상에서는 카디건과 스커트에 적용합니다.
    */
   outfitColor: string;
 
@@ -69,6 +76,10 @@ interface CharacterModelViewerProps {
    * 페스티벌 의상 하의 색상입니다.
    */
   festivalBottomColor?: string;
+  fanmeetCardiganColor?: string;
+  fanmeetInnerColor?: string;
+  fanmeetShortsColor?: string;
+  fanmeetSkirtColor?: string;
 
   /**
    * 화면 표시용 의상 이름입니다.
@@ -361,31 +372,38 @@ function findBalletPartColor(
   object: THREE.Object3D,
   balletWearColor: string,
   balletShortsColor: string,
-) {
+): string | null {
   let current: THREE.Object3D | null = object;
 
   while (current) {
-    if (
-      matchesPartName(
-        current.name,
-        BALLET_PART_NAMES.wear,
-      )
-    ) {
+    if (matchesPartName(current.name, BALLET_PART_NAMES.wear)) {
       return balletWearColor;
     }
 
-    if (
-      matchesPartName(
-        current.name,
-        BALLET_PART_NAMES.shorts,
-      )
-    ) {
+    if (matchesPartName(current.name, BALLET_PART_NAMES.shorts)) {
       return balletShortsColor;
     }
 
     current = current.parent;
   }
 
+  return null;
+}
+
+/** Match the mesh or its parent object, including Blender name suffixes. */
+function findFanmeetPartColor(
+  object: THREE.Object3D,
+  colors: Record<keyof typeof FANMEET_OUTFIT_PART_NAMES, string>,
+): string | null {
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    for (const part of Object.keys(FANMEET_OUTFIT_PART_NAMES) as (keyof typeof FANMEET_OUTFIT_PART_NAMES)[]) {
+      if (matchesPartName(current.name, FANMEET_OUTFIT_PART_NAMES[part])) {
+        return colors[part];
+      }
+    }
+    current = current.parent;
+  }
   return null;
 }
 
@@ -490,6 +508,27 @@ function applyMeshColor(object: THREE.Mesh, color: string) {
   object.material = cloneMaterialWithColor(object.material, color);
 }
 
+/**
+ * GLB의 원래 Base Color / Base Color Texture에 영향받지 않고
+ * 지정한 색상을 그대로 적용합니다.
+ */
+function applyMeshColorWithoutBaseTexture(
+  object: THREE.Mesh,
+  color: string,
+) {
+  if (Array.isArray(object.material)) {
+    object.material = object.material.map((material) =>
+      createMaterialWithColor(material, color),
+    );
+    return;
+  }
+
+  object.material = createMaterialWithColor(
+    object.material,
+    color,
+  );
+}
+
 function OutfitModel({
   modelUrl,
   outfitModelId,
@@ -504,6 +543,10 @@ function OutfitModel({
   musicalShortsColor,
   festivalTopColor,
   festivalBottomColor,
+  fanmeetCardiganColor,
+  fanmeetInnerColor,
+  fanmeetShortsColor,
+  fanmeetSkirtColor,
 }: {
   modelUrl: string;
   outfitModelId: OutfitModelId;
@@ -518,6 +561,10 @@ function OutfitModel({
   musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
+  fanmeetCardiganColor: string;
+  fanmeetInnerColor: string;
+  fanmeetShortsColor: string;
+  fanmeetSkirtColor: string;
 }) {
   const gltf = useGLTF(modelUrl);
 
@@ -528,13 +575,25 @@ function OutfitModel({
       outfitModelId !== "festival" &&
       outfitModelId !== "musical" &&
       outfitModelId !== "concert" &&
-      outfitModelId !== "ballet"
+      outfitModelId !== "ballet" &&
+      outfitModelId !== "theater"
     ) {
       return clonedScene;
     }
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "theater") {
+        const partColor = findFanmeetPartColor(object, {
+          cardigan: fanmeetCardiganColor,
+          inner: fanmeetInnerColor,
+          shorts: fanmeetShortsColor,
+          skirt: fanmeetSkirtColor,
+        });
+        if (partColor) applyMeshColorWithoutBaseTexture(object, partColor);
         return;
       }
 
@@ -647,6 +706,10 @@ function OutfitModel({
     musicalShortsColor,
     festivalTopColor,
     festivalBottomColor,
+    fanmeetCardiganColor,
+    fanmeetInnerColor,
+    fanmeetShortsColor,
+    fanmeetSkirtColor,
   ]);
 
   return <primitive object={scene} />;
@@ -674,6 +737,10 @@ function CharacterModel({
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  fanmeetCardiganColor = DEFAULT_FANMEET_CARDIGAN_COLOR,
+  fanmeetInnerColor = DEFAULT_FANMEET_INNER_COLOR,
+  fanmeetShortsColor = DEFAULT_FANMEET_SHORTS_COLOR,
+  fanmeetSkirtColor = DEFAULT_FANMEET_SKIRT_COLOR,
 }: Pick<
   CharacterModelViewerProps,
   | "modelPosition"
@@ -697,8 +764,13 @@ function CharacterModel({
   | "musicalShortsColor"
   | "festivalTopColor"
   | "festivalBottomColor"
+  | "fanmeetCardiganColor"
+  | "fanmeetInnerColor"
+  | "fanmeetShortsColor"
+  | "fanmeetSkirtColor"
 >) {
   const outfitModelUrl = getOutfitModelUrl(outfitModelId);
+
   const outfit = outfitModelUrl ? (
     <OutfitModel
       modelUrl={outfitModelUrl}
@@ -714,14 +786,27 @@ function CharacterModel({
       musicalShortsColor={musicalShortsColor}
       festivalTopColor={festivalTopColor}
       festivalBottomColor={festivalBottomColor}
+      fanmeetCardiganColor={fanmeetCardiganColor}
+      fanmeetInnerColor={fanmeetInnerColor}
+      fanmeetShortsColor={fanmeetShortsColor}
+      fanmeetSkirtColor={fanmeetSkirtColor}
     />
   ) : null;
 
   return (
     <Center
-      cacheKey={centered
-        ? [modelUrl, hairStyle, eyeStyle, mouthStyle, outfitModelId, modelScale].join(":")
-        : 0}
+      cacheKey={
+        centered
+          ? [
+              modelUrl,
+              hairStyle,
+              eyeStyle,
+              mouthStyle,
+              outfitModelId,
+              modelScale,
+            ].join(":")
+          : 0
+      }
     >
       <group
         scale={modelScale}
@@ -742,8 +827,12 @@ function CharacterModel({
 
         <MouthModel mouthStyle={mouthStyle} />
 
-        {centered ? outfit : (
-          <Suspense fallback={null}>{outfit}</Suspense>
+        {centered ? (
+          outfit
+        ) : (
+          <Suspense fallback={null}>
+            {outfit}
+          </Suspense>
         )}
       </group>
     </Center>
@@ -772,13 +861,28 @@ export default function CharacterModelViewer({
   musicalShortsColor = DEFAULT_MUSICAL_SHORTS_COLOR,
   festivalTopColor = DEFAULT_FESTIVAL_TOP_COLOR,
   festivalBottomColor = DEFAULT_FESTIVAL_BOTTOM_COLOR,
+  fanmeetCardiganColor = DEFAULT_FANMEET_CARDIGAN_COLOR,
+  fanmeetInnerColor = DEFAULT_FANMEET_INNER_COLOR,
+  fanmeetShortsColor = DEFAULT_FANMEET_SHORTS_COLOR,
+  fanmeetSkirtColor = DEFAULT_FANMEET_SKIRT_COLOR,
 }: CharacterModelViewerProps) {
   return (
     <div className="h-full w-full">
-      <Canvas camera={{ position: centered ? [0, 0, 6] : [0, 1.2, 6], fov: 35 }}>
+      <Canvas
+        camera={{
+          position: centered ? [0, 0, 6] : [0, 1.2, 6],
+          fov: 35,
+        }}
+      >
         <ambientLight intensity={1.7} />
-        <directionalLight position={[3, 5, 5]} intensity={2.2} />
-        <directionalLight position={[-3, 2, 2]} intensity={0.8} />
+        <directionalLight
+          position={[3, 5, 5]}
+          intensity={2.2}
+        />
+        <directionalLight
+          position={[-3, 2, 2]}
+          intensity={0.8}
+        />
 
         <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
@@ -803,6 +907,10 @@ export default function CharacterModelViewer({
             musicalShortsColor={musicalShortsColor}
             festivalTopColor={festivalTopColor}
             festivalBottomColor={festivalBottomColor}
+            fanmeetCardiganColor={fanmeetCardiganColor}
+            fanmeetInnerColor={fanmeetInnerColor}
+            fanmeetShortsColor={fanmeetShortsColor}
+            fanmeetSkirtColor={fanmeetSkirtColor}
           />
         </Suspense>
 

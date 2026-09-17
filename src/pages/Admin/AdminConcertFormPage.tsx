@@ -909,6 +909,10 @@ function CharacterCreatorLinkBox({
           musicalShortsColor={character.musicalShortsColor}
           festivalTopColor={character.festivalTopColor}
           festivalBottomColor={character.festivalBottomColor}
+          fanmeetCardiganColor={character.fanmeetCardiganColor}
+          fanmeetInnerColor={character.fanmeetInnerColor}
+          fanmeetShortsColor={character.fanmeetShortsColor}
+          fanmeetSkirtColor={character.fanmeetSkirtColor}
           outfitName={character.outfitName}
           outfitModelId={character.outfitModelId}
           hairStyle={character.hairStyle}

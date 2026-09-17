@@ -14,6 +14,16 @@ function ConcertGrid({ children }: { children: ReactNode }) {
   );
 }
 
+function ConcertListSkeleton({ count }: { count: number }) {
+  return (
+    <ConcertGrid>
+      {Array.from({ length: count }).map((_, i) => (
+        <ConcertCardSkeleton key={i} />
+      ))}
+    </ConcertGrid>
+  );
+}
+
 export default function ConcertListPage() {
   const { pathname } = useLocation();
   const isHome = pathname === "/";
@@ -21,8 +31,11 @@ export default function ConcertListPage() {
 
   const {
     data,
-    isLoading,
+    isPending,
     isError,
+    isFetching,
+    isFetchNextPageError,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -36,7 +49,7 @@ export default function ConcertListPage() {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !isFetchingNextPage) {
+        if (entry.isIntersecting && !isFetchingNextPage && !isFetchNextPageError) {
           fetchNextPage();
         }
       },
@@ -44,7 +57,7 @@ export default function ConcertListPage() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 
   const concerts = data?.pages.flatMap((p) => p.items) ?? [];
 
@@ -54,6 +67,12 @@ export default function ConcertListPage() {
   const BANNER_AFTER = 4;
   const beforeBanner = concerts.slice(0, BANNER_AFTER);
   const afterBanner = concerts.slice(BANNER_AFTER);
+
+  // isLoading(= isPending && isFetching)은 재시도 대기 중 false가 되어
+  // 빈 목록/에러로 깜빡일 수 있음 → isPending 또는 데이터 없는 refetch 중에는 스켈레톤 유지
+  const showLoading = isPending || (isFetching && !data);
+  // 다음 페이지 실패(isFetchNextPageError)는 목록을 유지하고 하단에서만 처리
+  const showError = isError && !data && !isFetching;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
@@ -65,16 +84,24 @@ export default function ConcertListPage() {
         </p>
       </div>
 
-      {isError ? (
-        <div className="bg-white border border-border rounded-xl p-12 text-center text-error">
-          공연 목록을 불러올 수 없습니다.
+      {showError ? (
+        <div
+          role="alert"
+          className="bg-white border border-border rounded-xl p-12 text-center space-y-4"
+        >
+          <p className="text-error">공연 목록을 불러올 수 없습니다.</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+            aria-busy={isFetching}
+            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            다시 시도
+          </button>
         </div>
-      ) : isLoading ? (
-        <ConcertGrid>
-          {Array.from({ length: BANNER_AFTER }).map((_, i) => (
-            <ConcertCardSkeleton key={`a-${i}`} />
-          ))}
-        </ConcertGrid>
+      ) : showLoading ? (
+        <ConcertListSkeleton count={BANNER_AFTER} />
       ) : concerts.length === 0 ? (
         <div className="text-center text-text-secondary py-12">
           등록된 공연이 없습니다.
@@ -90,13 +117,9 @@ export default function ConcertListPage() {
       {/* 목록이 비거나 로딩 중이어도 배너는 같은 위치에 둔다 */}
       <BannerSlider />
 
-      {!isError &&
-        (isLoading ? (
-          <ConcertGrid>
-            {Array.from({ length: BANNER_AFTER }).map((_, i) => (
-              <ConcertCardSkeleton key={`b-${i}`} />
-            ))}
-          </ConcertGrid>
+      {!showError &&
+        (showLoading ? (
+          <ConcertListSkeleton count={BANNER_AFTER} />
         ) : (
           afterBanner.length > 0 && (
             <ConcertGrid>
@@ -112,6 +135,20 @@ export default function ConcertListPage() {
       {isFetchingNextPage && (
         <div className="text-center text-text-secondary py-4 text-xs">
           더 불러오는 중...
+        </div>
+      )}
+      {isFetchNextPageError && !isFetchingNextPage && (
+        <div role="alert" className="text-center py-4 space-y-2">
+          <p className="text-sm text-error">추가 공연을 불러오지 못했습니다.</p>
+          <button
+            type="button"
+            onClick={() => void fetchNextPage()}
+            disabled={isFetchingNextPage}
+            aria-busy={isFetchingNextPage}
+            className="px-3 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            다시 시도
+          </button>
         </div>
       )}
     </div>

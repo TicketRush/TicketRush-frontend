@@ -29,6 +29,10 @@ export interface CharacterConfig {
   musicalShortsColor: string;
   festivalTopColor: string;
   festivalBottomColor: string;
+  fanmeetCardiganColor: string;
+  fanmeetInnerColor: string;
+  fanmeetShortsColor: string;
+  fanmeetSkirtColor: string;
   accessory: string;
   pose: CharacterPose;
   background: string;
