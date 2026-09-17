@@ -1,3 +1,4 @@
+import { findConcertPartColor, cloneConcertMaterialWithColor } from "./concertOutfitColor";
 import {
   Component,
   Suspense,
@@ -128,11 +129,6 @@ const BALLET_PART_NAMES = {
   shorts: "ballet_shorts",
 } as const;
 
-const CONCERT_PART_NAMES = {
-  jacket: "concert_jacket",
-  inner: "concert_inner",
-  bottom: "concert_shorts",
-} as const;
 
 function CharacterModelLoadingFallback() {
   return (
@@ -341,33 +337,6 @@ function matchesPartName(objectName: string, partName: string) {
  * Blender의 Object 이름과 실제 Mesh 이름이 다를 수도 있으므로,
  * 현재 Mesh부터 부모 Object까지 올라가며 파츠 이름을 찾습니다.
  */
-function findConcertPartColor(
-  object: THREE.Object3D,
-  jacketColor: string,
-  innerColor: string,
-  bottomColor: string,
-): string | null {
-  let current: THREE.Object3D | null = object;
-
-  while (current) {
-    if (matchesPartName(current.name, CONCERT_PART_NAMES.jacket)) {
-      return jacketColor;
-    }
-
-    if (matchesPartName(current.name, CONCERT_PART_NAMES.inner)) {
-      return innerColor;
-    }
-
-    if (matchesPartName(current.name, CONCERT_PART_NAMES.bottom)) {
-      return bottomColor;
-    }
-
-    current = current.parent;
-  }
-
-  return null;
-}
-
 function findBalletPartColor(
   object: THREE.Object3D,
   balletWearColor: string,
@@ -452,27 +421,6 @@ function createMaterialWithColor(
     roughness: 0.8,
     metalness: 0,
     side: material.side,
-  });
-}
-
-function cloneConcertMaterialWithColor(
-  material: THREE.Material,
-  color: string,
-): THREE.Material {
-  const clonedMaterial = material.clone() as THREE.Material & {
-    color?: THREE.Color;
-  };
-
-  if (clonedMaterial.color instanceof THREE.Color) {
-    clonedMaterial.color.set(color);
-    clonedMaterial.needsUpdate = true;
-
-    return clonedMaterial;
-  }
-
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.8,
   });
 }
 
