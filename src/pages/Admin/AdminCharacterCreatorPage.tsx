@@ -1,17 +1,21 @@
+import { toast } from "react-toastify";
+import type {
+  CharacterDraft,
+  CharacterPose as Pose,
+} from "@/types/domain/character";
+import {
+  CHARACTER_STORAGE_KEY,
+  loadSavedCharacter,
+  createCharacterConfig,
+  validateCharacterConfig,
+} from "@/utils/character/characterConfig";
 import { useLayoutEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
-import {
-  resolveStoredHairStyle,
-  type HairStyle,
-} from "@/components/admin/character/characterHair";
-import {
-  resolveStoredEyeStyle,
-  type EyeStyle,
-} from "@/components/admin/character/characterEye";
+import type { HairStyle } from "@/components/admin/character/characterHair";
+import type { EyeStyle } from "@/components/admin/character/characterEye";
 import {
   MOUTH_STYLE_LABELS,
-  resolveStoredMouthStyle,
   type MouthStyle,
 } from "@/components/admin/character/characterMouth";
 import {
@@ -20,7 +24,6 @@ import {
   SKIN_TONE_PRESETS,
   findSkinTonePresetByColor,
   normalizeHexColor,
-  resolveStoredSkinTone,
   type SkinToneSelection,
 } from "@/components/admin/character/characterSkin";
 import {
@@ -36,41 +39,9 @@ import {
   DEFAULT_OUTFIT_MODEL_ID,
   OUTFIT_OPTIONS,
   getOutfitOption,
-  resolveStoredOutfitModelId,
   type OutfitModelId,
 } from "@/components/admin/character/characterOutfit";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
-
-type Pose = "standing" | "wave" | "heart" | "dance" | "sing";
-
-interface CharacterConfig {
-  skinTone: SkinToneSelection;
-  skinColor: string;
-  hairStyle: HairStyle;
-  mouthStyle: MouthStyle;
-  eyeStyle: EyeStyle;
-  hairColor: string;
-  outfitModelId: OutfitModelId;
-  outfitName: string;
-  outfitColor: string;
-  balletWearColor: string;
-  balletShortsColor: string;
-  jacketColor: string;
-  innerColor: string;
-  bottomColor: string;
-  musicalJacketColor: string;
-  musicalInnerColor: string;
-  musicalShortsColor: string;
-  festivalTopColor: string;
-  festivalBottomColor: string;
-  fanmeetCardiganColor: string;
-  fanmeetInnerColor: string;
-  fanmeetShortsColor: string;
-  fanmeetSkirtColor: string;
-  accessory: string;
-  pose: Pose;
-  background: string;
-}
 
 interface BackgroundPreset {
   id: string;
@@ -90,7 +61,6 @@ interface OutfitColorCustomizerProps {
   onHexBlur: () => void;
 }
 
-const CHARACTER_STORAGE_KEY = "ticketRush:admin-character";
 const DEFAULT_RETURN_TO = "/admin/concerts/new";
 
 const HAIR_STYLES: {
@@ -269,7 +239,7 @@ const BACKGROUNDS: BackgroundPreset[] = [
   { id: "dark-gray", label: "다크 그레이", color: "#343A40" },
 ];
 
-const DEFAULT_CHARACTER: CharacterConfig = {
+const DEFAULT_CHARACTER: CharacterDraft = {
   skinTone: DEFAULT_SKIN_TONE,
   skinColor: DEFAULT_SKIN_COLOR,
   hairStyle: "ponytail",
@@ -302,207 +272,6 @@ function isSameHexColor(first: string, second: string) {
   return first.toUpperCase() === second.toUpperCase();
 }
 
-function loadSavedCharacter(): CharacterConfig {
-  const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
-
-  if (!savedCharacter) {
-    return DEFAULT_CHARACTER;
-  }
-
-  try {
-    const parsed = JSON.parse(savedCharacter) as Partial<
-      Omit<
-        CharacterConfig,
-        | "skinTone"
-        | "skinColor"
-        | "hairStyle"
-        | "mouthStyle"
-        | "eyeStyle"
-        | "hairColor"
-        | "outfitModelId"
-        | "outfitName"
-        | "outfitColor"
-        | "balletWearColor"
-        | "balletShortsColor"
-        | "jacketColor"
-        | "innerColor"
-        | "bottomColor"
-        | "musicalJacketColor"
-        | "musicalInnerColor"
-        | "musicalShortsColor"
-        | "festivalTopColor"
-        | "festivalBottomColor"
-        | "fanmeetCardiganColor"
-        | "fanmeetInnerColor"
-        | "fanmeetShortsColor"
-        | "fanmeetSkirtColor"
-        | "background"
-      >
-    > & {
-      skinTone?: unknown;
-      skinColor?: unknown;
-      hairStyle?: unknown;
-      mouthStyle?: unknown;
-      eyeStyle?: unknown;
-      hairColor?: unknown;
-      outfitModelId?: unknown;
-      outfitName?: unknown;
-      outfitColor?: unknown;
-      balletWearColor?: unknown;
-      balletShortsColor?: unknown;
-      jacketColor?: unknown;
-      innerColor?: unknown;
-      bottomColor?: unknown;
-      musicalJacketColor?: unknown;
-      musicalInnerColor?: unknown;
-      musicalShortsColor?: unknown;
-      festivalTopColor?: unknown;
-      festivalBottomColor?: unknown;
-      fanmeetCardiganColor?: unknown;
-      fanmeetInnerColor?: unknown;
-      fanmeetShortsColor?: unknown;
-      fanmeetSkirtColor?: unknown;
-      background?: unknown;
-    };
-
-    const resolvedSkin = resolveStoredSkinTone(
-      parsed.skinTone,
-      parsed.skinColor,
-    );
-
-    const resolvedHairColor =
-      typeof parsed.hairColor === "string"
-        ? normalizeHexColor(parsed.hairColor)
-        : null;
-
-    const resolvedOutfitColor =
-      typeof parsed.outfitColor === "string"
-        ? normalizeHexColor(parsed.outfitColor)
-        : null;
-
-    const legacyOutfitColor =
-      resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
-
-    const resolvedBalletWearColor =
-      typeof parsed.balletWearColor === "string"
-        ? normalizeHexColor(parsed.balletWearColor)
-        : null;
-
-    const resolvedBalletShortsColor =
-      typeof parsed.balletShortsColor === "string"
-        ? normalizeHexColor(parsed.balletShortsColor)
-        : null;
-
-    const resolvedJacketColor =
-      typeof parsed.jacketColor === "string"
-        ? normalizeHexColor(parsed.jacketColor)
-        : null;
-
-    const resolvedInnerColor =
-      typeof parsed.innerColor === "string"
-        ? normalizeHexColor(parsed.innerColor)
-        : null;
-
-    const resolvedBottomColor =
-      typeof parsed.bottomColor === "string"
-        ? normalizeHexColor(parsed.bottomColor)
-        : null;
-
-    const resolvedMusicalJacketColor =
-      typeof parsed.musicalJacketColor === "string"
-        ? normalizeHexColor(parsed.musicalJacketColor)
-        : null;
-
-    const resolvedMusicalInnerColor =
-      typeof parsed.musicalInnerColor === "string"
-        ? normalizeHexColor(parsed.musicalInnerColor)
-        : null;
-
-    const resolvedMusicalShortsColor =
-      typeof parsed.musicalShortsColor === "string"
-        ? normalizeHexColor(parsed.musicalShortsColor)
-        : null;
-
-    const resolvedFestivalTopColor =
-      typeof parsed.festivalTopColor === "string"
-        ? normalizeHexColor(parsed.festivalTopColor)
-        : null;
-
-    const resolvedFestivalBottomColor =
-      typeof parsed.festivalBottomColor === "string"
-        ? normalizeHexColor(parsed.festivalBottomColor)
-        : null;
-
-    const resolvedFanmeetCardiganColor =
-      typeof parsed.fanmeetCardiganColor === "string"
-        ? normalizeHexColor(parsed.fanmeetCardiganColor)
-        : null;
-
-    const resolvedFanmeetInnerColor =
-      typeof parsed.fanmeetInnerColor === "string"
-        ? normalizeHexColor(parsed.fanmeetInnerColor)
-        : null;
-
-    const resolvedFanmeetShortsColor =
-      typeof parsed.fanmeetShortsColor === "string"
-        ? normalizeHexColor(parsed.fanmeetShortsColor)
-        : null;
-
-    const resolvedFanmeetSkirtColor =
-      typeof parsed.fanmeetSkirtColor === "string"
-        ? normalizeHexColor(parsed.fanmeetSkirtColor)
-        : null;
-
-    const resolvedBackground =
-      typeof parsed.background === "string"
-        ? normalizeHexColor(parsed.background)
-        : null;
-
-    const resolvedOutfitModelId = resolveStoredOutfitModelId(
-      parsed.outfitModelId,
-      parsed.outfitName,
-    );
-
-    const resolvedOutfit = getOutfitOption(resolvedOutfitModelId);
-
-    return {
-      ...DEFAULT_CHARACTER,
-      ...parsed,
-      ...resolvedSkin,
-      hairStyle: resolveStoredHairStyle(parsed.hairStyle),
-      mouthStyle: resolveStoredMouthStyle(parsed.mouthStyle),
-      eyeStyle: resolveStoredEyeStyle(parsed.eyeStyle),
-      hairColor: resolvedHairColor ?? DEFAULT_HAIR_COLOR,
-      outfitModelId: resolvedOutfitModelId,
-      outfitName: resolvedOutfit.name,
-      outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
-      balletWearColor: resolvedBalletWearColor ?? legacyOutfitColor,
-      balletShortsColor: resolvedBalletShortsColor ?? legacyOutfitColor,
-      jacketColor: resolvedJacketColor ?? legacyOutfitColor,
-      innerColor: resolvedInnerColor ?? legacyOutfitColor,
-      bottomColor: resolvedBottomColor ?? legacyOutfitColor,
-      musicalJacketColor:
-        resolvedMusicalJacketColor ?? DEFAULT_MUSICAL_JACKET_COLOR,
-      musicalInnerColor:
-        resolvedMusicalInnerColor ?? DEFAULT_MUSICAL_INNER_COLOR,
-      musicalShortsColor:
-        resolvedMusicalShortsColor ?? DEFAULT_MUSICAL_SHORTS_COLOR,
-      festivalTopColor:
-        resolvedFestivalTopColor ?? DEFAULT_FESTIVAL_TOP_COLOR,
-      festivalBottomColor:
-        resolvedFestivalBottomColor ?? DEFAULT_FESTIVAL_BOTTOM_COLOR,
-      fanmeetCardiganColor: resolvedFanmeetCardiganColor ?? DEFAULT_FANMEET_CARDIGAN_COLOR,
-      fanmeetInnerColor: resolvedFanmeetInnerColor ?? DEFAULT_FANMEET_INNER_COLOR,
-      fanmeetShortsColor: resolvedFanmeetShortsColor ?? DEFAULT_FANMEET_SHORTS_COLOR,
-      fanmeetSkirtColor: resolvedFanmeetSkirtColor ?? DEFAULT_FANMEET_SKIRT_COLOR,
-      background: resolvedBackground ?? DEFAULT_CHARACTER.background,
-    } as CharacterConfig;
-  } catch {
-    localStorage.removeItem(CHARACTER_STORAGE_KEY);
-    return DEFAULT_CHARACTER;
-  }
-}
-
 function resolveAdminReturnTo(returnTo: string | null): string {
   if (!returnTo) {
     return DEFAULT_RETURN_TO;
@@ -531,8 +300,8 @@ export default function AdminCharacterCreatorPage() {
     });
   }, []);
 
-  const [character, setCharacter] = useState<CharacterConfig>(() =>
-    loadSavedCharacter(),
+  const [character, setCharacter] = useState<CharacterDraft>(() =>
+    loadSavedCharacter() ?? DEFAULT_CHARACTER,
   );
 
   const [skinHexInput, setSkinHexInput] = useState(
@@ -683,9 +452,9 @@ export default function AdminCharacterCreatorPage() {
   const isFanmeetOutfit = character.outfitModelId === "theater";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
-  function update<K extends keyof CharacterConfig>(
+  function update<K extends keyof CharacterDraft>(
     key: K,
-    value: CharacterConfig[K],
+    value: CharacterDraft[K],
   ) {
     setCharacter((prev) => ({
       ...prev,
@@ -1901,10 +1670,18 @@ export default function AdminCharacterCreatorPage() {
       return;
     }
 
-    localStorage.setItem(
-      CHARACTER_STORAGE_KEY,
-      JSON.stringify(character),
-    );
+    const config = createCharacterConfig(character);
+    const error = validateCharacterConfig(config, true);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    try {
+      localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(config));
+    } catch {
+      toast.error("캐릭터 설정을 저장하지 못했습니다. 다시 시도해주세요.");
+      return;
+    }
 
     const returnTo = resolveAdminReturnTo(searchParams.get("returnTo"));
     navigate(returnTo);

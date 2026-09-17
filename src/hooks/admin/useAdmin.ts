@@ -1,4 +1,5 @@
 // 관리자 hooks — 도메인별로 작아서 한 파일로 통합
+import type { CreateConcertInput } from "@/api/adminConcertCreate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/admin";
 import { fetchAdminBookingByNumber } from "@/api/bookings";
@@ -194,7 +195,7 @@ export function useConcertForEdit(id: number | undefined) {
 export function useCreateConcert() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: ConcertFormData) => api.createConcertApi(data),
+    mutationFn: (data: CreateConcertInput) => api.createConcertApi(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminKeys.all });
     },
