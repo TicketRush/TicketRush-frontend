@@ -9,6 +9,7 @@ export const MAX_TICKET_PRICE = 10_000_000;
 export const MAX_TOTAL_SEATS = 10_000;
 
 interface ValidateConcertFormParams {
+  original?: ConcertFormData;
   form: ConcertFormData;
   totalSeats: number;
   today?: Date;
@@ -55,6 +56,7 @@ function getMaxConcertDate(today: Date): Date {
 }
 
 export function validateConcertForm({
+  original,
   form,
   totalSeats,
   today = new Date(),
@@ -84,11 +86,11 @@ export function validateConcertForm({
   const todayStart = toStartOfDay(today);
   const maxConcertDate = getMaxConcertDate(todayStart);
 
-  if (concertDate < todayStart) {
+  if (concertDate < todayStart && (!original || form.date !== original.date)) {
     return "과거 날짜는 공연 날짜로 선택할 수 없습니다.";
   }
 
-  if (concertDate > maxConcertDate) {
+  if (concertDate > maxConcertDate && (!original || form.date !== original.date)) {
     return `공연 날짜는 오늘부터 최대 ${MAX_CONCERT_FUTURE_YEARS}년 후까지 입력할 수 있습니다.`;
   }
 
@@ -108,7 +110,7 @@ export function validateConcertForm({
     return `공연 러닝타임은 최대 ${MAX_DURATION_MINUTES}분까지 입력할 수 있습니다.`;
   }
 
-  if (!form.venue.trim()) {
+  if (!original && !form.venue.trim()) {
     return "공연장명을 입력해주세요.";
   }
 
@@ -124,15 +126,15 @@ export function validateConcertForm({
     return `티켓 가격은 최대 ${MAX_TICKET_PRICE.toLocaleString()}원까지 입력할 수 있습니다.`;
   }
 
-  if (!isPositiveInteger(totalSeats)) {
+  if (!original && !isPositiveInteger(totalSeats)) {
     return "총 좌석 수는 1석 이상의 정수로 입력해주세요.";
   }
 
-  if (totalSeats > MAX_TOTAL_SEATS) {
+  if (!original && totalSeats > MAX_TOTAL_SEATS) {
     return `총 좌석 수는 최대 ${MAX_TOTAL_SEATS.toLocaleString()}석까지 입력할 수 있습니다.`;
   }
 
-  if (!form.description.trim()) {
+  if (!original && !form.description.trim()) {
     return "공연 상세 설명을 입력해주세요.";
   }
 

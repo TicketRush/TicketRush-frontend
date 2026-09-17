@@ -92,6 +92,8 @@ export interface ConcertFacility {
  * 목록 전용 `remainingSeats`는 없다. 상세 게이지는 목록 캐시를 조회한다 (#203).
  */
 export interface ConcertDetail extends Omit<ConcertSummary, "remainingSeats"> {
+  characterConfig?: import("./character").CharacterConfig | null;
+  characterMessage?: string | null;
   description: string;
   /** 공연 시간 (분) */
   durationMinutes: number;

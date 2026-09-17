@@ -10,7 +10,7 @@ import {
   validateCharacterConfig,
 } from "@/utils/character/characterConfig";
 import { useLayoutEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import type { HairStyle } from "@/components/admin/character/characterHair";
 import type { EyeStyle } from "@/components/admin/character/characterEye";
@@ -287,6 +287,7 @@ function resolveAdminReturnTo(returnTo: string | null): string {
 }
 
 export default function AdminCharacterCreatorPage() {
+  const location = useLocation();
   useDocumentTitle("캐릭터 생성");
 
   const navigate = useNavigate();
@@ -1684,14 +1685,14 @@ export default function AdminCharacterCreatorPage() {
     }
 
     const returnTo = resolveAdminReturnTo(searchParams.get("returnTo"));
-    navigate(returnTo);
+    navigate(returnTo, { state: { ...location.state, characterConfig: config } });
   }
 
   function handleBack() {
     const returnTo = searchParams.get("returnTo");
 
     if (returnTo) {
-      navigate(resolveAdminReturnTo(returnTo));
+      navigate(resolveAdminReturnTo(returnTo), { state: location.state });
       return;
     }
 

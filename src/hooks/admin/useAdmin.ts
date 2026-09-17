@@ -1,5 +1,6 @@
 // 관리자 hooks — 도메인별로 작아서 한 파일로 통합
 import type { CreateConcertInput } from "@/api/adminConcertCreate";
+import type { UpdateConcertInput } from "@/api/adminConcertEdit";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/admin";
 import { fetchAdminBookingByNumber } from "@/api/bookings";
@@ -13,7 +14,6 @@ import type {
   AdminBookingListParams,
   AdminConcertListParams,
   AdminDashboardParams,
-  ConcertFormData,
 } from "@/types/domain/admin";
 import {
   isDashboardPeriodWithinLimit,
@@ -188,7 +188,10 @@ export function useConcertForEdit(id: number | undefined) {
       ? adminKeys.concertEdit(id)
       : ["admin", "concert-edit", "invalid"],
     queryFn: () => api.fetchConcertForEdit(id!),
-    enabled: !!id,
+    enabled: !!id && Number.isSafeInteger(id) && id > 0,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -205,9 +208,13 @@ export function useCreateConcert() {
 export function useUpdateConcert(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: ConcertFormData) => api.updateConcertApi(id, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.all });
+    mutationFn: (data: UpdateConcertInput) => api.updateConcertApi(id, data),
+    onSettled: () => {
+      // A file failure can follow a successful JSON PATCH.
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: adminKeys.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.concerts.all }),
+      ]);
     },
   });
 }

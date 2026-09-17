@@ -58,6 +58,8 @@ interface PerformanceListResponse {
 
 /** 백엔드 PerformanceDetailResponse (원본 스펙) */
 interface PerformanceDetailResponse {
+  characterConfig?: ConcertDetail["characterConfig"];
+  characterMessage?: string | null;
   performanceId: number;
   title: string;
   performer: string;
@@ -133,6 +135,8 @@ function mapListItem(item: PerformanceListResponse): ConcertSummary {
 
 function mapDetail(item: PerformanceDetailResponse): ConcertDetail {
   return {
+    characterConfig: item.characterConfig,
+    characterMessage: item.characterMessage,
     id: item.performanceId,
     title: item.title,
     performer: item.performer,
@@ -307,7 +311,23 @@ export async function fetchConcertDetail(id: number): Promise<ConcertDetail> {
 
   const res = await apiClient.get<PerformanceDetailResponse>(
     `/api/v1/performance/${id}`,
+    {
+      // Preserve the opaque subtree while retaining normal envelope/error conversion.
+      transformResponse: [function (data, headers, status) {
+        const raw = typeof data === "string" ? JSON.parse(data) : data;
+        const characterConfig = raw?.result?.character_config;
+        const transforms = apiClient.defaults.transformResponse;
+        for (const transform of [transforms].flat()) {
+          if (transform) data = transform.call(this, data, headers, status);
+        }
+        if (characterConfig != null && data?.result) {
+          data.result.characterConfig = characterConfig;
+        }
+        return data;
+      }],
+    },
   );
+  if (!res.data) throw new Error("공연 정보를 불러올 수 없습니다.");
   return mapDetail(res.data);
 }
 

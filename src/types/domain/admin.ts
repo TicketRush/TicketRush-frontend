@@ -199,6 +199,9 @@ export interface AdminSeatDetail {
  *   - posterUrl → imageMainUrl
  */
 export interface ConcertFormData {
+  bookingOpenAt?: string;
+  image3dUrl?: string;
+  imageGalleryUrls?: string[];
   characterConfig?: CharacterConfig | null;
   characterMessage?: string;
   title: string;
