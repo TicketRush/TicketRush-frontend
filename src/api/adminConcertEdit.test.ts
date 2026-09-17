@@ -175,6 +175,9 @@ describe("admin edit contract", () => {
       const value = await input();
       value.form.characterMessage = message;
       expect(createPerformancePatch(value).character_message).toBe("");
+      await updateConcertApi(42, value);
+      expect(adapter).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ character_message: "" });
     },
   );
   it("omits unchanged or absent character values and never sends existing URLs as files", async () => {
@@ -197,7 +200,8 @@ describe("admin edit contract", () => {
       gallery: [new File(["gallery"], "gallery.png")],
     };
     await updateConcertApi(42, value);
-    const config = adapter.mock.calls[1][0];
+    expect(adapter).toHaveBeenCalledTimes(1);
+    const config = adapter.mock.calls[0][0];
     expect(config.method).toBe("patch");
     expect(config.url).toBe("/api/v1/performance/admin/42/files");
     expect([...config.data.keys()]).toEqual([
@@ -238,6 +242,7 @@ describe("admin edit contract", () => {
   });
   it("does not upload files after a failed information PATCH", async () => {
     const value = await input();
+    value.form.title = "변경된 제목";
     adapter.mockRejectedValueOnce(new Error("failed"));
     await expect(
       updateConcertApi(42, { ...value, mainImage: new File(["x"], "x.png") }),
@@ -246,6 +251,7 @@ describe("admin edit contract", () => {
   });
   it("reports partial success when the file request fails", async () => {
     const value = await input();
+    value.form.title = "변경된 제목";
     adapter.mockImplementationOnce(async (config) => ({
       config,
       status: 200,
@@ -257,5 +263,37 @@ describe("admin edit contract", () => {
     await expect(
       updateConcertApi(42, { ...value, mainImage: new File(["x"], "x.png") }),
     ).rejects.toThrow("정보는 저장됐지만 파일 교체에 실패");
+    expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
+      "/api/v1/performance/admin/42", "/api/v1/performance/admin/42/files",
+    ]);
+  });
+  it("makes no HTTP requests when neither information nor files changed", async () => {
+    await expect(updateConcertApi(42, await input())).resolves.toBeUndefined();
+    expect(adapter).not.toHaveBeenCalled();
+  });
+  it("accepts successful file replacements that return unchanged URLs", async () => {
+    const value = await input();
+    adapter.mockImplementationOnce(async (config) => ({
+      config, status: 200, statusText: "OK", headers: new AxiosHeaders(),
+      data: JSON.stringify({ is_success: true, result: {
+        image_main_url: detail.image_main_url,
+        image3d_url: detail.image3d_url,
+        image_gallery_urls: detail.image_gallery_urls,
+      } }),
+    }));
+    await expect(updateConcertApi(42, { ...value,
+      mainImage: new File(["main"], "main.png"),
+      model3d: new File(["model"], "model.glb"),
+      gallery: [new File(["gallery"], "gallery.png")],
+    })).resolves.toBeUndefined();
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
+  it("reports a file-only failure without claiming information was saved", async () => {
+    const value = await input();
+    adapter.mockRejectedValueOnce(new Error("upload failed"));
+    const result = updateConcertApi(42, { ...value, mainImage: new File(["x"], "x.png") });
+    await expect(result).rejects.toThrow(/^파일 교체에 실패했습니다\./);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter.mock.calls[0][0].url).toBe("/api/v1/performance/admin/42/files");
   });
 });

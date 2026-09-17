@@ -219,8 +219,9 @@ export async function createConcertApi(input: CreateConcertInput) {
 export async function updateConcertApi(id: number, input: UpdateConcertInput) {
   const payload = createPerformancePatch(input);
   const files = createConcertReplacementFiles(input);
+  const hasInfoChanges = Object.values(payload).some((value) => value !== undefined);
   if (USE_MOCK) return mocks.mockUpdateConcert(id, input.form);
-  await apiClient.patch(`/api/v1/performance/admin/${id}`, JSON.stringify(payload), {
+  if (hasInfoChanges) await apiClient.patch(`/api/v1/performance/admin/${id}`, JSON.stringify(payload), {
     headers: { "Content-Type": "application/json" },
     // Explicit wire mapping preserves character_config's opaque keys.
     transformRequest: [(body) => body],
@@ -234,14 +235,14 @@ export async function updateConcertApi(id: number, input: UpdateConcertInput) {
       }>(`/api/v1/performance/admin/${id}/files`, files, {
         transformRequest: [(body) => body],
       });
-      if (!res.data ||
-        (input.mainImage && res.data.imageMainUrl === input.original.imageMainUrl) ||
-        (input.model3d && res.data.image3dUrl === input.original.image3dUrl) ||
-        (input.gallery?.length && JSON.stringify(res.data.imageGalleryUrls) === JSON.stringify(input.original.imageGalleryUrls))) {
+      if (!res.data) {
         throw new Error("선택한 파일의 교체 결과를 확인할 수 없습니다.");
       }
     } catch (error) {
-      throw new Error(`공연 정보는 저장됐지만 파일 교체에 실패했습니다. ${error instanceof Error ? error.message : "다시 시도해주세요."}`);
+      const message = hasInfoChanges
+        ? "공연 정보는 저장됐지만 파일 교체에 실패했습니다."
+        : "파일 교체에 실패했습니다.";
+      throw new Error(`${message} ${error instanceof Error ? error.message : "다시 시도해주세요."}`);
     }
   }
 }

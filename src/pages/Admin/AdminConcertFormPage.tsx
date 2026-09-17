@@ -366,7 +366,9 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
         toast.success("공연이 수정되었습니다.");
       }
 
-      sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
+      if (mode === "create") {
+        sessionStorage.removeItem(CONCERT_FORM_DRAFT_KEY);
+      }
       navigate("/admin");
     } catch (error: unknown) {
       const err =
