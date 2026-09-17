@@ -204,16 +204,6 @@ const FANMEET_INNER_COLORS = createPartColorPresets(DEFAULT_FANMEET_INNER_COLOR)
 const FANMEET_SHORTS_COLORS = createPartColorPresets(DEFAULT_FANMEET_SHORTS_COLOR);
 const FANMEET_SKIRT_COLORS = createPartColorPresets(DEFAULT_FANMEET_SKIRT_COLOR);
 
-const ACCESSORIES = [
-  { value: "none", label: "제거", icon: "❌" },
-  { value: "sunglasses", label: "선글라스", icon: "🕶️" },
-  { value: "hat", label: "모자", icon: "🎩" },
-  { value: "headset", label: "헤드셋", icon: "🎧" },
-  { value: "mic", label: "마이크", icon: "🎙️" },
-  { value: "guitar", label: "기타", icon: "🎸" },
-  { value: "light", label: "응원봉", icon: "💡" },
-];
-
 const POSES: { value: Pose; label: string; icon: string }[] = [
   { value: "standing", label: "기본 자세", icon: "🧍" },
   { value: "wave", label: "손 흔들기", icon: "👋" },
@@ -2593,34 +2583,6 @@ export default function AdminCharacterCreatorPage() {
               )}
             </CreatorSection>
 
-            <CreatorSection title="액세서리">
-              <div className="grid grid-cols-3 gap-3 md:grid-cols-7">
-                {ACCESSORIES.map((accessory) => (
-                  <OptionCard
-                    key={accessory.value}
-                    selected={
-                      character.accessory ===
-                      accessory.value
-                    }
-                    onClick={() =>
-                      update(
-                        "accessory",
-                        accessory.value,
-                      )
-                    }
-                  >
-                    <div className="text-2xl">
-                      {accessory.icon}
-                    </div>
-
-                    <p className="mt-2 text-xs font-bold text-slate-800">
-                      {accessory.label}
-                    </p>
-                  </OptionCard>
-                ))}
-              </div>
-            </CreatorSection>
-
             <CreatorSection title="포즈">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                 {POSES.map((pose) => (
@@ -2911,7 +2873,6 @@ export default function AdminCharacterCreatorPage() {
                 </p>
               )}
 
-              <p>액세서리: {character.accessory}</p>
               <p>포즈: {character.pose}</p>
               <p>
                 배경:{" "}
