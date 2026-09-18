@@ -478,12 +478,12 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
           </div>
         </Section>
 
-        {mode === "edit" && <Section title="예매 일정">
+        <Section title="예매 일정">
           <Field label="예매 오픈 시각 (한국 시간)">
             <FormInput type="datetime-local" value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
-            <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>
+            {mode === "edit" && <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>}
           </Field>
-        </Section>}
+        </Section>
 
         <Section title="장소 정보">
           <Field label="공연장명" required>

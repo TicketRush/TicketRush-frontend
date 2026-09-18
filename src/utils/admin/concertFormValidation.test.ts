@@ -76,6 +76,18 @@ describe("isPositiveInteger", () => {
 describe("validateConcertForm", () => {
   const today = new Date(2026, 8, 10);
 
+  it.each([undefined, "", "2026-09-30T20:00", "2026-09-30T20:00:45", "2020-01-01T00:00"])(
+    "allows optional valid booking time without date ordering rules (%s)", (bookingOpenAt) => {
+      expect(validateConcertForm({ form: { ...baseForm, bookingOpenAt }, totalSeats: 100, today })).toBeNull();
+    },
+  );
+
+  it.each(["invalid", "2026-02-30T20:00", "2026-09-30T24:00", "2026-09-30T20:00Z"])(
+    "rejects invalid booking time (%s)", (bookingOpenAt) => {
+      expect(validateConcertForm({ form: { ...baseForm, bookingOpenAt }, totalSeats: 100, today })).toBe("올바른 예매 오픈 시각을 입력해주세요.");
+    },
+  );
+
   it("정상적인 폼은 null을 반환한다", () => {
     expect(
       validateConcertForm({

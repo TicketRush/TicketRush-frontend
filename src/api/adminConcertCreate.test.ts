@@ -51,6 +51,29 @@ function input(): CreateConcertInput {
 }
 
 describe("performance multipart request", () => {
+  it.each([
+    ["2026-09-30T20:00", "2026-09-30 20:00:00"],
+    ["2026-09-30T20:00:45", "2026-09-30 20:00:45"],
+    ["2028-02-29T00:00", "2028-02-29 00:00:00"],
+  ])("maps local booking time %s into snake_case multipart JSON", async (value, expected) => {
+    const data = input();
+    data.form.bookingOpenAt = value;
+    const mapped = createPerformanceRequest(data);
+    expect(mapped.booking_open_at).toBe(expected);
+    expect(mapped).not.toHaveProperty("bookingOpenAt");
+    const request = JSON.parse(await (createConcertFormData(data).get("request") as Blob).text());
+    expect(request.booking_open_at).toBe(expected);
+    expect(request).not.toHaveProperty("bookingOpenAt");
+  });
+
+  it.each([undefined, ""])("omits an optional booking time (%s)", async (value) => {
+    const data = input();
+    data.form.bookingOpenAt = value;
+    const request = JSON.parse(await (createConcertFormData(data).get("request") as Blob).text());
+    expect(request).not.toHaveProperty("booking_open_at");
+    expect(request).not.toHaveProperty("bookingOpenAt");
+  });
+
   it("maps the real DTO and keeps characterConfig as an object", async () => {
     const value = input();
     const data = createConcertFormData(value);
@@ -135,6 +158,7 @@ describe("createConcertApi with the real axios interceptors", () => {
 
   it("posts to the real endpoint with authentication and intact multipart names", async () => {
     const value = input();
+    value.form.bookingOpenAt = "2026-09-30T20:00";
     await expect(createConcertApi(value)).resolves.toEqual({
       performanceId: 42,
     });
@@ -151,6 +175,8 @@ describe("createConcertApi with the real axios interceptors", () => {
     ]);
     const request = JSON.parse(await config.data.get("request").text());
     expect(request).toEqual(createPerformanceRequest(value));
+    expect(request.booking_open_at).toBe("2026-09-30 20:00:00");
+    expect(request).not.toHaveProperty("bookingOpenAt");
     expect(Object.keys(request).every((key) => !/[A-Z]/.test(key))).toBe(true);
     expect(config.data.get("mainImage")).toBe(value.mainImage);
     expect(config.data.get("model3d")).toBe(value.model3d);
@@ -160,6 +186,17 @@ describe("createConcertApi with the real axios interceptors", () => {
       "outfitModelId",
       "festival",
     );
+  });
+
+  it.each([
+    "invalid", " ", "2026-02-30T20:00", "2027-02-29T20:00",
+    "2026-09-30T24:00", "2026-09-30T20:60", "2026-09-30T20:00:60",
+    "2026-09-30T20:00Z", "2026-09-30T20:00+09:00",
+  ])("rejects invalid booking time %s before HTTP", async (bookingOpenAt) => {
+    const value = input();
+    value.form.bookingOpenAt = bookingOpenAt;
+    await expect(createConcertApi(value)).rejects.toThrow("올바른 예매 오픈 시각");
+    expect(adapter).not.toHaveBeenCalled();
   });
 
   it("preserves opaque character keys and nested values through request transforms", async () => {
