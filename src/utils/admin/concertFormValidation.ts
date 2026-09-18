@@ -39,6 +39,22 @@ export function isValidTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
+export function isValidBookingOpenAt(value: string): boolean {
+  return (
+    /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value) &&
+    isValidDate(value.slice(0, 10))
+  );
+}
+
+export function formatBookingOpenAt(value?: string): string | undefined {
+  if (!value) return undefined;
+  if (!isValidBookingOpenAt(value)) {
+    throw new Error("올바른 예매 오픈 시각을 입력해주세요.");
+  }
+  // Preserve the entered local time without a timezone conversion.
+  return `${value.replace("T", " ")}${value.length === 16 ? ":00" : ""}`;
+}
+
 export function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
@@ -136,6 +152,14 @@ export function validateConcertForm({
 
   if (!original && !form.description.trim()) {
     return "공연 상세 설명을 입력해주세요.";
+  }
+
+  if (
+    form.bookingOpenAt &&
+    form.bookingOpenAt !== original?.bookingOpenAt &&
+    !isValidBookingOpenAt(form.bookingOpenAt)
+  ) {
+    return "올바른 예매 오픈 시각을 입력해주세요.";
   }
 
   return null;

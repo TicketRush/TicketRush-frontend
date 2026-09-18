@@ -1,7 +1,7 @@
 import type { ConcertFormData } from "@/types/domain/admin";
 import type { ConcertDetail } from "@/types/domain/concert";
 import { validateCharacterConfig } from "@/utils/character/characterConfig";
-import { isValidDate } from "@/utils/admin/concertFormValidation";
+import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
 import {
   appendConcertFiles,
   MAX_CHARACTER_MESSAGE_LENGTH,
@@ -59,16 +59,6 @@ export function createPerformancePatch({ form, original }: UpdateConcertInput) {
   if (original.bookingOpenAt && !form.bookingOpenAt) {
     throw new Error("예매 오픈 시각 해제는 이 화면에서 지원하지 않습니다.");
   }
-  if (
-    form.bookingOpenAt &&
-    form.bookingOpenAt !== original.bookingOpenAt &&
-    (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(
-      form.bookingOpenAt,
-    ) ||
-      !isValidDate(form.bookingOpenAt.slice(0, 10)))
-  ) {
-    throw new Error("올바른 예매 오픈 시각을 입력해주세요.");
-  }
   const changed = <K extends keyof ConcertFormData>(key: K) =>
     form[key] !== original[key] ? form[key] : undefined;
   return {
@@ -88,7 +78,7 @@ export function createPerformancePatch({ form, original }: UpdateConcertInput) {
     address: changed("address"),
     booking_open_at:
       changed("bookingOpenAt") && form.bookingOpenAt
-        ? `${form.bookingOpenAt.replace("T", " ")}${form.bookingOpenAt.length === 16 ? ":00" : ""}`
+        ? formatBookingOpenAt(form.bookingOpenAt)
         : undefined,
     character_config:
       JSON.stringify(form.characterConfig) !==

@@ -86,6 +86,22 @@ async function input() {
 }
 
 describe("admin edit contract", () => {
+  it.each(["2027-02-29T12:30", "2027-01-01T24:00", "invalid", ""])(
+    "rejects invalid or cleared booking time before HTTP (%s)", async (bookingOpenAt) => {
+      const value = await input();
+      value.form.bookingOpenAt = bookingOpenAt;
+      await expect(updateConcertApi(42, value)).rejects.toThrow("예매 오픈 시각");
+      expect(adapter).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves booking time seconds and omits an unchanged value", async () => {
+    const value = await input();
+    expect(createPerformancePatch(value).booking_open_at).toBeUndefined();
+    value.form.bookingOpenAt = "2027-01-01T12:30:45";
+    expect(createPerformancePatch(value).booking_open_at).toBe("2027-01-01 12:30:45");
+  });
+
   it("loads the public detail and restores all form data without altering opaque keys", async () => {
     const data = await fetchConcertForEdit(42);
     expect(adapter.mock.calls[0][0].url).toBe("/api/v1/performance/42");

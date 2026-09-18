@@ -76,6 +76,7 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[{ pathname: path, state }]}>
       <Routes>
+        <Route path="/admin/concerts/new" element={<AdminConcertFormPage mode="create" />} />
         <Route
           path="/admin/concerts/:id/edit"
           element={<AdminConcertFormPage mode="edit" />}
@@ -86,6 +87,23 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
 }
 
 describe("admin edit initial rendering", () => {
+  it.each([undefined, "2026-09-30T20:00"])("renders the shared optional booking input in create mode (%s)", (bookingOpenAt) => {
+    hooks.query.mockReturnValue({});
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    const state = bookingOpenAt ? {
+      concertDraft: {
+        pathname: "/admin/concerts/new",
+        form: { ...initial.form, bookingOpenAt },
+        totalSeats: 120,
+      },
+    } : undefined;
+    const html = render("/admin/concerts/new", state);
+    expect(html).toContain("예매 오픈 시각 (한국 시간)");
+    expect(html).toContain('type="datetime-local"');
+    if (bookingOpenAt) expect(html).toContain(bookingOpenAt);
+    expect(html).not.toContain("기존 예매 오픈 시각 해제는 지원하지 않습니다.");
+  });
+
   it("renders server values, image URLs and fanmeet colors instead of a creation draft", () => {
     const html = render();
     for (const value of [

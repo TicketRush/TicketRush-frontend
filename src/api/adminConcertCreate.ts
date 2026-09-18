@@ -1,6 +1,7 @@
 import type { ConcertFormData } from "@/types/domain/admin";
 import type { CharacterConfig } from "@/types/domain/character";
 import { validateCharacterConfig } from "@/utils/character/characterConfig";
+import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
 
 export const MAX_CHARACTER_MESSAGE_LENGTH = 50;
 
@@ -24,6 +25,7 @@ export interface PerformanceCreateRequest {
   description: string;
   show_date: string;
   show_time: string;
+  booking_open_at?: string;
   duration_minutes: number;
   price: number;
   total_seats: number;
@@ -52,6 +54,7 @@ export function createPerformanceRequest({
     description: form.description,
     show_date: form.date,
     show_time: form.time.length === 5 ? `${form.time}:00` : form.time,
+    booking_open_at: formatBookingOpenAt(form.bookingOpenAt),
     duration_minutes: form.durationMinutes,
     price: form.price,
     total_seats: totalSeats,
