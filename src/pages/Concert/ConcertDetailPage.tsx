@@ -25,8 +25,13 @@
 //   - 상세 totalSeats(등록값) 미사용. 예매 CTA는 availableCount (#181)
 // - 2026-09-15 (이슈 #297):
 //   - InfoBox·출연 등 핵심 메타 미입력 시 「미정」 (섹션형 필드는 기존처럼 숨김)
+// - 2026-09-18 (이슈 #322):
+//   - 포스터·갤러리는 없거나 깨져도 PosterFrame으로 그라데이션 자리와 안내 유지
+//   - 공연 소개는 핵심 섹션이라 비어도 숨기지 않고 빈 상태 문구 표시
+//   - 편의시설·갤러리는 부가 정보라 기존 숨김 유지 (하이브리드)
+//   - 제목 미입력 시 「미정」
 import { useNavigate, useParams, Navigate } from "react-router-dom";
-import { useEffect, useRef, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -34,6 +39,7 @@ import {
   MapPin,
   DollarSign,
   CheckCircle2,
+  ImageOff,
 } from "lucide-react";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
 import { useConcertListItem } from "@/hooks/queries/useConcertListItem";
@@ -61,9 +67,8 @@ import {
 const POSTER_FALLBACK =
   "bg-gradient-to-b from-poster-fallback to-poster-fallback-end";
 
-function hideBrokenImage(e: SyntheticEvent<HTMLImageElement>) {
-  e.currentTarget.style.display = "none";
-}
+const EMPTY_POSTER_LABEL = "등록된 포스터가 없습니다";
+const EMPTY_DESCRIPTION_LABEL = "등록된 공연 소개가 없습니다.";
 
 export default function ConcertDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -81,7 +86,7 @@ export default function ConcertDetailPage() {
     isError: seatCountsError,
   } = useSeatCounts(concertId, shouldFetchSeats);
 
-  useDocumentTitle(data?.title ?? "공연 상세");
+  useDocumentTitle(trimOrNull(data?.title) ?? "공연 상세");
 
   if (!concertId || isNaN(concertId))
     return <Navigate to="/concerts" replace />;
@@ -149,6 +154,8 @@ export default function ConcertDetailPage() {
   );
   const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
   const description = trimOrNull(data.description) ?? "";
+  const title = trimOrNull(data.title);
+  const imageSubject = title ?? "공연";
   const performer = trimOrNull(data.performer);
   const showDate = trimOrNull(data.showDate);
   const scheduleLabel = formatShowScheduleLabel(
@@ -211,18 +218,14 @@ export default function ConcertDetailPage() {
       {listBackButton}
 
       {/* 포스터는 sticky 대상이 아님. 깨진 이미지도 그라데이션 자리를 유지한다. */}
-      <div
-        className={`mb-6 aspect-[4/3] rounded-xl overflow-hidden shadow-card ${POSTER_FALLBACK}`}
-      >
-        {data.imageMainUrl ? (
-          <img
-            src={data.imageMainUrl}
-            alt={`${data.title} 포스터`}
-            className="w-full h-full object-cover"
-            onError={hideBrokenImage}
-          />
-        ) : null}
-      </div>
+      <PosterFrame
+        key={data.imageMainUrl}
+        src={data.imageMainUrl}
+        alt={`${imageSubject} 포스터`}
+        className="mb-6 aspect-[4/3] rounded-xl shadow-card"
+        iconSize={40}
+        label={EMPTY_POSTER_LABEL}
+      />
 
       {/*
         모바일 순서: 제목 → 예매 박스 → 본문. 제목 sticky는 lg만 (좁은 화면에서 카드가 뷰포트를 먹지 않게).
@@ -230,7 +233,13 @@ export default function ConcertDetailPage() {
       */}
       <div className="grid grid-cols-1 lg:grid-cols-[7fr_3fr] gap-6 items-start">
         <div className="order-1 lg:sticky lg:top-16 z-10 bg-white border-2 border-border rounded-xl p-6 shadow-card lg:col-start-1 lg:row-start-1">
-          <h1 className="text-3xl font-bold text-text">{data.title}</h1>
+          <h1
+            className={`text-3xl font-bold ${
+              title ? "text-text" : "text-placeholder"
+            }`}
+          >
+            {title ?? UNSET_LABEL}
+          </h1>
           <p
             className={`mt-1 ${
               performer ? "text-text-secondary" : "text-placeholder"
@@ -277,13 +286,18 @@ export default function ConcertDetailPage() {
             </div>
           )}
 
-          {description && (
-            <Section title="공연 소개">
+          {/* 소개는 핵심 정보라 비어도 섹션을 남긴다. 부가 섹션만 숨김 (#322) */}
+          <Section title="공연 소개">
+            {description ? (
               <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
                 {description}
               </p>
-            </Section>
-          )}
+            ) : (
+              <p className="text-sm text-placeholder">
+                {EMPTY_DESCRIPTION_LABEL}
+              </p>
+            )}
+          </Section>
 
           {data.facilities && data.facilities.length > 0 && (
             <Section title="편의시설 및 서비스">
@@ -305,17 +319,13 @@ export default function ConcertDetailPage() {
             <Section title="공연장 갤러리">
               <div className="grid grid-cols-3 gap-3">
                 {galleryUrls.map((src, i) => (
-                  <div
+                  <PosterFrame
                     key={`${src}-${i}`}
-                    className={`aspect-square rounded-lg overflow-hidden ${POSTER_FALLBACK}`}
-                  >
-                    <img
-                      src={src}
-                      alt={`${data.title} 갤러리 ${i + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={hideBrokenImage}
-                    />
-                  </div>
+                    src={src}
+                    alt={`${imageSubject} 갤러리 ${i + 1}`}
+                    className="aspect-square rounded-lg"
+                    iconSize={24}
+                  />
                 ))}
               </div>
             </Section>
@@ -341,6 +351,50 @@ const DEFAULT_NOTICES = [
   "공연 당일 티켓과 신분증을 지참해주세요.",
   "미성년자는 보호자 동반이 필요합니다.",
 ];
+
+/**
+ * 포스터·갤러리 공용 프레임.
+ * src가 없거나 로드에 실패해도 그라데이션 자리를 유지하고 빈 상태를 드러낸다.
+ * 실패 상태는 src 단위라 호출측에서 key={src}로 리셋한다.
+ */
+function PosterFrame({
+  src,
+  alt,
+  className,
+  iconSize,
+  label,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  iconSize: number;
+  label?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(trimOrNull(src)) && !failed;
+
+  return (
+    <div className={`overflow-hidden ${POSTER_FALLBACK} ${className}`}>
+      {showImage ? (
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div
+          role="img"
+          aria-label={alt}
+          className="w-full h-full flex flex-col items-center justify-center gap-2 text-placeholder"
+        >
+          <ImageOff size={iconSize} aria-hidden />
+          {label && <p className="text-sm font-medium">{label}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CharacterPreviewCard({
   message,

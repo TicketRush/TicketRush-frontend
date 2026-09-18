@@ -56,6 +56,40 @@ function expectBody(html: string) {
   }
 }
 
+describe("detail empty states (#322)", () => {
+  it.each([undefined, null, "", "   "])("shows the poster empty state for %j", (imageMainUrl) => {
+    const html = render({ imageMainUrl });
+    expect(html).toContain("등록된 포스터가 없습니다");
+    expect(html).toContain("from-poster-fallback");
+    expectBody(html);
+  });
+
+  it("renders the poster image instead of the empty state when present", () => {
+    const html = render();
+    expect(html).toContain("/poster.png");
+    expect(html).not.toContain("등록된 포스터가 없습니다");
+  });
+
+  it.each([undefined, null, "", "   "])("keeps the 공연 소개 section for %j", (description) => {
+    const html = render({ description });
+    expect(html).toContain("공연 소개");
+    expect(html).toContain("등록된 공연 소개가 없습니다");
+  });
+
+  it("hides 편의시설 and 갤러리 when empty but keeps 공연 소개", () => {
+    const html = render({ facilities: [], imageGalleryUrls: [] });
+    expect(html).not.toContain("편의시설 및 서비스");
+    expect(html).not.toContain("공연장 갤러리");
+    expect(html).toContain("공연 소개");
+  });
+
+  it.each([undefined, null, "", "   "])("falls back to 미정 for a blank title (%j)", (title) => {
+    const html = render({ title });
+    expect(html).toContain("미정");
+    expect(html).toContain("공연 포스터");
+  });
+});
+
 describe("detail character API data", () => {
   it("renders the API character, all restored viewer settings and its message", () => {
     const html = render();
