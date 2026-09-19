@@ -4,6 +4,7 @@
 import type { BannerItem } from "@/types/domain/banner";
 import { mockDelay } from "./_helpers";
 
+// linkConcertId → MOCK_CONCERTS id (Jazz Night Live / BTS / Classical Evening)
 const MOCK_BANNERS: BannerItem[] = [
   {
     id: 1,
@@ -13,6 +14,7 @@ const MOCK_BANNERS: BannerItem[] = [
     tagLabel: "조기 예매 할인",
     iconEmoji: "🎵",
     date: "2026-09-15",
+    linkConcertId: 4,
     order: 1,
   },
   {
@@ -23,6 +25,7 @@ const MOCK_BANNERS: BannerItem[] = [
     tagLabel: "VIP 패키지 판매중",
     iconEmoji: "🎤",
     date: "2026-10-20",
+    linkConcertId: 1,
     order: 2,
   },
   {
@@ -33,6 +36,7 @@ const MOCK_BANNERS: BannerItem[] = [
     tagLabel: "프리미엄 좌석 한정",
     iconEmoji: "🎹",
     date: "2026-11-10",
+    linkConcertId: 3,
     order: 3,
   },
 ];

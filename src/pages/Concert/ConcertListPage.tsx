@@ -115,7 +115,7 @@ export default function ConcertListPage() {
       )}
 
       {/* 목록이 비거나 로딩 중이어도 배너는 같은 위치에 둔다 */}
-      <BannerSlider />
+      <BannerSlider concerts={concerts} />
 
       {!showError &&
         (showLoading ? (

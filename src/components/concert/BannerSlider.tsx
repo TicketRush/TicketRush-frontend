@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar } from "lucide-react";
 import { useBanners } from "@/hooks/queries/useBanners";
+import type { ConcertSummary } from "@/types/domain/concert";
+import { resolveBannerConcertId } from "@/utils/concert/resolveBannerConcertId";
 
 const AUTO_SLIDE_INTERVAL = 4000;
 
@@ -12,7 +14,11 @@ const GRADIENTS = [
   "from-blue-500 to-cyan-600",
 ];
 
-export default function BannerSlider() {
+export default function BannerSlider({
+  concerts = [],
+}: {
+  concerts?: ConcertSummary[];
+}) {
   const navigate = useNavigate();
   const { data: banners, isPending, isError, isFetching } = useBanners();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -47,11 +53,12 @@ export default function BannerSlider() {
 
   const current = banners[safeIndex];
   const gradient = GRADIENTS[safeIndex % GRADIENTS.length];
-  const isClickable = !!current.linkConcertId;
+  const linkedConcertId = resolveBannerConcertId(current, concerts);
+  const isClickable = !!linkedConcertId;
 
   function goToLinkedConcert() {
-    if (!current.linkConcertId) return;
-    navigate(`/concerts/${current.linkConcertId}`);
+    if (!linkedConcertId) return;
+    navigate(`/concerts/${linkedConcertId}`);
   }
 
   return (
