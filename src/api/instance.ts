@@ -29,14 +29,36 @@
 //     GET 쿼리 파라미터는 Jackson 네이밍 전략과 무관하게 컨트롤러의 Java 필드명
 //     그대로(camelCase) 바인딩되므로, snake_case 자동 변환이 minPrice/maxPrice/
 //     cursorId/seatIds 같은 다단어 파라미터를 조용히 깨뜨리고 있었음.
+// - 2026-09-19:
+//   - 공개 조회 endpoint(/performance, /performance/{id}, /banner,
+//     /seat/{id}/seat-counts)를 PUBLIC_ENDPOINTS에 추가. 서버 재시작 후
+//     localStorage에 남은 만료 토큰이 비로그인도 보는 공연 목록/배너/잔여석
+//     요청에까지 붙어, 로그아웃해야 화면이 다시 보이는 문제가 있었음.
+//   - 관리자 경로(/performance/admin/..., /seat/admin/...)와 겹치지 않도록
+//     {id}가 숫자인 경로만 정규식으로 매칭.
+//   - 토큰 거부 판별을 401 전용에서 isTokenRejection(401 + 토큰 문제인 403)으로
+//     확대. 게이트웨이가 만료 토큰을 403으로 자르면 재발급도 로그아웃도 하지
+//     않아 죽은 토큰이 계속 남던 문제. 권한 부족 403은 제외해 정상 로그인
+//     사용자가 로그아웃되지 않게 한다.
+//   - forceLogout: 이미 /login이면 replace 생략(리로드 루프 방지), 토큰 삭제는 항상.
+//   - performTokenRefresh가 USE_MOCK이면 mockReissue를 탄다. 이전에는 raw
+//     axios로 실 /auth/reissue만 호출해 mock 모드에서 재발급이 항상 실패했다.
+//   - persist merge에서 JWT exp가 둘 다 끝난 세션을 조용히 비운다. 헤더만
+//     로그인처럼 보이던 상태를 첫 렌더부터 막는다.
 // -------------------------------------------------------
 
-import axios, { type AxiosResponse, type AxiosError } from "axios";
+import axios, {
+  type AxiosResponse,
+  type AxiosError,
+  type InternalAxiosRequestConfig,
+} from "axios";
 import applyCaseMiddleware from "axios-case-converter";
 import type { ApiResponse } from "./types/response";
 import { isApiError } from "./types/response";
 import type { PaginationInfo } from "./types/pagination";
 import { ApiError } from "./errors/errorMapper";
+import { isTokenRejection } from "./errors/tokenRejection";
+import { USE_MOCK } from "./useMock";
 import useAuthStore from "../stores/global/authStore";
 
 // -------------------------------------------------------
@@ -72,6 +94,9 @@ const PUBLIC_ENDPOINTS_EXACT = [
   "/api/v1/auth/reissue",
   "/api/v1/user/signup",
   "/api/v1/user/exists/email",
+  // 비로그인도 보는 조회 API. 관리자 등록/수정은 /performance/admin 하위라 겹치지 않는다.
+  "/api/v1/performance",
+  "/api/v1/banner",
 ] as const;
 
 /**
@@ -83,6 +108,20 @@ const PUBLIC_ENDPOINTS_EXACT = [
 const PUBLIC_ENDPOINTS_PREFIX = [
   "/api/v1/auth/oauth", // /kakao/url, /naver/url 등
   "/api/v1/auth/signup", // /email-verification/send 등
+] as const;
+
+/**
+ * 인증 불필요 endpoint (패턴 매칭)
+ *
+ * 공개된 건 {id} 자리가 숫자인 경로뿐이다. 같은 prefix 아래
+ * /performance/admin/..., /seat/admin/... 이 관리자 전용이라 prefix 매칭은 못 쓴다.
+ *
+ * seat-counts는 비로그인도 보는 공연 상세의 잔여석 게이지가 쓴다.
+ * seat-layouts(좌석맵)는 로그인 필수 흐름(ProtectedRoute)이라 제외한다.
+ */
+const PUBLIC_ENDPOINTS_PATTERN = [
+  /^\/api\/v1\/performance\/\d+$/,
+  /^\/api\/v1\/seat\/\d+\/seat-counts$/,
 ] as const;
 
 /**
@@ -100,7 +139,8 @@ function isPublicEndpoint(url: string | undefined): boolean {
 
   return (
     PUBLIC_ENDPOINTS_EXACT.some((path) => pathname === path) ||
-    PUBLIC_ENDPOINTS_PREFIX.some((path) => pathname.startsWith(path + "/"))
+    PUBLIC_ENDPOINTS_PREFIX.some((path) => pathname.startsWith(path + "/")) ||
+    PUBLIC_ENDPOINTS_PATTERN.some((pattern) => pattern.test(pathname))
   );
 }
 
@@ -146,7 +186,9 @@ let refreshingPromise: Promise<string | null> | null = null;
  * 실제 refresh API 호출.
  * 성공 시 새 access token 반환, 실패 시 null 반환.
  *
- * raw axios 사용 (interceptor 미적용) — 무한 루프 방지.
+ * 실 API는 raw axios를 쓴다 (interceptor 미적용) — 무한 루프 방지.
+ * mock 모드는 mockReissue를 탄다. reissueTokenApi는 apiClient를 쓰므로
+ * 여기서 호출하면 interceptor에 다시 들어가 순환한다.
  *
  * ⚠️ 2026-07-18 실제 백엔드 스펙 확인(swagger-ui) 결과, 요청/응답 필드 모두
  *   camelCase임이 확인됨 (TokenReissueRequest.refreshToken,
@@ -158,14 +200,10 @@ async function performTokenRefresh(): Promise<string | null> {
   if (!currentRefreshToken) return null;
 
   try {
-    const res = await axios.post(
-      `${API_BASE_URL}/api/v1/auth/reissue`,
-      { refreshToken: currentRefreshToken },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    const result = USE_MOCK
+      ? await (await import("./mocks/auth")).mockReissue()
+      : await requestTokenReissue(currentRefreshToken);
 
-    // 백엔드 응답: { isSuccess, code, result: { accessToken, refreshToken, ... } }
-    const result = res.data?.result;
     if (!result?.accessToken) return null;
 
     useAuthStore
@@ -179,6 +217,17 @@ async function performTokenRefresh(): Promise<string | null> {
     console.error("[Refresh Token] 재발급 실패:", error);
     return null;
   }
+}
+
+async function requestTokenReissue(refreshToken: string) {
+  const res = await axios.post(
+    `${API_BASE_URL}/api/v1/auth/reissue`,
+    { refreshToken },
+    { headers: { "Content-Type": "application/json" } },
+  );
+
+  // 백엔드 응답: { isSuccess, code, result: { accessToken, refreshToken, ... } }
+  return res.data?.result;
 }
 
 /**
@@ -202,10 +251,35 @@ function getOrCreateRefreshPromise(): Promise<string | null> {
  *   - href 대신 replace로 히스토리에 남기지 않음
  *   - 뒤로가기 시 401 만료 페이지 재진입 방지
  *   - UX 개선
+ *
+ * 토큰 삭제는 리다이렉트 여부와 무관하게 항상 수행한다. 죽은 토큰이 남아 있으면
+ * 다음 요청에도 다시 붙어 같은 실패가 반복된다 (#326).
+ * 이미 /login이면 replace를 생략한다. 동시에 여러 요청이 거부될 때
+ * 같은 주소로 replace가 반복되면 로그인 페이지가 계속 리로드된다.
  */
 function forceLogout(): void {
   useAuthStore.getState().logout();
+
+  if (window.location.pathname === "/login") return;
   window.location.replace("/login");
+}
+
+/**
+ * 요청에 Authorization 헤더가 실제로 붙어 있었는지.
+ *
+ * AxiosHeaders.get은 대소문자를 구분하지 않는다. 헤더를 직접 넘긴 호출부가
+ * "authorization"으로 썼더라도 놓치지 않기 위해 get을 우선 사용한다.
+ */
+function hadAuthorizationHeader(
+  config: InternalAxiosRequestConfig | undefined,
+): boolean {
+  const headers = config?.headers;
+  if (!headers) return false;
+
+  if (typeof headers.get === "function") {
+    return Boolean(headers.get("Authorization"));
+  }
+  return Boolean(headers.Authorization);
 }
 
 // -------------------------------------------------------
@@ -263,10 +337,17 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
     const { status, data } = error.response;
 
-    // ── 401 Unauthorized ──
-    if (status === 401 && originalRequest) {
-      // 안전장치: 이미 재시도한 요청인데 또 401
-      // → refresh 성공 후 재시도가 다시 401 반환하는 극단 케이스
+    // ── 토큰 거부 (401, 그리고 토큰 문제로 판별된 403) ──
+    if (
+      originalRequest &&
+      isTokenRejection({
+        status,
+        hadAuthorizationHeader: hadAuthorizationHeader(originalRequest),
+        data,
+      })
+    ) {
+      // 안전장치: 이미 재시도한 요청인데 또 거부됨
+      // → refresh 성공 후 재시도가 다시 401/403 반환하는 극단 케이스
       // → 즉시 로그아웃 (사용자 UI에서 인증 만료 상태 명확히)
       if (originalRequest._retry) {
         forceLogout();
@@ -278,11 +359,11 @@ apiClient.interceptors.response.use(
             traceId: data?.traceId,
             result: null,
           },
-          401,
+          status,
         );
       }
 
-      // 첫 번째 401: 인증 필요 endpoint에서만 refresh 시도
+      // 첫 번째 거부: 인증 필요 endpoint에서만 refresh 시도
       // (public endpoint의 401은 인증 실패 = refresh와 무관)
       if (!isPublicEndpoint(originalRequest.url)) {
         originalRequest._retry = true;
@@ -305,7 +386,7 @@ apiClient.interceptors.response.use(
             traceId: data?.traceId,
             result: null,
           },
-          401,
+          status,
         );
       }
     }

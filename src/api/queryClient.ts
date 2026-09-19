@@ -3,35 +3,28 @@
 //
 // 역할 (UI 레이어):
 // - ApiError를 받아서 toast로 사용자에게 알림
-// - 401 에러 시 로그인 페이지 리다이렉트 등 공통 처리
 //
-// 에러 파싱/throw는 instance.ts interceptor가 담당
+// 에러 파싱/throw는 instance.ts interceptor가 담당.
+// 토큰 거부 시 로그아웃·/login 이동도 interceptor의 forceLogout이 담당한다.
+// 여기서 다시 리다이렉트하면 로그인 페이지가 리로드된다 (#326).
 // -------------------------------------------------------
 
 import { QueryClient, QueryCache, MutationCache } from "@tanstack/react-query";
-import { ApiError, isUnauthorizedError } from "./errors/errorMapper";
+import { ApiError } from "./errors/errorMapper";
 import { toast } from "../utils/toast";
 
 // -------------------------------------------------------
 // 공통 에러 핸들러
 // -------------------------------------------------------
 
-function handleGlobalError(error: unknown) {
+export function handleGlobalError(error: unknown) {
   if (!(error instanceof ApiError)) {
     toast.error("알 수 없는 오류가 발생했습니다.");
     return;
   }
 
-  // 401 → 로그인 페이지로 리다이렉트
-  if (isUnauthorizedError(error)) {
-    // TODO: Feat #8 완료 후 활성화
-    // useAuthStore.getState().logout();
-    // window.location.href = '/login';
-    toast.error("로그인이 만료되었습니다. 다시 로그인해주세요.");
-    return;
-  }
-
-  // 그 외 → ApiError.message (errorMapper가 이미 변환한 UI 메시지)
+  // 세션 만료 안내는 interceptor가 만든 AUTH_UNAUTHORIZED 메시지와
+  // 백엔드 COMMON_401 / AUTH_401_* 메시지를 그대로 쓴다.
   toast.error(error.message);
 }
 

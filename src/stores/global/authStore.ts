@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import type { UserRole } from "@/types/domain/auth";
+import { clearExpiredStoredAuth } from "@/utils/auth/decideStoredAuthCleanup";
 
 // HttpOnly Cookie 사용 시 수정
 interface AuthState {
@@ -47,7 +48,20 @@ const useAuthStore = create<AuthState>()(
         logout: () =>
           set({ accessToken: null, refreshToken: null, user: null }),
       }),
-      { name: "auth-storage" },
+      {
+        name: "auth-storage",
+        /**
+         * 재수화 시 만료가 확실한 세션은 스토어에 올리지 않는다 (#326).
+         *
+         * onRehydrateStorage에서 logout()을 호출하면 만료 토큰이 한 번
+         * 적용된 뒤에야 지워져, 헤더가 로그아웃 버튼으로 깜빡일 수 있다.
+         * merge에서 걸러야 첫 렌더부터 비로그인이다.
+         */
+        merge: (persistedState, currentState) => {
+          const persisted = (persistedState ?? {}) as Partial<AuthState>;
+          return clearExpiredStoredAuth({ ...currentState, ...persisted });
+        },
+      },
     ),
   ),
 );
