@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiError,
   isIgnorablePendingCancelError,
+  isUnauthorizedError,
   mapErrorToMessage,
 } from "./errorMapper";
 import { ERROR_CODES } from "./errorCodes";
@@ -34,6 +35,28 @@ describe("isIgnorablePendingCancelError", () => {
 
   it("네트워크 오류는 무시하지 않는다", () => {
     expect(isIgnorablePendingCancelError(api("NETWORK_ERROR"))).toBe(false);
+  });
+});
+
+describe("isUnauthorizedError", () => {
+  it("COMMON_401을 인증 만료로 본다", () => {
+    expect(isUnauthorizedError(api(ERROR_CODES.UNAUTHORIZED, 401))).toBe(true);
+  });
+
+  it("인터셉터가 만든 AUTH_UNAUTHORIZED도 인증 만료로 본다", () => {
+    expect(isUnauthorizedError(api("AUTH_UNAUTHORIZED", 403))).toBe(true);
+  });
+
+  it("AUTH_401_* 도 인증 만료로 본다", () => {
+    expect(isUnauthorizedError(api(ERROR_CODES.AUTH_EXPIRED_TOKEN, 401))).toBe(
+      true,
+    );
+  });
+
+  it("권한 부족은 인증 만료가 아니다", () => {
+    expect(isUnauthorizedError(api(ERROR_CODES.AUTH_ACCESS_DENIED, 403))).toBe(
+      false,
+    );
   });
 });
 

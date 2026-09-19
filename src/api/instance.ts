@@ -41,6 +41,10 @@
 //     않아 죽은 토큰이 계속 남던 문제. 권한 부족 403은 제외해 정상 로그인
 //     사용자가 로그아웃되지 않게 한다.
 //   - forceLogout: 이미 /login이면 replace 생략(리로드 루프 방지), 토큰 삭제는 항상.
+//   - performTokenRefresh가 USE_MOCK이면 mockReissue를 탄다. 이전에는 raw
+//     axios로 실 /auth/reissue만 호출해 mock 모드에서 재발급이 항상 실패했다.
+//   - persist merge에서 JWT exp가 둘 다 끝난 세션을 조용히 비운다. 헤더만
+//     로그인처럼 보이던 상태를 첫 렌더부터 막는다.
 // -------------------------------------------------------
 
 import axios, {
@@ -54,6 +58,7 @@ import { isApiError } from "./types/response";
 import type { PaginationInfo } from "./types/pagination";
 import { ApiError } from "./errors/errorMapper";
 import { isTokenRejection } from "./errors/tokenRejection";
+import { USE_MOCK } from "./useMock";
 import useAuthStore from "../stores/global/authStore";
 
 // -------------------------------------------------------
@@ -181,7 +186,9 @@ let refreshingPromise: Promise<string | null> | null = null;
  * 실제 refresh API 호출.
  * 성공 시 새 access token 반환, 실패 시 null 반환.
  *
- * raw axios 사용 (interceptor 미적용) — 무한 루프 방지.
+ * 실 API는 raw axios를 쓴다 (interceptor 미적용) — 무한 루프 방지.
+ * mock 모드는 mockReissue를 탄다. reissueTokenApi는 apiClient를 쓰므로
+ * 여기서 호출하면 interceptor에 다시 들어가 순환한다.
  *
  * ⚠️ 2026-07-18 실제 백엔드 스펙 확인(swagger-ui) 결과, 요청/응답 필드 모두
  *   camelCase임이 확인됨 (TokenReissueRequest.refreshToken,
@@ -193,14 +200,10 @@ async function performTokenRefresh(): Promise<string | null> {
   if (!currentRefreshToken) return null;
 
   try {
-    const res = await axios.post(
-      `${API_BASE_URL}/api/v1/auth/reissue`,
-      { refreshToken: currentRefreshToken },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    const result = USE_MOCK
+      ? await (await import("./mocks/auth")).mockReissue()
+      : await requestTokenReissue(currentRefreshToken);
 
-    // 백엔드 응답: { isSuccess, code, result: { accessToken, refreshToken, ... } }
-    const result = res.data?.result;
     if (!result?.accessToken) return null;
 
     useAuthStore
@@ -214,6 +217,17 @@ async function performTokenRefresh(): Promise<string | null> {
     console.error("[Refresh Token] 재발급 실패:", error);
     return null;
   }
+}
+
+async function requestTokenReissue(refreshToken: string) {
+  const res = await axios.post(
+    `${API_BASE_URL}/api/v1/auth/reissue`,
+    { refreshToken },
+    { headers: { "Content-Type": "application/json" } },
+  );
+
+  // 백엔드 응답: { isSuccess, code, result: { accessToken, refreshToken, ... } }
+  return res.data?.result;
 }
 
 /**

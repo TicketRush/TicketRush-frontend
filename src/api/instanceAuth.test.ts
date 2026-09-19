@@ -245,6 +245,20 @@ describe("토큰 거부 처리", () => {
     expect(adapter).toHaveBeenCalledTimes(1);
   });
 
+  it("mock 모드에서는 실 /reissue를 호출하지 않는다", async () => {
+    mode.mock = true;
+    gatewayRejection(403);
+    const post = vi.spyOn(axios, "post");
+
+    await apiClient.get("/api/v1/booking/me");
+
+    expect(post).not.toHaveBeenCalled();
+    expect(auth.setTokens).toHaveBeenCalled();
+    expect(String(auth.setTokens.mock.calls[0][0])).toMatch(/^mock-access-/);
+    expect(adapter).toHaveBeenCalledTimes(2);
+    expect(auth.logout).not.toHaveBeenCalled();
+  });
+
   it("공개 endpoint의 401은 재발급 대상이 아니다", async () => {
     adapter.mockImplementation(async (config) =>
       failure(config, 401, {

@@ -163,7 +163,13 @@ export function mapErrorToMessage(
 // -------------------------------------------------------
 
 export function isUnauthorizedError(error: unknown): boolean {
-  return error instanceof ApiError && error.code === ERROR_CODES.UNAUTHORIZED;
+  if (!(error instanceof ApiError)) return false;
+
+  return (
+    error.code === ERROR_CODES.UNAUTHORIZED ||
+    error.code === "AUTH_UNAUTHORIZED" ||
+    error.code.startsWith("AUTH_401_")
+  );
 }
 
 export function isForbiddenError(error: unknown): boolean {
