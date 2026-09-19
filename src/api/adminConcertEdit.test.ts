@@ -182,6 +182,7 @@ describe("admin edit contract", () => {
       character_config: value.form.characterConfig,
       character_message: "새 한마디",
     });
+    expect(JSON.parse(config.data)).not.toHaveProperty("total_seats");
     expect(adapter).toHaveBeenCalledTimes(1);
   });
 

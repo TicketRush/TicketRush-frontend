@@ -5,8 +5,8 @@ export const MAX_DURATION_MINUTES = 1440;
 
 // TODO: BE 계약 또는 서비스 정책 확정 시 값 조정
 export const MAX_TICKET_PRICE = 10_000_000;
-// PerformanceCreateRequest / PerformanceCreatedEvent.MAX_TOTAL_SEATS
-export const MAX_TOTAL_SEATS = 10_000;
+// Frontend creation limit (#316); server-side limits require separate verification.
+export const MAX_TOTAL_SEATS = 100_000;
 
 interface ValidateConcertFormParams {
   original?: ConcertFormData;
