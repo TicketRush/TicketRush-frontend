@@ -21,6 +21,7 @@ import type { ConcertFormData } from "@/types/domain/admin";
 import { MAX_CHARACTER_MESSAGE_LENGTH } from "@/api/adminConcertCreate";
 import type { Genre } from "@/types/domain/concert";
 import {
+  MAX_TOTAL_SEATS,
   sanitizeConcertForm,
   validateConcertForm,
 } from "@/utils/admin/concertFormValidation";
@@ -521,6 +522,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             <Field label="총 좌석 수" required>
               <FormInput
                 type="number"
+                max={MAX_TOTAL_SEATS}
                 disabled={mode === "edit"}
                 value={totalSeats === 0 ? "" : String(totalSeats)}
                 onChange={(v) => setTotalSeats(Number(v || 0))}
@@ -758,6 +760,7 @@ function FormInput({
   type = "text",
   placeholder,
   maxLength,
+  max,
   disabled,
 }: {
   value: string;
@@ -766,6 +769,7 @@ function FormInput({
   type?: string;
   placeholder?: string;
   maxLength?: number;
+  max?: number;
   disabled?: boolean;
 }) {
   return (
@@ -778,6 +782,7 @@ function FormInput({
       placeholder={placeholder}
       disabled={disabled}
       maxLength={maxLength}
+      max={max}
       className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
   );

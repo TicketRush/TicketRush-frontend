@@ -215,25 +215,34 @@ describe("validateConcertForm", () => {
     ).not.toBeNull();
   });
 
-  it("총 좌석 수 최대값은 허용한다", () => {
+  it.each([1, 9999, 10000, 10001, 99999, 100000])("총 좌석 수 %i석은 허용한다", (totalSeats) => {
+    expect(MAX_TOTAL_SEATS).toBe(100_000);
     expect(
       validateConcertForm({
         form: baseForm,
-        totalSeats: MAX_TOTAL_SEATS,
+        totalSeats,
         today,
       }),
     ).toBeNull();
   });
 
-  it("총 좌석 수 최대값 초과는 거부한다", () => {
+  it.each([100001, 1000000])("총 좌석 수 최대값 초과 %i석은 거부한다", (totalSeats) => {
     expect(
       validateConcertForm({
         form: baseForm,
-        totalSeats: MAX_TOTAL_SEATS + 1,
+        totalSeats,
         today,
       }),
-    ).not.toBeNull();
+    ).toBe("총 좌석 수는 최대 100,000석까지 입력할 수 있습니다.");
   });
+
+  it.each([0, -1, 1.5, NaN, Infinity, Number("abc")])(
+    "총 좌석 수가 양의 정수가 아니면 거부한다 (%s)",
+    (totalSeats) => {
+      expect(validateConcertForm({ form: baseForm, totalSeats, today }))
+        .toBe("총 좌석 수는 1석 이상의 정수로 입력해주세요.");
+    },
+  );
 
   it("필수 문자열이 공백뿐이면 거부한다", () => {
     expect(

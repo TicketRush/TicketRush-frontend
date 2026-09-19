@@ -158,6 +158,7 @@ describe("createConcertApi with the real axios interceptors", () => {
 
   it("posts to the real endpoint with authentication and intact multipart names", async () => {
     const value = input();
+    value.totalSeats = 100_000;
     value.form.bookingOpenAt = "2026-09-30T20:00";
     await expect(createConcertApi(value)).resolves.toEqual({
       performanceId: 42,
@@ -175,6 +176,8 @@ describe("createConcertApi with the real axios interceptors", () => {
     ]);
     const request = JSON.parse(await config.data.get("request").text());
     expect(request).toEqual(createPerformanceRequest(value));
+    expect(request.total_seats).toBe(100_000);
+    expect(request).not.toHaveProperty("totalSeats");
     expect(request.booking_open_at).toBe("2026-09-30 20:00:00");
     expect(request).not.toHaveProperty("bookingOpenAt");
     expect(Object.keys(request).every((key) => !/[A-Z]/.test(key))).toBe(true);
