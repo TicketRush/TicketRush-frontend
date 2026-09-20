@@ -13,6 +13,7 @@ import logo from "@/assets/images/logo.svg";
 export default function Header() {
   const navigate = useNavigate();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const role = useAuthStore((s) => s.user?.role);
   const logout = useAuthStore((s) => s.logout);
   const isLoggedIn = !!accessToken;
   const cancelPendingReservation = useCancelPendingReservation();
@@ -58,6 +59,26 @@ export default function Header() {
         <nav className="flex items-center gap-2">
           {isLoggedIn ? (
             <>
+              {role === "ADMIN" && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  aria-disabled={leaveLocked || undefined}
+                  onClick={async (event) => {
+                    if (leaveLocked) {
+                      warnLeaveLocked(event);
+                      return;
+                    }
+                    if (usePaymentStore.getState().bookingNumber) {
+                      const cancelled = await cancelPendingReservation();
+                      if (!cancelled || usePaymentStore.getState().bookingNumber) return;
+                    }
+                    navigate("/admin");
+                  }}
+                >
+                  관리자 모드
+                </Button>
+              )}
               <Link
                 to="/reservations/mypage"
                 aria-disabled={leaveLocked || undefined}
