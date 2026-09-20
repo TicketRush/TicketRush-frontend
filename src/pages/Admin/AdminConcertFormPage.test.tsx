@@ -87,6 +87,32 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
 }
 
 describe("admin edit initial rendering", () => {
+  it("allows 100,000 seats in create mode with the matching input maximum", () => {
+    hooks.query.mockReturnValue({});
+    const html = render("/admin/concerts/new", {
+      concertDraft: {
+        pathname: "/admin/concerts/new",
+        form: initial.form,
+        totalSeats: 100_000,
+      },
+    });
+    const input = html.match(/총 좌석 수.*?(<input\b[^>]*>)/)?.[1];
+    expect(input).toBeDefined();
+    expect(input).toContain('type="number"');
+    expect(input).toContain('max="100000"');
+    expect(input).toContain('value="100000"');
+    expect(input).not.toContain("disabled");
+    // Keep the existing browser defaults for min and step.
+    expect(input).not.toMatch(/\s(?:min|step)=/);
+  });
+
+  it("keeps the total seat input disabled in edit mode", () => {
+    const input = render().match(/총 좌석 수.*?(<input\b[^>]*>)/)?.[1];
+    expect(input).toBeDefined();
+    expect(input).toContain('disabled=""');
+    expect(input).toContain('value="120"');
+  });
+
   it.each([undefined, "2026-09-30T20:00"])("renders the shared optional booking input in create mode (%s)", (bookingOpenAt) => {
     hooks.query.mockReturnValue({});
     vi.stubGlobal("sessionStorage", { getItem: () => null });
