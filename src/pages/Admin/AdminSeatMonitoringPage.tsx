@@ -1,10 +1,16 @@
-// 관리자 좌석 모니터링 (#169 / #336)
+// 관리자 좌석 모니터링 (#169 / #336 / #361)
 //
 // KPI: GET /api/v1/seat/{id}/seat-counts (useSeatCounts). 맵은 admin monitoring.
 // 상세 bookingNumber로 예매 단건을 조합.
 // #336: 공개 SSE(seat-status/stream)로 맵·KPI 캐시를 패치. 재조회 중에도 기존 화면 유지.
+// #361: 연결 상태, /admin/seat-monitoring/:id URL, 목록 숫자 재조회, HOLD 만료 시 맵 유지.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { toast } from "react-toastify";
 import StatCard from "@/components/admin/StatCard";
@@ -18,6 +24,7 @@ import {
   useAdminConcerts,
 } from "@/hooks/admin/useAdmin";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
+import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { LEGACY_HOLD_BOOKING_NUMBER } from "@/api/admin";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
@@ -27,6 +34,11 @@ import type { AdminConcertItem } from "@/types/domain/admin";
 import type { ConcertStatus, Genre } from "@/types/domain/concert";
 import Pagination from "@/components/admin/Pagination";
 import { resolveSelectedSeatLiveUpdate } from "@/utils/admin/adminSeatLiveUpdate";
+import { parseAdminPerformanceId } from "@/utils/admin/parseAdminPerformanceId";
+import {
+  SEAT_STREAM_CONNECTION_LABEL,
+  type SeatStreamConnectionStatus,
+} from "@/utils/seat/seatStreamConnection";
 import {
   formatAdminCount,
   formatAdminOccupancy,
@@ -56,15 +68,29 @@ const GENRE_LABELS: Record<Genre, string> = {
   BALLET: "발레",
 };
 
+interface MonitoringLocationState {
+  concert?: AdminConcertItem;
+}
+
 export default function AdminSeatMonitoringPage() {
   useDocumentTitle("좌석 모니터링");
 
+  const { performanceId: rawPerformanceId } = useParams<{
+    performanceId?: string;
+  }>();
+  const performanceId = parseAdminPerformanceId(rawPerformanceId);
+
+  if (rawPerformanceId && performanceId == null) {
+    return <Navigate to="/admin/seat-monitoring" replace />;
+  }
+  if (performanceId == null) {
+    return <AdminSeatMonitoringList />;
+  }
+  return <AdminSeatMonitoringMapRoute performanceId={performanceId} />;
+}
+
+function AdminSeatMonitoringList() {
   const navigate = useNavigate();
-  const [selectedConcertId, setSelectedConcertId] = useState<number | null>(
-    null,
-  );
-  const [selectedConcert, setSelectedConcert] =
-    useState<AdminConcertItem | null>(null);
   const [listPage, setListPage] = useState(0);
 
   const {
@@ -72,62 +98,62 @@ export default function AdminSeatMonitoringPage() {
     isLoading: concertsLoading,
     isError: concertsError,
     isPlaceholderData: concertsPlaceholder,
-  } = useAdminConcerts({
-    page: listPage,
-    size: MONITORING_PAGE_SIZE,
-  });
+  } = useAdminConcerts(
+    {
+      page: listPage,
+      size: MONITORING_PAGE_SIZE,
+    },
+    { refetchOnMount: "always" },
+  );
   const concertList = concerts?.items ?? [];
 
   // ── 1단계: 공연 목록 화면 ────────────────────────
-  if (!selectedConcertId) {
-    return (
-      <div className="p-8 space-y-6">
-        {/* 헤더 */}
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
-              SEAT MONITORING
-            </span>
-            <h1 className="text-3xl font-bold mt-2">
-              좌석 현황 실시간 모니터링
-            </h1>
-            <p className="text-sm text-admin-text-secondary mt-1">
-              공연별 좌석 상태를 실시간으로 확인하고 관리합니다
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate("/admin")}
-            className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
-          >
-            <ArrowLeft size={16} /> 대시보드
-          </button>
-        </div>
-
-        {/* 공연 목록 테이블 */}
-        <div className="bg-admin-surface border-2 border-admin-surface-border rounded-xl p-6">
-          <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
-            EVENT LISTS
+  return (
+    <div className="p-8 space-y-6">
+      {/* 헤더 */}
+      <div className="flex items-start justify-between">
+        <div>
+          <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-1 rounded">
+            SEAT MONITORING
           </span>
-          <h3 className="text-base font-bold mb-4 text-gray-900">
-            전체 공연 목록
-          </h3>
+          <h1 className="text-3xl font-bold mt-2">좌석 현황 실시간 모니터링</h1>
+          <p className="text-sm text-admin-text-secondary mt-1">
+            공연별 좌석 상태를 실시간으로 확인하고 관리합니다
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/admin")}
+          className="px-4 py-2 rounded-lg bg-admin-dark-bg border-2 border-admin-dark-border flex items-center gap-2"
+        >
+          <ArrowLeft size={16} /> 대시보드
+        </button>
+      </div>
 
-          {concertsError && concertList.length === 0 ? (
-            <div className="text-center py-12 text-red-400">
-              공연 목록을 불러올 수 없습니다.
-            </div>
-          ) : (concertsLoading && concertList.length === 0) ||
-            concertsPlaceholder ? (
-            <div className="text-center py-12 text-admin-text-secondary">
-              공연 정보를 불러오는 중...
-            </div>
-          ) : concertList.length === 0 ? (
-            <div className="text-center py-12 text-admin-text-secondary">
-              등록된 공연이 없습니다.
-            </div>
-          ) : (
-            <>
+      {/* 공연 목록 테이블 */}
+      <div className="bg-admin-surface border-2 border-admin-surface-border rounded-xl p-6">
+        <span className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2">
+          EVENT LISTS
+        </span>
+        <h3 className="text-base font-bold mb-4 text-gray-900">
+          전체 공연 목록
+        </h3>
+
+        {concertsError && concertList.length === 0 ? (
+          <div className="text-center py-12 text-red-400">
+            공연 목록을 불러올 수 없습니다.
+          </div>
+        ) : (concertsLoading && concertList.length === 0) ||
+          concertsPlaceholder ? (
+          <div className="text-center py-12 text-admin-text-secondary">
+            공연 정보를 불러오는 중...
+          </div>
+        ) : concertList.length === 0 ? (
+          <div className="text-center py-12 text-admin-text-secondary">
+            등록된 공연이 없습니다.
+          </div>
+        ) : (
+          <>
             <div className="overflow-x-auto">
             <table className="w-full text-sm admin-table">
               <thead className="border-b border-admin-border">
@@ -177,8 +203,11 @@ export default function AdminSeatMonitoringPage() {
                     <tr
                       key={c.id}
                       onClick={() => {
-                        setSelectedConcert(c);
-                        setSelectedConcertId(c.id);
+                        navigate(`/admin/seat-monitoring/${c.id}`, {
+                          state: {
+                            concert: c,
+                          } satisfies MonitoringLocationState,
+                        });
                       }}
                       className="border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
                     >
@@ -226,36 +255,49 @@ export default function AdminSeatMonitoringPage() {
                 onChange={setListPage}
               />
             ) : null}
-            </>
-          )}
-        </div>
+          </>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // ── 2단계: 좌석 맵 화면 ─────────────────────────
-  const selected =
-    selectedConcert ?? concertList.find((c) => c.id === selectedConcertId);
+function AdminSeatMonitoringMapRoute({
+  performanceId,
+}: {
+  performanceId: number;
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const stateConcert = (location.state as MonitoringLocationState | null)
+    ?.concert;
+  const concertFromState =
+    stateConcert?.id === performanceId ? stateConcert : undefined;
+  const { data: concertDetail, isError: concertDetailError } = useConcertDetail(
+    concertFromState ? undefined : performanceId,
+  );
+  const concertTitle =
+    concertFromState?.title ??
+    concertDetail?.title ??
+    (concertDetailError ? `공연 ${performanceId}` : "");
 
   return (
     <AdminSeatMonitoringMap
-      performanceId={selectedConcertId}
-      concert={selected ?? null}
-      onChangeConcert={() => {
-        setSelectedConcertId(null);
-        setSelectedConcert(null);
-      }}
+      key={performanceId}
+      performanceId={performanceId}
+      concertTitle={concertTitle}
+      onChangeConcert={() => navigate("/admin/seat-monitoring")}
     />
   );
 }
 
 export function AdminSeatMonitoringMap({
   performanceId,
-  concert,
+  concertTitle,
   onChangeConcert,
 }: {
   performanceId: number;
-  concert: AdminConcertItem | null;
+  concertTitle: string;
   onChangeConcert: () => void;
 }) {
   const navigate = useNavigate();
@@ -296,7 +338,7 @@ export function AdminSeatMonitoringMap({
     monitoringFetchedAfterMount,
   );
 
-  useSeatEventStream(performanceId, true, {
+  const { connectionStatus } = useSeatEventStream(performanceId, true, {
     getMapQueryKey: adminKeys.seatMonitoring,
     syncUserSelection: false,
   });
@@ -333,6 +375,11 @@ export function AdminSeatMonitoringMap({
       selectedSeatId ? refetchDetail() : Promise.resolve(),
     ]).finally(() => setIsRefreshing(false));
   }, [refetchCounts, refetchMonitoring, refetchDetail, selectedSeatId]);
+
+  const handleHoldExpired = useCallback(() => {
+    if (selectedSeatId == null) return;
+    void refetchDetail();
+  }, [selectedSeatId, refetchDetail]);
 
   function handleSeatClick(seat: SeatWithStatus) {
     if (seat.status === "AVAILABLE") {
@@ -406,9 +453,12 @@ export function AdminSeatMonitoringMap({
             SEAT MONITORING
           </span>
           <h1 className="text-3xl font-bold mt-2">좌석 현황 실시간 모니터링</h1>
-          <p className="text-sm text-admin-text-secondary mt-1">
-            공연별 좌석 상태를 실시간으로 확인하고 관리합니다
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-admin-text-secondary">
+              공연별 좌석 상태를 실시간으로 확인하고 관리합니다
+            </p>
+            <ConnectionStatusBadge status={connectionStatus} />
+          </div>
         </div>
         <button
           type="button"
@@ -426,7 +476,7 @@ export function AdminSeatMonitoringMap({
           <input
             type="text"
             readOnly
-            value={concert?.title ?? ""}
+            value={concertTitle}
             onClick={onChangeConcert}
             className="flex-1 bg-admin-bg border border-admin-border rounded-lg px-3 py-2 text-sm cursor-pointer"
           />
@@ -555,7 +605,7 @@ export function AdminSeatMonitoringMap({
             onShowReserver={(bookingNumber) =>
               goToBookings(bookingNumber, "reserver")
             }
-            onHoldExpired={handleRefresh}
+            onHoldExpired={handleHoldExpired}
           />
         </div>
       </div>
@@ -569,5 +619,44 @@ function LegendRow({ swatch, label }: { swatch: string; label: string }) {
       <span className={`w-4 h-4 rounded ${swatch}`} />
       <span className="text-admin-text-secondary">{label}</span>
     </div>
+  );
+}
+
+const CONNECTION_BADGE_TONE: Record<
+  SeatStreamConnectionStatus,
+  { wrap: string; dot: string }
+> = {
+  connecting: {
+    wrap: "bg-admin-border text-admin-text-secondary",
+    dot: "bg-admin-text-secondary",
+  },
+  live: {
+    wrap: "bg-green-500/15 text-[#00C950]",
+    dot: "bg-[#00C950]",
+  },
+  reconnecting: {
+    wrap: "bg-yellow-500/15 text-yellow-600",
+    dot: "bg-yellow-400",
+  },
+  polling: {
+    wrap: "bg-blue-500/15 text-[#1D7DFF]",
+    dot: "bg-[#1D7DFF]",
+  },
+};
+
+function ConnectionStatusBadge({
+  status,
+}: {
+  status: SeatStreamConnectionStatus;
+}) {
+  const tone = CONNECTION_BADGE_TONE[status];
+  return (
+    <span
+      role="status"
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider ${tone.wrap}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} />
+      {SEAT_STREAM_CONNECTION_LABEL[status]}
+    </span>
   );
 }

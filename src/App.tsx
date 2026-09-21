@@ -102,6 +102,10 @@ const router = createBrowserRouter([
             element: <AdminSeatMonitoringPage />,
           },
           {
+            path: "/admin/seat-monitoring/:performanceId",
+            element: <AdminSeatMonitoringPage />,
+          },
+          {
             path: "/admin/concerts/new",
             element: <AdminConcertFormPage mode="create" />,
           },

@@ -39,6 +39,27 @@ describe("AdminSeatDetailPanel", () => {
     vi.unstubAllGlobals();
   });
 
+  it("맵이 SOLD인데 상세가 아직 HOLD면 예매자·작업을 막아 둔다", () => {
+    vi.stubGlobal("React", React);
+    const html = renderPanel({ mapStatus: "SOLD" });
+    expect(html).toContain("갱신 중");
+    expect(html).not.toContain("홍길동");
+    expect(html).toMatch(/\sdisabled(?!:)/);
+    vi.unstubAllGlobals();
+  });
+
+  it("맵과 상세가 모두 SOLD면 예매자를 보여 주고 작업을 연다", () => {
+    vi.stubGlobal("React", React);
+    const html = renderPanel({
+      mapStatus: "SOLD",
+      detail: { ...holdDetail, status: "SOLD", holdRemainingSec: undefined },
+    });
+    expect(html).toContain("홍길동");
+    expect(html).not.toContain("갱신 중");
+    expect(html).not.toMatch(/\sdisabled(?!:)/);
+    vi.unstubAllGlobals();
+  });
+
   it("맵과 상세가 HOLD면 예약 해제를 보여 준다", () => {
     vi.stubGlobal("React", React);
     const html = renderPanel({ mapStatus: "HOLD" });

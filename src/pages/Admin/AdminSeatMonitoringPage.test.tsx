@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AdminSeatMonitoringPage, {
   AdminSeatMonitoringMap,
 } from "./AdminSeatMonitoringPage";
@@ -16,10 +16,13 @@ const mocks = vi.hoisted(() => ({
   counts: vi.fn(),
   detail: vi.fn(),
   release: vi.fn(),
+  concertDetail: vi.fn(),
+  stream: vi.fn(),
 }));
 
 vi.mock("@/hooks/admin/useAdmin", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/hooks/admin/useAdmin")>();
+  const actual =
+    await importOriginal<typeof import("@/hooks/admin/useAdmin")>();
   return {
     ...actual,
     useAdminConcerts: mocks.concerts,
@@ -31,8 +34,11 @@ vi.mock("@/hooks/admin/useAdmin", async (importOriginal) => {
 vi.mock("@/hooks/queries/useSeats", () => ({
   useSeatCounts: mocks.counts,
 }));
+vi.mock("@/hooks/queries/useConcertDetail", () => ({
+  useConcertDetail: mocks.concertDetail,
+}));
 vi.mock("@/hooks/seat/useSeatEventStream", () => ({
-  useSeatEventStream: vi.fn(),
+  useSeatEventStream: mocks.stream,
 }));
 vi.mock("@/hooks/common/useDocumentTitle", () => ({
   useDocumentTitle: vi.fn(),
@@ -116,39 +122,74 @@ beforeEach(() => {
     mutateAsync: vi.fn(),
     isPending: false,
   });
+  mocks.concertDetail.mockReturnValue({
+    data: { title: "테스트 공연" },
+  });
+  mocks.stream.mockReturnValue({ connectionStatus: "live" });
 });
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderList() {
+function renderAt(path: string) {
   return renderToStaticMarkup(
-    <MemoryRouter>
-      <AdminSeatMonitoringPage />
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route
+          path="/admin/seat-monitoring"
+          element={<AdminSeatMonitoringPage />}
+        />
+        <Route
+          path="/admin/seat-monitoring/:performanceId"
+          element={<AdminSeatMonitoringPage />}
+        />
+      </Routes>
     </MemoryRouter>,
   );
+}
+
+function renderList() {
+  return renderAt("/admin/seat-monitoring");
 }
 
 function renderMap() {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <AdminSeatMonitoringMap performanceId={12} concert={concert} onChangeConcert={() => {}} />
+      <AdminSeatMonitoringMap
+        performanceId={12}
+        concertTitle={concert.title}
+        onChangeConcert={() => {}}
+      />
     </MemoryRouter>,
   );
 }
 
-describe("AdminSeatMonitoringPage live updates (#336)", () => {
+describe("AdminSeatMonitoringPage live updates (#336 / #361)", () => {
   it("공연 목록의 ID·장르·날짜·판매 지표는 가운데, 공연명은 왼쪽 정렬이다", () => {
     const html = renderList();
-    expect(html).toContain('>ID</th>');
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">ID<\/th>/);
+    expect(html).toContain(">ID</th>");
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">ID<\/th>/,
+    );
     expect(html).toMatch(/<th class="py-3 px-3 text-left">공연명<\/th>/);
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">장르<\/th>/);
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">날짜<\/th>/);
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">판매\/총<\/th>/);
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">점유율<\/th>/);
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">매출<\/th>/);
-    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">상태<\/th>/);
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">장르<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">날짜<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">판매\/총<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">점유율<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">매출<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="py-3 px-3 text-center whitespace-nowrap">상태<\/th>/,
+    );
     expect(html).toContain("text-left font-bold");
     expect(html).toContain("overflow-x-auto");
   });
@@ -160,9 +201,24 @@ describe("AdminSeatMonitoringPage live updates (#336)", () => {
     expect(useSeatEventStream).not.toHaveBeenCalled();
   });
 
-  it("맵 화면에서 공개 SSE로 관리자 맵 캐시를 패치한다", () => {
-    const html = renderMap();
+  it("목록으로 돌아오면 판매/점유율을 항상 다시 받는다", () => {
+    renderList();
+    expect(mocks.concerts).toHaveBeenCalledWith(
+      { page: 0, size: 50 },
+      { refetchOnMount: "always" },
+    );
+  });
+
+  it("잘못된 공연 ID면 맵 SSE를 열지 않는다", () => {
+    const html = renderAt("/admin/seat-monitoring/abc");
+    expect(html).not.toContain("새로고침");
+    expect(useSeatEventStream).not.toHaveBeenCalled();
+  });
+
+  it("맵 URL이면 같은 공연 맵을 열고 SSE로 관리자 맵 캐시를 패치한다", () => {
+    const html = renderAt("/admin/seat-monitoring/12");
     expect(html).toContain("새로고침");
+    expect(html).toContain("테스트 공연");
     expect(html).toContain("좌석 A-1 AVAILABLE");
     expect(html).toContain("좌석 A-2 HOLD");
     expect(useSeatEventStream).toHaveBeenCalledWith(
@@ -178,6 +234,38 @@ describe("AdminSeatMonitoringPage live updates (#336)", () => {
       "seat-monitoring",
       12,
     ]);
+  });
+
+  it("맵 화면에서 공개 SSE로 관리자 맵 캐시를 패치한다", () => {
+    const html = renderMap();
+    expect(html).toContain("새로고침");
+    expect(html).toContain("좌석 A-1 AVAILABLE");
+    expect(html).toContain("좌석 A-2 HOLD");
+    expect(useSeatEventStream).toHaveBeenCalledWith(
+      12,
+      true,
+      expect.objectContaining({
+        syncUserSelection: false,
+        getMapQueryKey: adminKeys.seatMonitoring,
+      }),
+    );
+  });
+
+  it("SSE LIVE와 폴링 상태를 화면에 구분한다", () => {
+    const live = renderMap();
+    expect(live).toContain("LIVE");
+    expect(live).not.toContain("폴링 중");
+
+    mocks.stream.mockReturnValue({ connectionStatus: "polling" });
+    const polling = renderMap();
+    expect(polling).toContain("폴링 중");
+    expect(polling).not.toContain("LIVE");
+
+    mocks.stream.mockReturnValue({ connectionStatus: "reconnecting" });
+    expect(renderMap()).toContain("재연결 중");
+
+    mocks.stream.mockReturnValue({ connectionStatus: "connecting" });
+    expect(renderMap()).toContain("연결 중");
   });
 
   it("백그라운드 재조회 중에도 맵과 숫자를 유지하고 새로고침 버튼은 돌리지 않는다", () => {
@@ -221,4 +309,3 @@ describe("AdminSeatMonitoringPage live updates (#336)", () => {
     expect(html).not.toContain("좌석 A-1 AVAILABLE");
   });
 });
-

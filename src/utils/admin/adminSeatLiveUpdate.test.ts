@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isAdminSoldDetailPending,
   resolveAdminDetailViewStatus,
   resolveSelectedSeatLiveUpdate,
 } from "./adminSeatLiveUpdate";
@@ -8,6 +9,15 @@ describe("resolveAdminDetailViewStatus", () => {
   it("맵 상태가 있으면 상세보다 맵을 우선한다", () => {
     expect(resolveAdminDetailViewStatus("SOLD", "HOLD")).toBe("SOLD");
     expect(resolveAdminDetailViewStatus(undefined, "HOLD")).toBe("HOLD");
+  });
+});
+
+describe("isAdminSoldDetailPending", () => {
+  it("맵이 SOLD이고 상세가 HOLD일 때만 갱신 중이다", () => {
+    expect(isAdminSoldDetailPending("SOLD", "HOLD")).toBe(true);
+    expect(isAdminSoldDetailPending("SOLD", "SOLD")).toBe(false);
+    expect(isAdminSoldDetailPending("HOLD", "HOLD")).toBe(false);
+    expect(isAdminSoldDetailPending(undefined, "HOLD")).toBe(false);
   });
 });
 

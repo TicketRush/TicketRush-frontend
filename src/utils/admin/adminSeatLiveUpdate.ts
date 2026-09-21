@@ -8,6 +8,14 @@ export function resolveAdminDetailViewStatus(
   return mapStatus ?? detailStatus;
 }
 
+/** 맵은 SOLD인데 상세가 아직 HOLD면 예매자/시각을 갱신 중으로 둔다 (#361). */
+export function isAdminSoldDetailPending(
+  mapStatus: SeatStatus | undefined,
+  detailStatus: SeatStatus | undefined,
+): boolean {
+  return mapStatus === "SOLD" && detailStatus === "HOLD";
+}
+
 /** 맵 SSE 반영 후 선택 좌석 상세를 어떻게 맞출지. */
 export function resolveSelectedSeatLiveUpdate(args: {
   selectedSeatId: number | null;
