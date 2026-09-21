@@ -69,11 +69,11 @@ export function findSeatStatus(
   return seatMap?.seats?.find((seat) => seat.id === seatId)?.status;
 }
 
-/** 맵이 아직 없으면 재조회를 보류하고, 맵이 뜬 뒤에만 없는 좌석을 다시 받는다. */
+/** 배치가 있고 좌석이 있을 때만, 맵에 없는 좌석을 서버에서 다시 받는다. */
 export function shouldRefetchUnknownSeat(
   seatMap: SeatMapData | undefined,
 ): boolean {
-  return Array.isArray(seatMap?.seats);
+  return Boolean(seatMap?.layoutReady && seatMap.seats?.length);
 }
 
 /** 맵이 처음 준비되면, 로드 전에 건너뛴 알림을 숫자로 맞춘다. */
@@ -81,5 +81,5 @@ export function shouldResyncCountsOnMapReady(
   hadSeats: boolean,
   nextMap: SeatMapData | undefined,
 ): boolean {
-  return !hadSeats && Array.isArray(nextMap?.seats);
+  return !hadSeats && shouldRefetchUnknownSeat(nextMap);
 }

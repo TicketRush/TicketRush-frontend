@@ -1,8 +1,9 @@
-// 관리자 좌석 모니터링 (#169)
+// 관리자 좌석 모니터링 (#169 / #336)
 //
 // KPI: GET /api/v1/seat/{id}/seat-counts (useSeatCounts). 맵은 admin monitoring.
-// 상세 bookingNumber로 예매 단건을 조합. SSE·폴링 없음 — 새로고침/작업/좌석 선택만.
-import { useCallback, useState } from "react";
+// 상세 bookingNumber로 예매 단건을 조합.
+// #336: 공개 SSE(seat-status/stream)로 맵·KPI 캐시를 패치. 재조회 중에도 기존 화면 유지.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { toast } from "react-toastify";
@@ -10,16 +11,18 @@ import StatCard from "@/components/admin/StatCard";
 import AdminSeatMap from "@/components/admin/AdminSeatMap";
 import AdminSeatDetailPanel from "@/components/admin/AdminSeatDetailPanel";
 import {
+  adminKeys,
   useAdminSeatMonitoring,
   useAdminSeatDetail,
   useAdminReleaseSeat,
   useAdminConcerts,
 } from "@/hooks/admin/useAdmin";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
+import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { LEGACY_HOLD_BOOKING_NUMBER } from "@/api/admin";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import { ApiError } from "@/api/errors/errorMapper";
-import type { SeatWithStatus } from "@/types/domain/seat";
+import type { SeatStatus, SeatWithStatus } from "@/types/domain/seat";
 import type { AdminConcertItem } from "@/types/domain/admin";
 import type { ConcertStatus, Genre } from "@/types/domain/concert";
 import Pagination from "@/components/admin/Pagination";
@@ -30,9 +33,30 @@ import {
   formatAdminShowSchedule,
   formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
+import { isInitialQueryPending } from "@/utils/query/isInitialQueryPending";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const MONITORING_PAGE_SIZE = 50;
+
+/** 맵 SSE 반영 후 선택 좌석 상세를 어떻게 맞출지. */
+export function resolveSelectedSeatLiveUpdate(args: {
+  selectedSeatId: number | null;
+  selectedStatus: SeatStatus | undefined;
+  prevSeatId: number | null;
+  prevStatus: SeatStatus | undefined;
+}): "clear" | "refetch" | "keep" {
+  if (args.selectedSeatId == null) return "keep";
+  if (args.selectedStatus === "AVAILABLE") return "clear";
+  if (
+    args.prevSeatId === args.selectedSeatId &&
+    args.selectedStatus &&
+    args.prevStatus &&
+    args.prevStatus !== args.selectedStatus
+  ) {
+    return "refetch";
+  }
+  return "keep";
+}
 
 const STATUS_LABELS: Record<ConcertStatus, string> = {
   UPCOMING: "예정",
@@ -60,7 +84,6 @@ export default function AdminSeatMonitoringPage() {
   );
   const [selectedConcert, setSelectedConcert] =
     useState<AdminConcertItem | null>(null);
-  const [selectedSeatId, setSelectedSeatId] = useState<number | null>(null);
   const [listPage, setListPage] = useState(0);
 
   const {
@@ -73,110 +96,6 @@ export default function AdminSeatMonitoringPage() {
     size: MONITORING_PAGE_SIZE,
   });
   const concertList = concerts?.items ?? [];
-
-  const {
-    data: monitoring,
-    isLoading,
-    isError: monitoringError,
-    refetch: refetchMonitoring,
-    isFetching: monitoringFetching,
-  } = useAdminSeatMonitoring(selectedConcertId ?? undefined);
-  const {
-    data: seatCounts,
-    isError: countsError,
-    refetch: refetchCounts,
-    isFetching: countsFetching,
-  } = useSeatCounts(selectedConcertId ?? undefined, !!selectedConcertId, {
-    fresh: true,
-    refetchOnWindowFocus: false,
-  });
-  const {
-    data: seatDetail,
-    isLoading: detailLoading,
-    isError: detailError,
-    refetch: refetchDetail,
-  } = useAdminSeatDetail(selectedConcertId ?? undefined, selectedSeatId);
-
-  const releaseMutation = useAdminReleaseSeat(selectedConcertId ?? 0);
-  const isFetching = monitoringFetching || countsFetching;
-
-  const handleRefresh = useCallback(() => {
-    void refetchCounts();
-    void refetchMonitoring();
-    if (selectedSeatId) void refetchDetail();
-  }, [refetchCounts, refetchMonitoring, refetchDetail, selectedSeatId]);
-
-  function handleSeatClick(seat: SeatWithStatus) {
-    if (seat.status === "AVAILABLE") {
-      setSelectedSeatId(null);
-      return;
-    }
-    const reselected = selectedSeatId === seat.id;
-    setSelectedSeatId(seat.id);
-    void refetchCounts();
-    void refetchMonitoring();
-    if (reselected) void refetchDetail();
-  }
-
-  async function handleRelease(seatId: number, bookingNumber?: string) {
-    const trimmed = bookingNumber?.trim();
-    const releaseBookingNumber = trimmed || LEGACY_HOLD_BOOKING_NUMBER;
-
-    try {
-      await releaseMutation.mutateAsync({
-        seatId,
-        bookingNumber: releaseBookingNumber,
-      });
-      toast.success("예약이 해제되었습니다.");
-      setSelectedSeatId(null);
-    } catch (error: unknown) {
-      const err = ApiError.fromUnknown(error);
-      toast.error(err.message);
-
-      if (err.code === ERROR_CODES.SEAT_NOT_HELD) {
-        handleRefresh();
-        setSelectedSeatId(null);
-        return;
-      }
-      if (err.code === ERROR_CODES.SEAT_SOLD_NOT_RELEASABLE) {
-        handleRefresh();
-        if (trimmed) goToBookings(trimmed, "refund");
-        return;
-      }
-      if (err.code === ERROR_CODES.SEAT_RELEASE_CONFLICT) {
-        handleRefresh();
-      }
-    }
-  }
-
-  function goToBookings(
-    bookingNumber: string | undefined,
-    intent: "refund" | "reserver",
-  ) {
-    const number = bookingNumber?.trim();
-    if (!number) {
-      toast.info("예매 번호가 없어 예매 내역에서 찾을 수 없습니다.");
-      navigate("/admin/bookings");
-      return;
-    }
-
-    const params = new URLSearchParams({ bookingNumber: number });
-    if (intent === "refund") params.set("intent", "refund");
-    toast.info(
-      intent === "refund"
-        ? "예매 내역에서 환불할 예매를 엽니다."
-        : "예매자 정보를 확인합니다.",
-    );
-    navigate(`/admin/bookings?${params}`);
-  }
-
-  function handleRefund(bookingNumber?: string) {
-    goToBookings(bookingNumber, "refund");
-  }
-
-  function handleShowReserver(bookingNumber?: string) {
-    goToBookings(bookingNumber, "reserver");
-  }
 
   // ── 1단계: 공연 목록 화면 ────────────────────────
   if (!selectedConcertId) {
@@ -331,8 +250,168 @@ export default function AdminSeatMonitoringPage() {
 
   // ── 2단계: 좌석 맵 화면 ─────────────────────────
   const selected =
-    selectedConcert ??
-    concertList.find((c) => c.id === selectedConcertId);
+    selectedConcert ?? concertList.find((c) => c.id === selectedConcertId);
+
+  return (
+    <AdminSeatMonitoringMap
+      performanceId={selectedConcertId}
+      concert={selected ?? null}
+      onChangeConcert={() => {
+        setSelectedConcertId(null);
+        setSelectedConcert(null);
+      }}
+    />
+  );
+}
+
+export function AdminSeatMonitoringMap({
+  performanceId,
+  concert,
+  onChangeConcert,
+}: {
+  performanceId: number;
+  concert: AdminConcertItem | null;
+  onChangeConcert: () => void;
+}) {
+  const navigate = useNavigate();
+  const [selectedSeatId, setSelectedSeatId] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const prevSelectedRef = useRef<{
+    seatId: number | null;
+    status: SeatStatus | undefined;
+  }>({ seatId: null, status: undefined });
+
+  const {
+    data: monitoring,
+    isLoading,
+    isError: monitoringError,
+    refetch: refetchMonitoring,
+    isFetching: monitoringFetching,
+    isFetchedAfterMount: monitoringFetchedAfterMount,
+  } = useAdminSeatMonitoring(performanceId);
+  const {
+    data: seatCounts,
+    isError: countsError,
+    refetch: refetchCounts,
+  } = useSeatCounts(performanceId, true, {
+    fresh: true,
+    refetchOnWindowFocus: false,
+  });
+  const {
+    data: seatDetail,
+    isLoading: detailLoading,
+    isError: detailError,
+    refetch: refetchDetail,
+  } = useAdminSeatDetail(performanceId, selectedSeatId);
+
+  const releaseMutation = useAdminReleaseSeat(performanceId);
+  const mapInitialPending = isInitialQueryPending(
+    isLoading,
+    monitoringFetching,
+    monitoringFetchedAfterMount,
+  );
+
+  useSeatEventStream(performanceId, true, {
+    getMapQueryKey: adminKeys.seatMonitoring,
+    syncUserSelection: false,
+  });
+
+  const selectedSeatStatus = monitoring?.seats.find(
+    (seat) => seat.id === selectedSeatId,
+  )?.status;
+
+  useEffect(() => {
+    const prev = prevSelectedRef.current;
+    const action = resolveSelectedSeatLiveUpdate({
+      selectedSeatId,
+      selectedStatus: selectedSeatStatus,
+      prevSeatId: prev.seatId,
+      prevStatus: prev.status,
+    });
+    if (action === "clear" || selectedSeatId == null) {
+      if (action === "clear") setSelectedSeatId(null);
+      prevSelectedRef.current = { seatId: null, status: undefined };
+      return;
+    }
+    if (action === "refetch") void refetchDetail();
+    prevSelectedRef.current = {
+      seatId: selectedSeatId,
+      status: selectedSeatStatus,
+    };
+  }, [selectedSeatId, selectedSeatStatus, refetchDetail]);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    void Promise.all([
+      refetchCounts(),
+      refetchMonitoring(),
+      selectedSeatId ? refetchDetail() : Promise.resolve(),
+    ]).finally(() => setIsRefreshing(false));
+  }, [refetchCounts, refetchMonitoring, refetchDetail, selectedSeatId]);
+
+  function handleSeatClick(seat: SeatWithStatus) {
+    if (seat.status === "AVAILABLE") {
+      setSelectedSeatId(null);
+      return;
+    }
+    if (selectedSeatId === seat.id) {
+      void refetchDetail();
+      return;
+    }
+    setSelectedSeatId(seat.id);
+  }
+
+  function goToBookings(
+    bookingNumber: string | undefined,
+    intent: "refund" | "reserver",
+  ) {
+    const number = bookingNumber?.trim();
+    if (!number) {
+      toast.info("예매 번호가 없어 예매 내역에서 찾을 수 없습니다.");
+      navigate("/admin/bookings");
+      return;
+    }
+
+    const params = new URLSearchParams({ bookingNumber: number });
+    if (intent === "refund") params.set("intent", "refund");
+    toast.info(
+      intent === "refund"
+        ? "예매 내역에서 환불할 예매를 엽니다."
+        : "예매자 정보를 확인합니다.",
+    );
+    navigate(`/admin/bookings?${params}`);
+  }
+
+  async function handleRelease(seatId: number, bookingNumber?: string) {
+    const trimmed = bookingNumber?.trim();
+    const releaseBookingNumber = trimmed || LEGACY_HOLD_BOOKING_NUMBER;
+
+    try {
+      await releaseMutation.mutateAsync({
+        seatId,
+        bookingNumber: releaseBookingNumber,
+      });
+      toast.success("예약이 해제되었습니다.");
+      setSelectedSeatId(null);
+    } catch (error: unknown) {
+      const err = ApiError.fromUnknown(error);
+      toast.error(err.message);
+
+      if (err.code === ERROR_CODES.SEAT_NOT_HELD) {
+        handleRefresh();
+        setSelectedSeatId(null);
+        return;
+      }
+      if (err.code === ERROR_CODES.SEAT_SOLD_NOT_RELEASABLE) {
+        handleRefresh();
+        if (trimmed) goToBookings(trimmed, "refund");
+        return;
+      }
+      if (err.code === ERROR_CODES.SEAT_RELEASE_CONFLICT) {
+        handleRefresh();
+      }
+    }
+  }
 
   return (
     <div className="p-8 space-y-6">
@@ -362,23 +441,19 @@ export default function AdminSeatMonitoringPage() {
           <input
             type="text"
             readOnly
-            value={selected?.title ?? ""}
-            onClick={() => {
-              setSelectedConcertId(null);
-              setSelectedConcert(null);
-              setSelectedSeatId(null);
-            }}
+            value={concert?.title ?? ""}
+            onClick={onChangeConcert}
             className="flex-1 bg-admin-bg border border-admin-border rounded-lg px-3 py-2 text-sm cursor-pointer"
           />
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={isFetching}
+            disabled={isRefreshing}
             className="px-4 py-2 rounded-lg bg-primary text-white font-semibold flex items-center gap-2 disabled:opacity-50"
           >
             <RefreshCcw
               size={14}
-              className={isFetching ? "animate-spin" : ""}
+              className={isRefreshing ? "animate-spin" : ""}
             />
             새로고침
           </button>
@@ -447,7 +522,7 @@ export default function AdminSeatMonitoringPage() {
             SEAT MAP
           </span>
 
-          {isLoading && !monitoring ? (
+          {mapInitialPending && !monitoring ? (
             <div className="text-center py-20 text-admin-text-secondary">
               좌석 정보 불러오는 중...
             </div>
@@ -489,9 +564,12 @@ export default function AdminSeatMonitoringPage() {
             isLoading={detailLoading}
             isError={detailError}
             isReleasing={releaseMutation.isPending}
+            mapStatus={selectedSeatStatus}
             onRelease={handleRelease}
-            onRefund={handleRefund}
-            onShowReserver={handleShowReserver}
+            onRefund={(bookingNumber) => goToBookings(bookingNumber, "refund")}
+            onShowReserver={(bookingNumber) =>
+              goToBookings(bookingNumber, "reserver")
+            }
             onHoldExpired={handleRefresh}
           />
         </div>
