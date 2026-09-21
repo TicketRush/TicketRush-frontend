@@ -25,6 +25,7 @@ import type {
 } from "@/types/domain/booking";
 import type { AdminBookingBookerResponse } from "../adminSeatMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
+import { nextStatusAfterUserBookingDelete } from "@/utils/booking/userRefund";
 import { MOCK_CONCERTS } from "./concerts";
 import { applyMockSeatHold, mockReleaseSeat } from "./seats";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -104,6 +105,24 @@ const bookingStore: BookingDetail[] = [
     price: 132000,
     paidAt: null,
     createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    cancelledAt: null,
+  },
+  {
+    bookingId: 5,
+    bookingNumber: "R7F11-REQ01",
+    status: "CONFIRMED",
+    performanceId: 1,
+    performanceTitle: "BTS World Tour: Beyond the Stars",
+    performancePerformer: "BTS",
+    performanceVenue: "잠실 올림픽 주경기장",
+    performanceDate: "2027-03-15",
+    performanceTime: "18:00",
+    performanceImageMainUrl: POSTER,
+    seatId: 24,
+    seatNumber: "B-12",
+    price: 132000,
+    paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     cancelledAt: null,
   },
 ];
@@ -236,18 +255,29 @@ export async function mockCancelBooking(bookingNumber: string): Promise<void> {
   await mockDelay(500);
   const booking = bookingStore.find((b) => b.bookingNumber === bookingNumber);
   if (!booking) {
-    await mockError("BOOKING_NOT_FOUND", "예매 정보를 찾을 수 없습니다.");
+    await mockError(
+      ERROR_CODES.BOOKING_NOT_FOUND,
+      "예매 정보를 찾을 수 없습니다.",
+      0,
+      404,
+    );
   }
-  // ⚠️ 스펠링 정정: CANCELLED → CANCELED
-  if (booking!.status === "CANCELED") {
-    await mockError("BOOKING_ALREADY_CANCELED", "이미 취소된 예매입니다.");
+  const next = nextStatusAfterUserBookingDelete(booking!.status);
+  if (next == null) {
+    await mockError(
+      ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED,
+      "현재 상태에서는 취소하거나 환불할 수 없습니다.",
+      0,
+      409,
+    );
   }
-  const wasPending = booking!.status === "PENDING";
-  booking!.status = "CANCELED";
-  booking!.cancelledAt = new Date().toISOString();
-  if (wasPending) {
+  if (next === "CANCELED") {
+    booking!.status = "CANCELED";
+    booking!.cancelledAt = new Date().toISOString();
     await mockReleaseSeat(booking!.performanceId, booking!.seatId);
+    return;
   }
+  booking!.status = "REFUNDING";
 }
 
 /** 결제 confirm 시 booking 상태 업데이트 (mock 내부용) */

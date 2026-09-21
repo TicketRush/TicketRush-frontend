@@ -7,6 +7,7 @@ import {
   formatPerformanceSchedule,
   getBookingTab,
   isRefundableBooking,
+  userBookingStatusLabel,
   paymentCompleteHeading,
   showScheduleToMs,
   ticketDetailHeading,
@@ -158,6 +159,14 @@ describe("formatPaymentAmount", () => {
   });
 });
 
+describe("userBookingStatusLabel", () => {
+  it("REFUNDING은 환불 신청 완료로 표시한다", () => {
+    expect(userBookingStatusLabel("REFUNDING")).toBe("환불 신청 완료");
+    expect(userBookingStatusLabel("REFUNDED")).toBe("환불 완료");
+    expect(userBookingStatusLabel("CONFIRMED")).toBe("예매 확정");
+  });
+});
+
 describe("canFetchTicketQr", () => {
   it("CONFIRMED만 QR을 조회한다", () => {
     expect(canFetchTicketQr("CONFIRMED")).toBe(true);
@@ -169,6 +178,11 @@ describe("canFetchTicketQr", () => {
 describe("bookingQrPlaceholder", () => {
   it("PENDING은 결제 완료 후 발급 안내를 한다", () => {
     expect(bookingQrPlaceholder("PENDING")).toContain("결제 완료");
+  });
+
+  it("환불 상태면 입장 QR 대신 환불 안내를 한다", () => {
+    expect(bookingQrPlaceholder("REFUNDING")).toContain("환불 신청");
+    expect(bookingQrPlaceholder("REFUNDED")).toContain("환불");
   });
 });
 
@@ -187,7 +201,8 @@ describe("ticketDetailHeading", () => {
     expect(ticketDetailHeading("CONFIRMED").title).toBe("티켓 확인");
     expect(ticketDetailHeading("PENDING").title).toBe("결제 대기 중");
     expect(ticketDetailHeading("CANCELED").title).toContain("입장할 수 없는");
-    expect(ticketDetailHeading("REFUNDED").title).toContain("입장할 수 없는");
+    expect(ticketDetailHeading("REFUNDED").title).toContain("환불 완료");
+    expect(ticketDetailHeading("REFUNDING").title).toBe("환불 신청 완료");
   });
 });
 

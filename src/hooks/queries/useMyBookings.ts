@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMyBookings } from "@/api/bookings";
 import { queryKeys } from "@/constants/queryKeys";
 import type { MyBookingsParams } from "@/types/domain/booking";
+import { overlayMyBookingsResponse } from "@/utils/booking/userRefund";
 
 const DEFAULT_SIZE = 100;
 
@@ -15,6 +16,7 @@ export function useMyBookings(params: MyBookingsParams = {}) {
   return useQuery({
     queryKey: queryKeys.bookings.mine(normalized),
     queryFn: () => fetchMyBookings(normalized),
+    select: overlayMyBookingsResponse,
     staleTime: 30_000,
   });
 }

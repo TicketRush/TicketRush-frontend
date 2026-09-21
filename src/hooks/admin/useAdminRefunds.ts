@@ -1,7 +1,7 @@
 // 관리자: 환불 모니터링 hooks — booking-service 실 API
 //
 // 예매 내역(#174)의 목록·stats·환불(POST .../refund)과 분리한다.
-// 이 파일은 환불 실패·고착 복구(#135)만 다룬다:
+// 이 파일은 환불 실패·고착 복구(#135)만 다룬다. 정상 신청·진행 중 환불은 조회하지 않는다 (#338):
 //   GET  .../refund-failed, .../refunding-stuck
 //   POST .../refund-retry
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import type { UserRole } from "@/types/domain/auth";
 import { clearExpiredStoredAuth } from "@/utils/auth/decideStoredAuthCleanup";
+import { clearRequestedRefunds } from "@/utils/booking/userRefund";
 
 // HttpOnly Cookie 사용 시 수정
 interface AuthState {
@@ -45,8 +46,10 @@ const useAuthStore = create<AuthState>()(
           set({ accessToken, refreshToken, user }),
         setTokens: (accessToken, refreshToken) =>
           set({ accessToken, refreshToken }),
-        logout: () =>
-          set({ accessToken: null, refreshToken: null, user: null }),
+        logout: () => {
+          clearRequestedRefunds();
+          set({ accessToken: null, refreshToken: null, user: null });
+        },
       }),
       {
         name: "auth-storage",

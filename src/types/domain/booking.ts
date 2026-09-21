@@ -26,8 +26,8 @@
 // 예매 상태 — 백엔드 booking-service enum과 정확히 일치
 //   PENDING: 결제 대기 (좌석 자동 HOLD 중, 서버 expires_at까지)
 //    CONFIRMED: 결제 완료
-//    CANCELED: 취소됨 (환불 없음, PENDING → CANCELED or 사용자 취소)
-//    REFUNDING: 환불 진행 중
+//    CANCELED: 취소됨 (환불 없음, PENDING → CANCELED)
+//    REFUNDING: 환불 신청 접수(사용자 DELETE) 또는 처리 중
 //    REFUNDED: 환불 완료
 //    EXPIRED: 타이머 만료 (자동 취소)
 
