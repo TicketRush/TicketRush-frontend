@@ -82,7 +82,7 @@ describe("validateConcertForm", () => {
     },
   );
 
-  it.each(["invalid", "2026-02-30T20:00", "2026-09-30T24:00", "2026-09-30T20:00Z"])(
+  it.each(["invalid", "2026-02-30T20:00", "2026-09-30T24:00", "2026-09-30T20:00Z", "2028--T", "202-01-31T20:30:45", "0999-01-31T20:30", "2028-02-T20:30", "2028-02-29T", "--T20:30"])(
     "rejects invalid booking time (%s)", (bookingOpenAt) => {
       expect(validateConcertForm({ form: { ...baseForm, bookingOpenAt }, totalSeats: 100, today })).toBe("올바른 예매 오픈 시각을 입력해주세요.");
     },

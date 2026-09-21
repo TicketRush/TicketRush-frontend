@@ -87,6 +87,21 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
 }
 
 describe("admin edit initial rendering", () => {
+  it("restores the booking date parts in edit mode while leaving the show date input unchanged", () => {
+    hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, bookingOpenAt: "2028-02-29T20:30:00" } }, isPending: false, isFetchedAfterMount: true });
+    const html = render();
+    expect(html).toContain('value="2028"');
+    expect(html).toContain('value="02" selected=""');
+    expect(html).toContain('value="29" selected=""');
+    expect(html).toContain('value="20:30"');
+    const showDateInput = html.match(/공연 날짜.*?(<input\b[^>]*>)/)?.[1];
+    expect(showDateInput).toContain('type="text"');
+    expect(showDateInput).toContain('value="2027-01-01"');
+    expect(showDateInput).toContain('placeholder="예: 2026-07-20"');
+    expect(html).toContain("기존 예매 오픈 시각 해제는 지원하지 않습니다.");
+    expect(hooks.update).not.toHaveBeenCalled();
+  });
+
   it("restores independent jazz colors into the edit preview", () => {
     const characterConfig = createCharacterConfig(restoreCharacterDraft({ outfitModelId: "rainbow-blouse", jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" })!);
     hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, characterConfig } }, isPending: false, isFetchedAfterMount: true });
@@ -132,8 +147,14 @@ describe("admin edit initial rendering", () => {
     } : undefined;
     const html = render("/admin/concerts/new", state);
     expect(html).toContain("예매 오픈 시각 (한국 시간)");
-    expect(html).toContain('type="datetime-local"');
-    if (bookingOpenAt) expect(html).toContain(bookingOpenAt);
+    expect(html).not.toContain('type="datetime-local"');
+    for (const part of ["year", "month", "day", "time"]) expect(html).toContain(`id="booking-open-${part}"`);
+    if (bookingOpenAt) {
+      expect(html).toContain('value="2026"');
+      expect(html).toContain('value="09" selected=""');
+      expect(html).toContain('value="30" selected=""');
+      expect(html).toContain('value="20:00"');
+    }
     expect(html).not.toContain("기존 예매 오픈 시각 해제는 지원하지 않습니다.");
   });
 
@@ -146,7 +167,7 @@ describe("admin edit initial rendering", () => {
       "/server-main.png",
       "/server-gallery.png",
       "/server.glb",
-      "2026-12-01T20:00:00",
+      'value="20:00"',
     ]) {
       expect(html).toContain(value);
     }

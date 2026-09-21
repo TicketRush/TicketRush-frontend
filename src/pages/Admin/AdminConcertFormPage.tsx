@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import BookingOpenAtInput from "@/components/admin/BookingOpenAtInput";
 import { toast } from "react-toastify";
 import {
   useConcertForEdit,
@@ -481,7 +482,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
 
         <Section title="예매 일정">
           <Field label="예매 오픈 시각 (한국 시간)">
-            <FormInput type="datetime-local" value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
+            <BookingOpenAtInput value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
             {mode === "edit" && <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>}
           </Field>
         </Section>
