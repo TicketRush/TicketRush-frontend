@@ -7,16 +7,9 @@ import {
   formatAdminDateTime,
   formatAdminText,
 } from "@/utils/admin/formatAdminMetric";
+import { resolveAdminDetailViewStatus } from "@/utils/admin/adminSeatLiveUpdate";
 
 const BOOKER_LOAD_FAILED = "불러오지 못했습니다";
-
-/** 맵 SSE가 더 빠르면 맵 상태를 우선한다. */
-export function resolveAdminDetailViewStatus(
-  mapStatus: SeatStatus | undefined,
-  detailStatus: SeatStatus | undefined,
-): SeatStatus | undefined {
-  return mapStatus ?? detailStatus;
-}
 
 function bookerText(detail: AdminSeatDetail): string {
   if (detail.bookerLoadFailed) return BOOKER_LOAD_FAILED;

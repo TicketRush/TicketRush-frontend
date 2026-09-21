@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import AdminSeatDetailPanel, {
-  resolveAdminDetailViewStatus,
-} from "./AdminSeatDetailPanel";
+import AdminSeatDetailPanel from "./AdminSeatDetailPanel";
 import type { AdminSeatDetail } from "@/types/domain/admin";
 
 const holdDetail: AdminSeatDetail = {
@@ -30,13 +28,6 @@ function renderPanel(
     />,
   );
 }
-
-describe("resolveAdminDetailViewStatus", () => {
-  it("맵 상태가 있으면 상세보다 맵을 우선한다", () => {
-    expect(resolveAdminDetailViewStatus("SOLD", "HOLD")).toBe("SOLD");
-    expect(resolveAdminDetailViewStatus(undefined, "HOLD")).toBe("HOLD");
-  });
-});
 
 describe("AdminSeatDetailPanel", () => {
   it("맵이 SOLD면 상세가 HOLD여도 예약 해제를 보여 주지 않는다", () => {

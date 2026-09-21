@@ -26,6 +26,7 @@ import type { SeatStatus, SeatWithStatus } from "@/types/domain/seat";
 import type { AdminConcertItem } from "@/types/domain/admin";
 import type { ConcertStatus, Genre } from "@/types/domain/concert";
 import Pagination from "@/components/admin/Pagination";
+import { resolveSelectedSeatLiveUpdate } from "@/utils/admin/adminSeatLiveUpdate";
 import {
   formatAdminCount,
   formatAdminOccupancy,
@@ -37,26 +38,6 @@ import { isInitialQueryPending } from "@/utils/query/isInitialQueryPending";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const MONITORING_PAGE_SIZE = 50;
-
-/** 맵 SSE 반영 후 선택 좌석 상세를 어떻게 맞출지. */
-export function resolveSelectedSeatLiveUpdate(args: {
-  selectedSeatId: number | null;
-  selectedStatus: SeatStatus | undefined;
-  prevSeatId: number | null;
-  prevStatus: SeatStatus | undefined;
-}): "clear" | "refetch" | "keep" {
-  if (args.selectedSeatId == null) return "keep";
-  if (args.selectedStatus === "AVAILABLE") return "clear";
-  if (
-    args.prevSeatId === args.selectedSeatId &&
-    args.selectedStatus &&
-    args.prevStatus &&
-    args.prevStatus !== args.selectedStatus
-  ) {
-    return "refetch";
-  }
-  return "keep";
-}
 
 const STATUS_LABELS: Record<ConcertStatus, string> = {
   UPCOMING: "예정",
