@@ -156,7 +156,6 @@ describe("SeatSelectionPage live updates (#335)", () => {
     const html = renderPage();
     expect(html).not.toContain("예매 가능 여부를 확인하는 중...");
     expect(html).toContain("좌석 선택");
-    expect(html).toContain("overflow-x-auto");
     expect(html).toContain("예매 가능");
     expect(html).toContain("임시예매");
   });
@@ -182,5 +181,16 @@ describe("SeatSelectionPage live updates (#335)", () => {
     const html = renderPage();
     expect(html).not.toContain("좌석 선택");
     expect(html).not.toContain("예매가 마감되었습니다");
+  });
+});
+
+describe("SeatSelectionPage zoom (#344)", () => {
+  it("가로 스크롤 대신 줌 컨트롤을 보여 준다", () => {
+    const html = renderPage();
+    expect(html).toContain("좌석맵 확대 축소");
+    expect(html).toContain("aria-label=\"확대\"");
+    expect(html).toContain("aria-label=\"축소\"");
+    expect(html).toContain("aria-label=\"전체 보기\"");
+    expect(html).not.toContain("overflow-x-auto");
   });
 });

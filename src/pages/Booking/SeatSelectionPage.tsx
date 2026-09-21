@@ -24,13 +24,15 @@
 // - #123: SSE/polling으로 선택 좌석이 AVAILABLE이 아니게 되면 선택 해제
 // - #335: 진입 가드는 최초 판정만. SSE는 캐시 패치, 폴링/포커스 refetch는 맵을 유지
 //   입장 후 잔여 0·판매 종료는 안내 후 확인 시 공연 상세로 이동
-// - #340: 새로고침 시 window·좌석맵 가로 스크롤을 공연 ID 기준으로 복원
+// - #340: 새로고침 시 window 세로 스크롤을 공연 ID 기준으로 복원
+// - #344: 가로 스크롤 대신 PinchZoomPan으로 맞춤 배율·줌/팬. 범례는 줌 밖에 둔다.
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import Button from "@/components/common/Button/Button";
 import Modal from "@/components/common/Modal/Modal";
+import PinchZoomPan from "@/components/common/PinchZoomPan";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
@@ -173,8 +175,9 @@ export default function SeatSelectionPage() {
     performanceId,
     stayOnSeatMap,
   );
+  // #340 window 세로 스크롤 복원. 맵 가로 스크롤 컨테이너는 #344 줌으로 없어져 비워 둔다(#382).
   const mapScrollRef = useRef<HTMLDivElement>(null);
-  const { onMapScroll } = useSeatSelectionScroll({
+  useSeatSelectionScroll({
     performanceId:
       performanceId != null && Number.isSafeInteger(performanceId)
         ? performanceId
@@ -495,42 +498,44 @@ export default function SeatSelectionPage() {
           </div>
         </div>
 
-        {/* 좌석 그리드 — 범례는 우측.
-            flex w-max min-w-full justify-center:
-            좁을 때 콘텐츠 폭만큼 늘어나 왼쪽부터 스크롤, 넓을 때 가운데 정렬.
-            패딩은 툴팁·포커스 링이 overflow에 잘리지 않게 확보. */}
-        <div
-          ref={mapScrollRef}
-          onScroll={onMapScroll}
-          className="overflow-x-auto pt-8 pb-3 px-2"
-        >
-          <div className="flex w-max min-w-full justify-center">
-            <div className="flex flex-row items-center gap-6">
-              {isLoading && !seatMap ? (
-                <div className="text-center text-text-secondary py-12">
-                  좌석 정보 불러오는 중...
-                </div>
-              ) : isError && !seatMap ? (
-                <div className="flex items-center justify-center gap-2 text-error py-12">
-                  <AlertCircle size={20} />
-                  좌석 정보를 불러올 수 없습니다.
-                </div>
-              ) : seatMap && !seatMap.layoutReady ? (
-                <div className="text-center text-text-secondary py-12">
-                  좌석 배치가 아직 생성되지 않았습니다.
-                </div>
-              ) : (
+        {/* 좌석 그리드 — 가로 스크롤 대신 뷰포트 줌/팬 (#344).
+            범례는 줌 밖에 두어 확대 후에도 읽히게 한다.
+            줌은 버튼·Ctrl(Cmd)+휠·핀치. 일반 휠은 페이지 스크롤.
+            맞춤 배율에서는 팬하지 않아 맵 위에서 페이지를 내릴 수 있다.
+            패딩은 툴팁·포커스 링이 overflow에 잘리지 않게 확보.
+            #340 window 세로 스크롤은 유지. 맵 가로 스크롤 복원은 줌으로 대체(#382). */}
+        {isLoading && !seatMap ? (
+          <div className="text-center text-text-secondary py-12">
+            좌석 정보 불러오는 중...
+          </div>
+        ) : isError && !seatMap ? (
+          <div className="flex items-center justify-center gap-2 text-error py-12">
+            <AlertCircle size={20} />
+            좌석 정보를 불러올 수 없습니다.
+          </div>
+        ) : seatMap && !seatMap.layoutReady ? (
+          <div className="text-center text-text-secondary py-12">
+            좌석 배치가 아직 생성되지 않았습니다.
+          </div>
+        ) : (
+          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            <PinchZoomPan className="w-full min-w-0 min-h-[280px] h-[min(52vh,560px)] rounded-lg bg-gray-50">
+              <div className="p-8">
                 <SeatMap
                   seats={seatMap?.seats ?? []}
                   layout={seatMap?.layout}
-                  selectedSeatId={selectedSeatAvailable ? (selectedSeat?.id ?? null) : null}
+                  selectedSeatId={
+                    selectedSeatAvailable ? (selectedSeat?.id ?? null) : null
+                  }
                   onSeatClick={handleSeatClick}
                 />
-              )}
+              </div>
+            </PinchZoomPan>
+            <div className="flex justify-center lg:justify-start shrink-0">
               <SeatLegend />
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 4개 통계 */}
