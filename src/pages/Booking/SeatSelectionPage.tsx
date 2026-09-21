@@ -22,11 +22,14 @@
 //   - performanceId 변경 시 selectedSeat 초기화 (교차 공연 HOLD 방지)
 //   - 가드용 detail/counts는 fresh 조회로 최신 기준 판정
 // - #123: SSE/polling으로 선택 좌석이 AVAILABLE이 아니게 되면 선택 해제
-import { useEffect, useRef, useCallback } from "react";
+// - #335: 진입 가드는 최초 판정만. SSE는 캐시 패치, 폴링/포커스 refetch는 맵을 유지
+//   입장 후 잔여 0·판매 종료는 안내 후 확인 시 공연 상세로 이동
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { X, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import Button from "@/components/common/Button/Button";
+import Modal from "@/components/common/Modal/Modal";
 import SeatMap from "@/components/seat/SeatMap";
 import SeatLegend from "@/components/seat/SeatLegend";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
@@ -51,6 +54,14 @@ import {
   canBookConcert,
   shouldFetchSeatCounts,
 } from "@/utils/concert/canBookConcert";
+import { isInitialQueryPending } from "@/utils/query/isInitialQueryPending";
+import {
+  resolveSeatExitNotice,
+  shouldNotifySeatTaken,
+  seatMapHasAvailable,
+  getSeatExitNoticeCopy,
+  type SoldOutNoticeKind,
+} from "@/utils/seat/soldOutNotice";
 
 export default function SeatSelectionPage() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +79,10 @@ export default function SeatSelectionPage() {
   const pendingSeatId = usePaymentStore((s) => s.seatId);
   const resetPayment = usePaymentStore((s) => s.reset);
   const cancelPendingReservation = useCancelPendingReservation();
+  const [hasEntered, setHasEntered] = useState(false);
+  const [soldOutNotice, setSoldOutNotice] = useState<SoldOutNoticeKind | null>(
+    null,
+  );
 
   /** 내 「좌석 확인」 진행 중·내 PENDING HOLD는 선택 해제 스킵 (#167) */
   const confirmingSeatIdRef = useRef<number | null>(null);
@@ -78,8 +93,10 @@ export default function SeatSelectionPage() {
     [bookingNumber, pendingSeatId],
   );
 
-  // URL의 공연이 바뀌면 이전 공연 selectedSeat 잔존 방지
+  // URL의 공연이 바뀌면 이전 공연 selectedSeat·매진 안내 잔존 방지
   useEffect(() => {
+    setHasEntered(false);
+    setSoldOutNotice(null);
     if (!performanceId || isNaN(performanceId)) return;
     resetSeat();
   }, [performanceId, resetSeat]);
@@ -88,6 +105,7 @@ export default function SeatSelectionPage() {
     data: concert,
     isLoading: concertLoading,
     isFetching: concertFetching,
+    isFetchedAfterMount: concertFetchedAfterMount,
     isError: concertError,
   } = useConcertDetail(performanceId, { fresh: true });
 
@@ -102,14 +120,25 @@ export default function SeatSelectionPage() {
     data: seatCounts,
     isLoading: seatCountsLoading,
     isFetching: seatCountsFetching,
+    isFetchedAfterMount: seatCountsFetchedAfterMount,
     isError: seatCountsError,
   } = useSeatCounts(performanceId, shouldFetchSeats, { fresh: true });
+
+  const concertInitialPending = isInitialQueryPending(
+    concertLoading,
+    concertFetching,
+    concertFetchedAfterMount,
+  );
+  const countsInitialPending = isInitialQueryPending(
+    seatCountsLoading,
+    seatCountsFetching,
+    seatCountsFetchedAfterMount,
+  );
 
   const seatsReady =
     shouldFetchSeats &&
     !!seatCounts &&
-    !seatCountsLoading &&
-    !seatCountsFetching &&
+    !countsInitialPending &&
     !seatCountsError;
   const remaining = seatsReady ? seatCounts.availableCount : null;
 
@@ -121,40 +150,80 @@ export default function SeatSelectionPage() {
       remaining,
     });
 
-  // 가드 판정 전(상세·seat-counts fresh 조회)에는 좌석맵/SSE를 열지 않음
+  useEffect(() => {
+    if (canEnter) setHasEntered(true);
+  }, [canEnter]);
+
+  const stayOnSeatMap = canEnter || hasEntered;
+
+  // 가드는 최초 예매 가능 판정에만 쓴다. SSE/폴링/포커스 refetch는 맵을 유지 (#335)
   const guardPending =
     !!performanceId &&
     !isNaN(performanceId) &&
-    (concertLoading ||
-      concertFetching ||
+    (concertInitialPending ||
       (!concertError &&
         !!concert &&
         shouldFetchSeats &&
-        (seatCountsLoading || seatCountsFetching)));
+        countsInitialPending));
 
   // #122: layouts → 좌석맵, counts → 하단 잔여/상태 통계
   const { data: seatMap, isLoading, isError } = useSeats(
     performanceId,
-    canEnter,
+    stayOnSeatMap,
   );
   const createBookingMutation = useCreateBooking();
   const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);
-  useSeatEventStream(performanceId, canEnter, { shouldPreserveSelection });
+  useSeatEventStream(performanceId, stayOnSeatMap, {
+    shouldPreserveSelection,
+    concertStatus: concert?.status,
+  });
+
+  const isOwnHoldInFlight =
+    createBookingMutation.isPending ||
+    releaseSeatMutation.isPending ||
+    !!bookingNumber;
+
+  useEffect(() => {
+    setSoldOutNotice(
+      resolveSeatExitNotice({
+        hasEntered,
+        concertStatus: concert?.status,
+        remaining,
+        isOwnHoldInFlight,
+        mapHasAvailable: seatMapHasAvailable(seatMap),
+        counts: seatCounts,
+      }),
+    );
+  }, [
+    hasEntered,
+    concert?.status,
+    remaining,
+    seatCounts,
+    isOwnHoldInFlight,
+    seatMap,
+  ]);
 
   // polling fallback 등으로 캐시가 갱신돼도 선택 좌석이 AVAILABLE이 아니면 해제
   useEffect(() => {
     if (!selectedSeat || !seatMap?.seats) return;
+    const notify = shouldNotifySeatTaken({
+      remaining,
+      mapHasAvailable: seatMapHasAvailable(seatMap),
+      concertStatus: concert?.status,
+    });
     const current = seatMap.seats.find((s) => s.id === selectedSeat.id);
     if (!current) {
       clearSelectedSeatIfTaken(selectedSeat.id, "SOLD", {
         preserve: shouldPreserveSelection(selectedSeat.id),
+        notify,
       });
       return;
     }
     clearSelectedSeatIfTaken(selectedSeat.id, current.status, {
       preserve: shouldPreserveSelection(selectedSeat.id),
+      notify,
     });
-  }, [seatMap, selectedSeat, shouldPreserveSelection]);
+  }, [seatMap, selectedSeat, shouldPreserveSelection, remaining, concert?.status]);
 
   // 직접 URL 진입 시에도 결제 플로우용 store를 맞춤
   useEffect(() => {
@@ -218,8 +287,12 @@ export default function SeatSelectionPage() {
     );
   }
 
-  // 상세 실패·좌석 정보 실패·예매 불가 → 상세로 복귀 (#181)
-  if (concertError || !concert || seatCountsError || !canEnter) {
+  // 상세 실패·좌석 정보 실패·최초 예매 불가 → 상세로 복귀 (#181)
+  // 입장 후 잔여 0·판매 종료는 안내 모달로 처리한다 (#335)
+  if (concertError || !concert || seatCountsError) {
+    return <Navigate to={`/concerts/${performanceId}`} replace />;
+  }
+  if (!hasEntered && !canEnter) {
     return <Navigate to={`/concerts/${performanceId}`} replace />;
   }
 
@@ -230,6 +303,7 @@ export default function SeatSelectionPage() {
     );
 
   function handleSeatClick(seat: SeatWithStatus) {
+    if (soldOutNotice) return;
     toggleSeat({
       id: seat.id,
       seatLayoutId: seat.seatLayoutId,
@@ -318,6 +392,11 @@ export default function SeatSelectionPage() {
     }
   }
 
+  function handleSoldOutConfirm() {
+    resetSeat();
+    navigate(`/concerts/${performanceId}`, { replace: true });
+  }
+
   async function handleBack() {
     try {
       if (bookingNumber) {
@@ -337,6 +416,9 @@ export default function SeatSelectionPage() {
 
   const isConfirmPending =
     createBookingMutation.isPending || releaseSeatMutation.isPending;
+  const soldOutCopy = soldOutNotice
+    ? getSeatExitNoticeCopy(soldOutNotice, concert.bookingOpenAt)
+    : null;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
@@ -361,10 +443,10 @@ export default function SeatSelectionPage() {
         </div>
         <button
           type="button"
-          disabled={!selectedSeatAvailable || isConfirmPending}
+          disabled={!selectedSeatAvailable || isConfirmPending || !!soldOutNotice}
           onClick={handleConfirm}
           className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-            selectedSeatAvailable && !isConfirmPending
+            selectedSeatAvailable && !isConfirmPending && !soldOutNotice
               ? "bg-primary text-white hover:opacity-90"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
@@ -404,11 +486,11 @@ export default function SeatSelectionPage() {
         <div className="overflow-x-auto pt-8 pb-3 px-2">
           <div className="flex w-max min-w-full justify-center">
             <div className="flex flex-row items-center gap-6">
-              {isLoading ? (
+              {isLoading && !seatMap ? (
                 <div className="text-center text-text-secondary py-12">
                   좌석 정보 불러오는 중...
                 </div>
-              ) : isError ? (
+              ) : isError && !seatMap ? (
                 <div className="flex items-center justify-center gap-2 text-error py-12">
                   <AlertCircle size={20} />
                   좌석 정보를 불러올 수 없습니다.
@@ -467,6 +549,22 @@ export default function SeatSelectionPage() {
           />
         </div>
       </div>
+
+      <Modal
+        isOpen={soldOutCopy != null}
+        onClose={handleSoldOutConfirm}
+        title={soldOutCopy?.title}
+        size="sm"
+        disableOverlayClose
+        disableEscClose
+        footer={
+          <Button variant="primary" size="sm" onClick={handleSoldOutConfirm}>
+            확인
+          </Button>
+        }
+      >
+        <p>{soldOutCopy?.message}</p>
+      </Modal>
     </div>
   );
 }
