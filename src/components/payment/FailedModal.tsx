@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { FocusTrap } from "focus-trap-react";
 import { AlertTriangle } from "lucide-react";
 import { usePaymentStore } from "@/stores/reservation/paymentStore";
+import { useBodyScrollLock } from "@/hooks/common/useBodyScrollLock";
 
 interface PaymentFailedModalProps {
   onClose: () => void;
@@ -24,14 +25,7 @@ export default function PaymentFailedModal({
   const descId = useId();
   const reason =
     message || storeErrorMessage || "결제가 완료되지 않았습니다.";
-
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+  useBodyScrollLock(true);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -45,12 +39,13 @@ export default function PaymentFailedModal({
   }, [onClose, closePending]);
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overscroll-contain">
       <FocusTrap
         focusTrapOptions={{
           escapeDeactivates: false,
           clickOutsideDeactivates: false,
           returnFocusOnDeactivate: true,
+          preventScroll: true,
           fallbackFocus: '[role="dialog"]',
         }}
       >

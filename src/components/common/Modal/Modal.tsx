@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { FocusTrap } from "focus-trap-react";
 import { X } from "lucide-react";
 import clsx from "clsx";
+import { useBodyScrollLock } from "@/hooks/common/useBodyScrollLock";
 
 export type ModalSize = "sm" | "md" | "lg";
 /** default: 사용자 라이트 / admin: 관리자 다크 카드 (#286) */
@@ -77,6 +78,7 @@ export default function Modal({
   // ESC·오버레이가 모두 막힌 요청 진행 중에는 X도 잠근다
   const closeLocked = disableOverlayClose && disableEscClose;
   const theme = variantStyles[variant];
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (!isOpen || disableEscClose) return;
@@ -89,18 +91,6 @@ export default function Modal({
     return () => document.removeEventListener("keydown", handleEsc);
   }, [isOpen, onClose, disableEscClose]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // ⚠️ 단일 모달 기준. nested modal이면 body-scroll-lock 검토.
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -110,13 +100,14 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 overscroll-contain"
       onClick={handleOverlayClick}
     >
       <FocusTrap
         focusTrapOptions={{
           returnFocusOnDeactivate: true,
           fallbackFocus: '[role="dialog"]',
+          preventScroll: true,
           // 오버레이·ESC 닫기는 바깥 핸들러에서만 처리한다
           clickOutsideDeactivates: false,
           escapeDeactivates: false,
