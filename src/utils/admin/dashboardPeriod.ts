@@ -34,6 +34,20 @@ export function defaultDashboardRange(today = new Date()): {
   return { start, end };
 }
 
+/**
+ * 대시보드 달력의 초기 표시 월.
+ * 조회 시작일(최근 30일이면 이전달일 수 있음)이 아니라 종료일(기본값: 오늘)을 보여 준다.
+ */
+export function dashboardCalendarView({
+  end,
+}: {
+  start: Date;
+  end: Date;
+}): { year: number; month: number } {
+  const view = startOfDay(end);
+  return { year: view.getFullYear(), month: view.getMonth() };
+}
+
 /** 시작·종료일 포함 일수. BE `ChronoUnit.DAYS.between(from, to) + 1` 과 동일. */
 export function inclusiveDayCount(start: Date, end: Date): number {
   return (
