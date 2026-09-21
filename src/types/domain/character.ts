@@ -19,6 +19,9 @@ export interface CharacterConfig {
   hairColor: string;
   outfitModelId: OutfitModelId;
   outfitColor: string;
+  jazzShirtColor: string;
+  jazzInnerColor: string;
+  jazzPantsColor: string;
   balletWearColor: string;
   balletShortsColor: string;
   jacketColor: string;

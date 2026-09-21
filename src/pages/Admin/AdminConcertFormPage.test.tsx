@@ -20,8 +20,8 @@ vi.mock("@/hooks/admin/useAdmin", () => ({
   useUpdateConcert: () => ({ mutateAsync: hooks.update, isPending: false }),
 }));
 vi.mock("@/components/admin/character/CharacterModelViewer", () => ({
-  default: (props: { fanmeetCardiganColor: string }) => (
-    <span>{props.fanmeetCardiganColor}</span>
+  default: (props: { fanmeetCardiganColor: string; jazzShirtColor: string; jazzInnerColor: string; jazzPantsColor: string }) => (
+    <span>{props.fanmeetCardiganColor} {props.jazzShirtColor} {props.jazzInnerColor} {props.jazzPantsColor}</span>
   ),
 }));
 vi.mock("@/hooks/common/useDocumentTitle", () => ({
@@ -87,6 +87,13 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
 }
 
 describe("admin edit initial rendering", () => {
+  it("restores independent jazz colors into the edit preview", () => {
+    const characterConfig = createCharacterConfig(restoreCharacterDraft({ outfitModelId: "rainbow-blouse", jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" })!);
+    hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, characterConfig } }, isPending: false, isFetchedAfterMount: true });
+    const html = render();
+    for (const color of ["#FF0000", "#00FF00", "#0000FF"]) expect(html).toContain(color);
+  });
+
   it("allows 100,000 seats in create mode with the matching input maximum", () => {
     hooks.query.mockReturnValue({});
     const html = render("/admin/concerts/new", {

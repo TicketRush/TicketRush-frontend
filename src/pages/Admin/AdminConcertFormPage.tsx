@@ -963,6 +963,9 @@ function CharacterCreatorLinkBox({
           skinColor={character.skinColor}
           hairColor={character.hairColor}
           outfitColor={character.outfitColor}
+          jazzShirtColor={character.jazzShirtColor}
+          jazzInnerColor={character.jazzInnerColor}
+          jazzPantsColor={character.jazzPantsColor}
           balletWearColor={character.balletWearColor}
           balletShortsColor={character.balletShortsColor}
           jacketColor={character.jacketColor}

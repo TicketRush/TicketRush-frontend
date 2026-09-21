@@ -1,3 +1,4 @@
+import { applyJazzPartColor } from "./jazzOutfitColor";
 import { findConcertPartColor, cloneConcertMaterialWithColor } from "./concertOutfitColor";
 import {
   Component,
@@ -54,6 +55,9 @@ interface CharacterModelViewerProps {
    * 팬미팅 의상에서는 카디건과 스커트에 적용합니다.
    */
   outfitColor: string;
+  jazzShirtColor?: string;
+  jazzInnerColor?: string;
+  jazzPantsColor?: string;
 
   /** Ballet part colors fall back to outfitColor when omitted. */
   balletWearColor?: string;
@@ -481,6 +485,9 @@ function OutfitModel({
   modelUrl,
   outfitModelId,
   outfitColor,
+  jazzShirtColor,
+  jazzInnerColor,
+  jazzPantsColor,
   balletWearColor,
   balletShortsColor,
   jacketColor,
@@ -499,6 +506,9 @@ function OutfitModel({
   modelUrl: string;
   outfitModelId: OutfitModelId;
   outfitColor: string;
+  jazzShirtColor?: string;
+  jazzInnerColor?: string;
+  jazzPantsColor?: string;
   balletWearColor?: string;
   balletShortsColor?: string;
   jacketColor?: string;
@@ -536,7 +546,11 @@ function OutfitModel({
       }
 
       if (outfitModelId === "rainbow-blouse") {
-        applyMeshColor(object, outfitColor);
+        applyJazzPartColor(object, {
+          shirt: jazzShirtColor ?? outfitColor,
+          inner: jazzInnerColor ?? outfitColor,
+          pants: jazzPantsColor ?? outfitColor,
+        });
         return;
       }
 
@@ -650,6 +664,9 @@ function OutfitModel({
     gltf.scene,
     outfitModelId,
     outfitColor,
+    jazzShirtColor,
+    jazzInnerColor,
+    jazzPantsColor,
     balletWearColor,
     balletShortsColor,
     jacketColor,
@@ -678,6 +695,9 @@ function CharacterModel({
   hairColor,
   outfitModelId,
   outfitColor,
+  jazzShirtColor,
+  jazzInnerColor,
+  jazzPantsColor,
   balletWearColor,
   balletShortsColor,
   jacketColor,
@@ -704,6 +724,9 @@ function CharacterModel({
   | "skinColor"
   | "hairColor"
   | "outfitColor"
+  | "jazzShirtColor"
+  | "jazzInnerColor"
+  | "jazzPantsColor"
   | "balletWearColor"
   | "balletShortsColor"
   | "jacketColor"
@@ -730,6 +753,9 @@ function CharacterModel({
       modelUrl={outfitModelUrl}
       outfitModelId={outfitModelId}
       outfitColor={outfitColor}
+      jazzShirtColor={jazzShirtColor}
+      jazzInnerColor={jazzInnerColor}
+      jazzPantsColor={jazzPantsColor}
       balletWearColor={balletWearColor}
       balletShortsColor={balletShortsColor}
       jacketColor={jacketColor}
@@ -802,6 +828,9 @@ export default function CharacterModelViewer({
   hairColor,
   outfitModelId,
   outfitColor,
+  jazzShirtColor,
+  jazzInnerColor,
+  jazzPantsColor,
   balletWearColor,
   balletShortsColor,
   jacketColor,
@@ -848,6 +877,9 @@ export default function CharacterModelViewer({
             hairColor={hairColor}
             outfitModelId={outfitModelId}
             outfitColor={outfitColor}
+            jazzShirtColor={jazzShirtColor}
+            jazzInnerColor={jazzInnerColor}
+            jazzPantsColor={jazzPantsColor}
             balletWearColor={balletWearColor}
             balletShortsColor={balletShortsColor}
             jacketColor={jacketColor}

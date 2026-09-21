@@ -12,6 +12,21 @@ vi.mock("@/hooks/common/useDocumentTitle", () => ({ useDocumentTitle: vi.fn() })
 afterEach(() => vi.unstubAllGlobals());
 
 describe("character creator without accessory controls", () => {
+  it.each(["rainbow-blouse", "concert", "theater", "classic", "ballet", "musical", "festival"])("shows jazz controls only for jazz (%s)", (outfitModelId) => {
+    vi.stubGlobal("React", React);
+    vi.stubGlobal("localStorage", { getItem: () => JSON.stringify({ outfitModelId, outfitColor: "#ABCDEF" }) });
+    const html = renderToStaticMarkup(<MemoryRouter><AdminCharacterCreatorPage /></MemoryRouter>);
+    for (const part of ["shirt", "inner", "pants"]) {
+      expect(html.includes(`id="jazz-${part}-color-picker"`)).toBe(outfitModelId === "rainbow-blouse");
+      expect(html.includes(`id="jazz-${part}-hex"`)).toBe(outfitModelId === "rainbow-blouse");
+    }
+    if (outfitModelId === "rainbow-blouse") {
+      for (const label of ["셔츠 색상", "이너 색상", "바지 색상"]) expect(html).toContain(label);
+      expect(html).not.toContain('id="outfit-color-picker"');
+      expect(html).toContain('value="#ABCDEF"');
+    }
+  });
+
   it.each([undefined, "none", "sunglasses", "hat", "headset", "mic", "guitar", "light"])(
     "hides accessory options and summary while accepting stored value %s",
     (accessory) => {

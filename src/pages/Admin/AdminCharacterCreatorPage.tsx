@@ -239,6 +239,9 @@ const DEFAULT_CHARACTER: CharacterDraft = {
   outfitModelId: DEFAULT_OUTFIT_MODEL_ID,
   outfitName: getOutfitOption(DEFAULT_OUTFIT_MODEL_ID).name,
   outfitColor: DEFAULT_OUTFIT_COLOR,
+  jazzShirtColor: DEFAULT_OUTFIT_COLOR,
+  jazzInnerColor: DEFAULT_OUTFIT_COLOR,
+  jazzPantsColor: DEFAULT_OUTFIT_COLOR,
   balletWearColor: DEFAULT_BALLET_WEAR_COLOR,
   balletShortsColor: DEFAULT_BALLET_SHORTS_COLOR,
   jacketColor: DEFAULT_CONCERT_JACKET_COLOR,
@@ -364,6 +367,15 @@ export default function AdminCharacterCreatorPage() {
   const [festivalBottomHexError, setFestivalBottomHexError] =
     useState("");
 
+  const [jazzShirtHexInput, setJazzShirtHexInput] = useState(() => character.jazzShirtColor);
+  const [jazzShirtHexError, setJazzShirtHexError] = useState("");
+
+  const [jazzInnerHexInput, setJazzInnerHexInput] = useState(() => character.jazzInnerColor);
+  const [jazzInnerHexError, setJazzInnerHexError] = useState("");
+
+  const [jazzPantsHexInput, setJazzPantsHexInput] = useState(() => character.jazzPantsColor);
+  const [jazzPantsHexError, setJazzPantsHexError] = useState("");
+
   const [fanmeetCardiganHexInput, setFanmeetCardiganHexInput] = useState(() => character.fanmeetCardiganColor);
   const [fanmeetCardiganHexError, setFanmeetCardiganHexError] = useState("");
 
@@ -440,6 +452,7 @@ export default function AdminCharacterCreatorPage() {
   const isBalletOutfit = character.outfitModelId === "ballet";
   const isConcertOutfit = character.outfitModelId === "concert";
   const isMusicalOutfit = character.outfitModelId === "musical";
+  const isJazzOutfit = character.outfitModelId === "rainbow-blouse";
   const isFanmeetOutfit = character.outfitModelId === "theater";
   const isFestivalOutfit = character.outfitModelId === "festival";
 
@@ -1188,6 +1201,168 @@ export default function AdminCharacterCreatorPage() {
     setFestivalBottomHexError("");
   }
 
+  function applyJazzShirtColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("jazzShirtColor", normalized);
+    setJazzShirtHexInput(normalized);
+    setJazzShirtHexError("");
+
+    return true;
+  }
+
+  function handleJazzShirtHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setJazzShirtHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyJazzShirtColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setJazzShirtHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setJazzShirtHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setJazzShirtHexError("");
+  }
+
+  function handleJazzShirtHexBlur() {
+    const normalized = normalizeHexColor(jazzShirtHexInput);
+
+    if (normalized) {
+      applyJazzShirtColor(normalized);
+      return;
+    }
+
+    setJazzShirtHexInput(character.jazzShirtColor);
+    setJazzShirtHexError("");
+  }
+
+  function applyJazzInnerColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("jazzInnerColor", normalized);
+    setJazzInnerHexInput(normalized);
+    setJazzInnerHexError("");
+
+    return true;
+  }
+
+  function handleJazzInnerHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setJazzInnerHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyJazzInnerColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setJazzInnerHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setJazzInnerHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setJazzInnerHexError("");
+  }
+
+  function handleJazzInnerHexBlur() {
+    const normalized = normalizeHexColor(jazzInnerHexInput);
+
+    if (normalized) {
+      applyJazzInnerColor(normalized);
+      return;
+    }
+
+    setJazzInnerHexInput(character.jazzInnerColor);
+    setJazzInnerHexError("");
+  }
+
+  function applyJazzPantsColor(value: string) {
+    const normalized = normalizeHexColor(value);
+
+    if (!normalized) {
+      return false;
+    }
+
+    update("jazzPantsColor", normalized);
+    setJazzPantsHexInput(normalized);
+    setJazzPantsHexError("");
+
+    return true;
+  }
+
+  function handleJazzPantsHexChange(value: string) {
+    const upperValue = value.toUpperCase();
+    setJazzPantsHexInput(upperValue);
+
+    const normalized = normalizeHexColor(upperValue);
+
+    if (normalized) {
+      applyJazzPantsColor(normalized);
+      return;
+    }
+
+    const hexBody = upperValue.startsWith("#")
+      ? upperValue.slice(1)
+      : upperValue;
+
+    if (!/^[0-9A-F]*$/.test(hexBody)) {
+      setJazzPantsHexError("0-9와 A-F만 입력할 수 있습니다.");
+      return;
+    }
+
+    if (hexBody.length > 6) {
+      setJazzPantsHexError("HEX 색상은 6자리로 입력해주세요.");
+      return;
+    }
+
+    setJazzPantsHexError("");
+  }
+
+  function handleJazzPantsHexBlur() {
+    const normalized = normalizeHexColor(jazzPantsHexInput);
+
+    if (normalized) {
+      applyJazzPantsColor(normalized);
+      return;
+    }
+
+    setJazzPantsHexInput(character.jazzPantsColor);
+    setJazzPantsHexError("");
+  }
+
   function applyFanmeetCardiganColor(value: string) {
     const normalized = normalizeHexColor(value);
 
@@ -1500,6 +1675,15 @@ export default function AdminCharacterCreatorPage() {
     setFestivalBottomHexInput(DEFAULT_CHARACTER.festivalBottomColor);
     setFestivalBottomHexError("");
 
+    setJazzShirtHexInput(DEFAULT_CHARACTER.jazzShirtColor);
+    setJazzShirtHexError("");
+
+    setJazzInnerHexInput(DEFAULT_CHARACTER.jazzInnerColor);
+    setJazzInnerHexError("");
+
+    setJazzPantsHexInput(DEFAULT_CHARACTER.jazzPantsColor);
+    setJazzPantsHexError("");
+
     setFanmeetCardiganHexInput(DEFAULT_CHARACTER.fanmeetCardiganColor);
     setFanmeetCardiganHexError("");
 
@@ -1576,6 +1760,7 @@ export default function AdminCharacterCreatorPage() {
       !isMusicalOutfit &&
       !isFestivalOutfit &&
       !isFanmeetOutfit &&
+      !isJazzOutfit &&
       !normalizeHexColor(outfitHexInput)
     ) {
       setOutfitHexError(
@@ -1631,6 +1816,21 @@ export default function AdminCharacterCreatorPage() {
       setFestivalBottomHexError(
         "하의 컬러를 적용하려면 올바른 6자리 HEX 값을 입력해주세요.",
       );
+      return;
+    }
+
+    if (isJazzOutfit && !normalizeHexColor(jazzShirtHexInput)) {
+      setJazzShirtHexError("셔츠 색상을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
+      return;
+    }
+
+    if (isJazzOutfit && !normalizeHexColor(jazzInnerHexInput)) {
+      setJazzInnerHexError("이너 색상을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
+      return;
+    }
+
+    if (isJazzOutfit && !normalizeHexColor(jazzPantsHexInput)) {
+      setJazzPantsHexError("바지 색상을 적용하려면 올바른 6자리 HEX 값을 입력해주세요.");
       return;
     }
 
@@ -2461,6 +2661,56 @@ export default function AdminCharacterCreatorPage() {
                     onHexBlur={handleMusicalShortsHexBlur}
                   />
                 </>
+              ) : isJazzOutfit ? (
+                <>
+                  <OutfitColorControl
+                    title="셔츠 색상"
+                    customTitle="사용자 지정 셔츠 색상"
+                    idPrefix="jazz-shirt"
+                    currentColor={character.jazzShirtColor}
+                    hexInput={jazzShirtHexInput}
+                    hexError={jazzShirtHexError}
+                    presets={OUTFIT_COLORS}
+                    isCustom={!OUTFIT_COLORS.some((color) => isSameHexColor(color, character.jazzShirtColor))}
+                    placeholder={DEFAULT_OUTFIT_COLOR}
+                    onPresetClick={applyJazzShirtColor}
+                    onColorPickerChange={applyJazzShirtColor}
+                    onHexChange={handleJazzShirtHexChange}
+                    onHexBlur={handleJazzShirtHexBlur}
+                  />
+
+                  <OutfitColorControl
+                    title="이너 색상"
+                    customTitle="사용자 지정 이너 색상"
+                    idPrefix="jazz-inner"
+                    currentColor={character.jazzInnerColor}
+                    hexInput={jazzInnerHexInput}
+                    hexError={jazzInnerHexError}
+                    presets={OUTFIT_COLORS}
+                    isCustom={!OUTFIT_COLORS.some((color) => isSameHexColor(color, character.jazzInnerColor))}
+                    placeholder={DEFAULT_OUTFIT_COLOR}
+                    onPresetClick={applyJazzInnerColor}
+                    onColorPickerChange={applyJazzInnerColor}
+                    onHexChange={handleJazzInnerHexChange}
+                    onHexBlur={handleJazzInnerHexBlur}
+                  />
+
+                  <OutfitColorControl
+                    title="바지 색상"
+                    customTitle="사용자 지정 바지 색상"
+                    idPrefix="jazz-pants"
+                    currentColor={character.jazzPantsColor}
+                    hexInput={jazzPantsHexInput}
+                    hexError={jazzPantsHexError}
+                    presets={OUTFIT_COLORS}
+                    isCustom={!OUTFIT_COLORS.some((color) => isSameHexColor(color, character.jazzPantsColor))}
+                    placeholder={DEFAULT_OUTFIT_COLOR}
+                    onPresetClick={applyJazzPantsColor}
+                    onColorPickerChange={applyJazzPantsColor}
+                    onHexChange={handleJazzPantsHexChange}
+                    onHexBlur={handleJazzPantsHexBlur}
+                  />
+                </>
               ) : isFanmeetOutfit ? (
                 <>
                   <OutfitColorControl
@@ -2771,6 +3021,9 @@ export default function AdminCharacterCreatorPage() {
                 skinColor={character.skinColor}
                 hairColor={character.hairColor}
                 outfitColor={character.outfitColor}
+                jazzShirtColor={character.jazzShirtColor}
+                jazzInnerColor={character.jazzInnerColor}
+                jazzPantsColor={character.jazzPantsColor}
                 balletWearColor={character.balletWearColor}
                 balletShortsColor={character.balletShortsColor}
                 jacketColor={character.jacketColor}
@@ -2847,6 +3100,12 @@ export default function AdminCharacterCreatorPage() {
                   <p>
                     반바지: {character.musicalShortsColor.toUpperCase()}
                   </p>
+                </>
+              ) : isJazzOutfit ? (
+                <>
+                  <p>셔츠: {character.jazzShirtColor.toUpperCase()}</p>
+                  <p>이너: {character.jazzInnerColor.toUpperCase()}</p>
+                  <p>바지: {character.jazzPantsColor.toUpperCase()}</p>
                 </>
               ) : isFanmeetOutfit ? (
                 <>

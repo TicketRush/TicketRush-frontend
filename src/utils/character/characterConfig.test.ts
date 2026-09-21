@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Buffer } from "node:buffer";
+import { restoreCharacterForDisplay } from "./characterConfig";
 import {
   CHARACTER_CONFIG_SCHEMA_VERSION,
   MAX_CHARACTER_CONFIG_BYTES,
@@ -181,6 +182,34 @@ describe("character config and legacy restoration", () => {
       throw new Error("storage unavailable");
     });
     expect(loadSavedCharacter()).toBeNull();
+  });
+});
+
+describe("jazz config compatibility", () => {
+  it("preserves independent colors in JSON, localStorage and public display", () => {
+    const colors = { jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" };
+    const saved = createCharacterConfig(restoreCharacterDraft({ outfitModelId: "rainbow-blouse", ...colors })!);
+    const json = JSON.stringify(saved);
+    vi.stubGlobal("localStorage", { getItem: () => json });
+    expect(saved.schemaVersion).toBe(1);
+    expect(loadSavedCharacter()).toMatchObject(colors);
+    expect(restoreCharacterForDisplay(JSON.parse(json))).toMatchObject(colors);
+    expect(createCharacterConfig(loadSavedCharacter()!)).toEqual(saved);
+  });
+
+  it.each([undefined, 1])("restores legacy jazz outfitColor with schema %s", (schemaVersion) => {
+    const legacy = { ...config, schemaVersion, outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF" } as Record<string, unknown>;
+    for (const key of ["jazzShirtColor", "jazzInnerColor", "jazzPantsColor"]) delete legacy[key];
+    const expected = { jazzShirtColor: "#ABCDEF", jazzInnerColor: "#ABCDEF", jazzPantsColor: "#ABCDEF" };
+    expect(restoreCharacterDraft(legacy)).toMatchObject(expected);
+    expect(restoreCharacterForDisplay(legacy)).toMatchObject(expected);
+  });
+
+  it("normalizes valid fields, falls back per missing/invalid field and rejects invalid public colors", () => {
+    const value = { ...config, outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF", jazzShirtColor: "123abc", jazzInnerColor: null, jazzPantsColor: "bad" };
+    expect(restoreCharacterDraft(value)).toMatchObject({ jazzShirtColor: "#123ABC", jazzInnerColor: "#ABCDEF", jazzPantsColor: "#ABCDEF" });
+    expect(restoreCharacterForDisplay(value)).toBeNull();
+    expect(restoreCharacterDraft({ outfitName: "재즈" })).toMatchObject({ outfitModelId: "rainbow-blouse", jazzShirtColor: "#60A5FA", jazzInnerColor: "#60A5FA", jazzPantsColor: "#60A5FA" });
   });
 });
 
