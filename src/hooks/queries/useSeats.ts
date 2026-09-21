@@ -2,9 +2,14 @@
 // - useSeats / useSeatLayouts: seat-layouts (좌석맵)
 // - useSeatCounts: seat-counts (상태별 수)
 // staleTime: 0 — 좌석맵은 실시간 (SSE #123과 병행)
+// #362: HTTP 스냅샷은 SSE 패치를 좌석 단위로 합친다. 통째 교체하지 않음.
 import { useQuery } from "@tanstack/react-query";
 import { fetchSeats, fetchSeatCounts } from "@/api/seats";
 import { queryKeys } from "@/constants/queryKeys";
+import {
+  fetchAndMergeSeatMap,
+  fetchSeatCountsUnlessLivePatched,
+} from "@/utils/seat/seatLivePatchTracker";
 
 interface UseSeatCountsOptions {
   /**
@@ -24,7 +29,13 @@ export function useSeats(
     queryKey: performanceId
       ? queryKeys.seats.byPerformance(performanceId)
       : ["seats", "invalid"],
-    queryFn: () => fetchSeats(performanceId!),
+    queryFn: ({ client }) =>
+      fetchAndMergeSeatMap(
+        client,
+        queryKeys.seats.byPerformance(performanceId!),
+        performanceId!,
+        () => fetchSeats(performanceId!),
+      ),
     enabled: !!performanceId && enabled,
     staleTime: 0, // 실시간
   });
@@ -44,7 +55,13 @@ export function useSeatCounts(
     queryKey: performanceId
       ? queryKeys.seats.counts(performanceId)
       : ["seats", "counts", "invalid"],
-    queryFn: () => fetchSeatCounts(performanceId!),
+    queryFn: ({ client }) =>
+      fetchSeatCountsUnlessLivePatched(
+        client,
+        queryKeys.seats.counts(performanceId!),
+        performanceId!,
+        () => fetchSeatCounts(performanceId!),
+      ),
     enabled: !!performanceId && enabled,
     staleTime: fresh ? 0 : 5_000,
     refetchOnMount: fresh ? "always" : true,

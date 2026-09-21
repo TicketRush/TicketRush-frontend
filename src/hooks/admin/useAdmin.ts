@@ -19,6 +19,16 @@ import {
   isDashboardPeriodWithinLimit,
   parseLocalDateKey,
 } from "@/utils/admin/dashboardPeriod";
+import {
+  applySeatCountDelta,
+  findSeatStatus,
+  patchSeatMapStatus,
+} from "@/utils/seat/applySeatStatusUpdate";
+import {
+  fetchAndMergeSeatMap,
+  recordSeatLivePatch,
+} from "@/utils/seat/seatLivePatchTracker";
+import type { SeatCounts, SeatMapData } from "@/types/domain/seat";
 
 export const adminKeys = {
   all: ["admin"] as const,
@@ -119,12 +129,19 @@ export function useAdminRefundBooking() {
 }
 
 // ── 좌석 모니터링 ─────────────────────────────────────
+// #362: 재조회 HTTP는 SSE 패치와 좌석 단위로 합친다.
 export function useAdminSeatMonitoring(performanceId: number | undefined) {
   return useQuery({
     queryKey: performanceId
       ? adminKeys.seatMonitoring(performanceId)
       : ["admin", "seat-monitoring", "invalid"],
-    queryFn: () => api.fetchAdminSeatMonitoring(performanceId!),
+    queryFn: ({ client }) =>
+      fetchAndMergeSeatMap(
+        client,
+        adminKeys.seatMonitoring(performanceId!),
+        performanceId!,
+        () => api.fetchAdminSeatMonitoring(performanceId!),
+      ),
     enabled: !!performanceId,
     staleTime: 0,
     refetchOnWindowFocus: false,
@@ -167,16 +184,29 @@ export function useAdminReleaseSeat(performanceId: number) {
       seatId: number;
       bookingNumber: string;
     }) => api.adminReleaseSeatApi(performanceId, seatId, bookingNumber),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: adminKeys.seatMonitoring(performanceId),
-      });
+    onSuccess: (_data, { seatId }) => {
+      const mapKey = adminKeys.seatMonitoring(performanceId);
+      const countsKey = queryKeys.seats.counts(performanceId);
+      const previousStatus = findSeatStatus(
+        qc.getQueryData<SeatMapData>(mapKey),
+        seatId,
+      );
+
+      recordSeatLivePatch(performanceId, seatId);
+      qc.setQueryData<SeatMapData>(mapKey, (old) =>
+        patchSeatMapStatus(old, seatId, "AVAILABLE"),
+      );
+      if (previousStatus && previousStatus !== "AVAILABLE") {
+        qc.setQueryData<SeatCounts>(countsKey, (old) =>
+          old ? applySeatCountDelta(old, previousStatus, "AVAILABLE") : old,
+        );
+      }
+
+      qc.invalidateQueries({ queryKey: mapKey });
       qc.invalidateQueries({
         queryKey: ["admin", "seat-detail", performanceId],
       });
-      qc.invalidateQueries({
-        queryKey: queryKeys.seats.counts(performanceId),
-      });
+      qc.invalidateQueries({ queryKey: countsKey });
     },
   });
 }

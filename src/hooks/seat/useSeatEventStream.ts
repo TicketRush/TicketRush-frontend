@@ -3,7 +3,8 @@
 // - 이벤트는 좌석맵·seat-counts 캐시를 setQueryData로 패치 (맵 언마운트·카운트 재조회 없음)
 // - 맵에 없는 좌석·카운트 불일치면 counts/맵을 백그라운드 재조회
 // - 맵이 처음 준비되면 로드 전 건너뛴 알림을 counts 재조회로 맞춤
-// - SSE 연결 중에도 주기적으로 숫자를 맞춰 놓친 이벤트를 보정
+// - SSE 연결 중 30초 보정은 맵·counts를 다시 받되, 맵은 좌석 단위로 합친다 (#362)
+// - HTTP 스냅샷은 좌석 단위로 합쳐, 방금 SSE로 맞춘 HOLD/SOLD를 덮지 않는다 (#362)
 // - 연결 실패/단절 시 짧은 debounce 후 5초 polling fallback (백그라운드 재조회)
 // - SSE 재연결(open) 시 debounce/polling 중지
 // - unmount 시 EventSource.close + clearTimeout/clearInterval
@@ -30,6 +31,7 @@ import {
   shouldResyncCountsOnMapReady,
   shouldResyncSeatCounts,
 } from "@/utils/seat/applySeatStatusUpdate";
+import { recordSeatLivePatch } from "@/utils/seat/seatLivePatchTracker";
 import {
   seatMapHasAvailable,
   shouldNotifySeatTaken,
@@ -78,8 +80,7 @@ function queryKeysEqual(a: QueryKey, b: QueryKey): boolean {
 function isForceHoldSelectedEnabled(): boolean {
   if (typeof window === "undefined") return false;
   return (
-    new URLSearchParams(window.location.search).get("forceHoldSelected") ===
-    "1"
+    new URLSearchParams(window.location.search).get("forceHoldSelected") === "1"
   );
 }
 
@@ -101,6 +102,7 @@ function patchSeatCaches(
   queryClient: QueryClient,
   mapKey: QueryKey,
   countsKey: QueryKey,
+  performanceId: number,
   seatId: number,
   status: SeatStatus,
 ) {
@@ -123,6 +125,8 @@ function patchSeatCaches(
     return;
   }
   if (previousStatus === status) return;
+
+  recordSeatLivePatch(performanceId, seatId);
 
   const currentCounts = queryClient.getQueryData<SeatCounts>(countsKey);
   if (
@@ -182,6 +186,7 @@ export function useSeatEventStream(
         queryClient,
         mapKey,
         countsKey,
+        performanceId,
         event.seatId,
         event.status,
       );
@@ -325,7 +330,14 @@ export function useSeatEventStream(
       );
       if (current && current !== "AVAILABLE") return;
 
-      patchSeatCaches(queryClient, mapKey, countsKey, selected.id, "HOLD");
+      patchSeatCaches(
+        queryClient,
+        mapKey,
+        countsKey,
+        performanceId,
+        selected.id,
+        "HOLD",
+      );
 
       const mapAfter = queryClient.getQueryData<SeatMapData>(mapKey);
       const countsAfter = queryClient.getQueryData<SeatCounts>(countsKey);
