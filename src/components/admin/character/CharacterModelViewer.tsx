@@ -524,13 +524,19 @@ function OutfitModel({
       outfitModelId !== "musical" &&
       outfitModelId !== "concert" &&
       outfitModelId !== "ballet" &&
-      outfitModelId !== "theater"
+      outfitModelId !== "theater" &&
+      outfitModelId !== "rainbow-blouse"
     ) {
       return clonedScene;
     }
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "rainbow-blouse") {
+        applyMeshColor(object, outfitColor);
         return;
       }
 
