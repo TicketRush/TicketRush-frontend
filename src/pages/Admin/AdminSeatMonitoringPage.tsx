@@ -128,17 +128,18 @@ export default function AdminSeatMonitoringPage() {
             </div>
           ) : (
             <>
-            <table className="w-full text-sm text-left admin-table">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm admin-table">
               <thead className="border-b border-admin-border">
                 <tr className="text-xs text-admin-text-secondary">
-                  <th className="py-3 px-3 text-left">ID</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">ID</th>
                   <th className="py-3 px-3 text-left">공연명</th>
-                  <th className="py-3 px-3 text-left">장르</th>
-                  <th className="py-3 px-3 text-left">날짜</th>
-                  <th className="py-3 px-3 text-left">판매/총</th>
-                  <th className="py-3 px-3 text-left">점유율</th>
-                  <th className="py-3 px-3 text-left">매출</th>
-                  <th className="py-3 px-3 text-left">상태</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">장르</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">날짜</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">판매/총</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">점유율</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">매출</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">상태</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,26 +182,28 @@ export default function AdminSeatMonitoringPage() {
                       }}
                       className="border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
                     >
-                      <td className="py-3 px-3 font-mono text-xs">
+                      <td className="py-3 px-3 text-center font-mono text-xs whitespace-nowrap">
                         E{String(c.id).padStart(3, "0")}
                       </td>
-                      <td className="py-3 px-3 font-bold">{c.title}</td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-left font-bold">{c.title}</td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         {c.genreName ?? GENRE_LABELS[c.genre] ?? c.genre}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
                         {formatAdminShowSchedule(c.date, c.showTime)}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
                         {formatAdminSeats(c.soldSeats, c.totalSeats)}
                       </td>
-                      <td className={`py-3 px-3 font-bold ${rateColor}`}>
+                      <td
+                        className={`py-3 px-3 text-center font-bold tabular-nums whitespace-nowrap ${rateColor}`}
+                      >
                         {formatAdminOccupancy(c.occupancyRate)}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
                         {formatAdminWon(c.revenue)}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span
                           className="px-3 py-1 rounded-md text-xs font-bold text-white"
                           style={{
@@ -215,6 +218,7 @@ export default function AdminSeatMonitoringPage() {
                 })}
               </tbody>
             </table>
+            </div>
             {concerts?.pagination ? (
               <Pagination
                 pageIndex={listPage}

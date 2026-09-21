@@ -138,6 +138,21 @@ function renderMap() {
 }
 
 describe("AdminSeatMonitoringPage live updates (#336)", () => {
+  it("공연 목록의 ID·장르·날짜·판매 지표는 가운데, 공연명은 왼쪽 정렬이다", () => {
+    const html = renderList();
+    expect(html).toContain('>ID</th>');
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">ID<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-left">공연명<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">장르<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">날짜<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">판매\/총<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">점유율<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">매출<\/th>/);
+    expect(html).toMatch(/<th class="py-3 px-3 text-center whitespace-nowrap">상태<\/th>/);
+    expect(html).toContain("text-left font-bold");
+    expect(html).toContain("overflow-x-auto");
+  });
+
   it("공연 목록에서는 SSE를 열지 않는다", () => {
     const html = renderList();
     expect(html).toContain("전체 공연 목록");
