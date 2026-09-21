@@ -7,7 +7,10 @@ import {
   formatAdminDateTime,
   formatAdminText,
 } from "@/utils/admin/formatAdminMetric";
-import { resolveAdminDetailViewStatus } from "@/utils/admin/adminSeatLiveUpdate";
+import {
+  isAdminSoldDetailPending,
+  resolveAdminDetailViewStatus,
+} from "@/utils/admin/adminSeatLiveUpdate";
 
 const BOOKER_LOAD_FAILED = "불러오지 못했습니다";
 
@@ -84,6 +87,7 @@ export default function AdminSeatDetailPanel({
   }
 
   const viewStatus = resolveAdminDetailViewStatus(mapStatus, detail.status);
+  const pendingBooker = isAdminSoldDetailPending(mapStatus, detail.status);
 
   // 상태별 분기 — 맵이 먼저 SOLD면 해제 버튼을 보여 주지 않는다
   if (viewStatus === "HOLD") {
@@ -101,6 +105,7 @@ export default function AdminSeatDetailPanel({
     return (
       <SoldDetail
         detail={detail}
+        pendingBooker={pendingBooker}
         onRefund={onRefund}
         onShowReserver={onShowReserver}
       />
@@ -194,7 +199,7 @@ function HoldDetail({
           }`}
         >
           {expired
-            ? "맵은 잠시 HOLD로 남을 수 있습니다. 새로고침하거나 강제 해제하세요."
+            ? "서버 반영을 기다리는 중입니다. 잠시 후 좌석 색이 바뀌거나 강제 해제할 수 있습니다."
             : "남은 시간"}
         </p>
       </div>
@@ -220,10 +225,12 @@ function HoldDetail({
 // ── SOLD 좌석 상세 ────────────────────────────────────
 function SoldDetail({
   detail,
+  pendingBooker,
   onRefund,
   onShowReserver,
 }: {
   detail: AdminSeatDetail;
+  pendingBooker: boolean;
   onRefund: (bookingNumber?: string) => void;
   onShowReserver: (bookingNumber?: string) => void;
 }) {
@@ -236,8 +243,14 @@ function SoldDetail({
         <p className="text-xs text-admin-text-secondary">판매 완료</p>
       </div>
 
-      <Field label="예약자" value={bookerText(detail)} />
-      <Field label="예약 시간" value={bookedAtText(detail)} />
+      <Field
+        label="예약자"
+        value={pendingBooker ? "갱신 중" : bookerText(detail)}
+      />
+      <Field
+        label="예약 시간"
+        value={pendingBooker ? "갱신 중" : bookedAtText(detail)}
+      />
 
       <p className="text-[10px] font-bold tracking-wider bg-admin-border px-2 py-0.5 rounded inline-block mb-2 mt-4">
         관리자 작업
@@ -246,14 +259,16 @@ function SoldDetail({
         <button
           type="button"
           onClick={() => onRefund(detail.bookingNumber)}
-          className="w-full py-3 rounded font-bold text-white bg-admin-refund"
+          disabled={pendingBooker}
+          className="w-full py-3 rounded font-bold text-white bg-admin-refund disabled:opacity-50"
         >
           환불 처리
         </button>
         <button
           type="button"
           onClick={() => onShowReserver(detail.bookingNumber)}
-          className="w-full py-3 rounded font-bold text-white bg-admin-resend"
+          disabled={pendingBooker}
+          className="w-full py-3 rounded font-bold text-white bg-admin-resend disabled:opacity-50"
         >
           예매자 정보 보기
         </button>

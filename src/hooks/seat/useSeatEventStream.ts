@@ -13,7 +13,8 @@
 // - enabled=false (#181 예매 가능 가드 판정 전/불가) 이면 SSE·polling·QA 타이머 모두 열지 않음
 // - #336: getMapQueryKey로 관리자 monitoring 캐시를 같은 공개 스트림으로 패치
 // - syncUserSelection=false면 예매 선택 해제·토스트·QA HOLD를 하지 않음
-import { useEffect, useRef } from "react";
+// - #361: connectionStatus로 LIVE / 재연결 중 / 폴링 중을 구분
+import { useEffect, useRef, useState } from "react";
 import {
   useQueryClient,
   type QueryClient,
@@ -43,6 +44,11 @@ import type {
   SeatStatus,
   SeatUpdateEvent,
 } from "@/types/domain/seat";
+import {
+  reduceSeatStreamConnection,
+  type SeatStreamConnectionEvent,
+  type SeatStreamConnectionStatus,
+} from "@/utils/seat/seatStreamConnection";
 
 const POLL_INTERVAL_MS = 5_000;
 /** onerror 직후 바로 polling 하지 않고, 짧은 재연결 기회를 준 뒤 fallback */
@@ -149,7 +155,7 @@ export function useSeatEventStream(
   performanceId: number | undefined,
   enabled: boolean = true,
   options?: UseSeatEventStreamOptions,
-) {
+): { connectionStatus: SeatStreamConnectionStatus } {
   const queryClient = useQueryClient();
   const shouldPreserveSelection = options?.shouldPreserveSelection;
   const preserveRef = useRef(shouldPreserveSelection);
@@ -161,14 +167,26 @@ export function useSeatEventStream(
   const syncUserSelection = options?.syncUserSelection !== false;
   const syncUserSelectionRef = useRef(syncUserSelection);
   syncUserSelectionRef.current = syncUserSelection;
+  const [connectionStatus, setConnectionStatus] =
+    useState<SeatStreamConnectionStatus>("connecting");
 
   useEffect(() => {
-    if (!performanceId || !enabled) return;
+    if (!performanceId || !enabled) {
+      setConnectionStatus("connecting");
+      return;
+    }
 
     let disposed = false;
     let pollingId: ReturnType<typeof setInterval> | null = null;
     let resyncId: ReturnType<typeof setInterval> | null = null;
     let fallbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    const emitConnection = (event: SeatStreamConnectionEvent) => {
+      if (disposed) return;
+      setConnectionStatus((current) =>
+        reduceSeatStreamConnection(current, event),
+      );
+    };
+    emitConnection("start");
     const mapKey = (getMapQueryKeyRef.current ?? defaultMapQueryKey)(
       performanceId,
     );
@@ -231,6 +249,7 @@ export function useSeatEventStream(
     const startPolling = () => {
       if (disposed || pollingId != null) return;
       stopResync();
+      emitConnection("poll");
       pollOnce();
       pollingId = setInterval(pollOnce, POLL_INTERVAL_MS);
     };
@@ -252,11 +271,13 @@ export function useSeatEventStream(
     const unsubscribe = subscribeSeatStream(performanceId, applySeatUpdate, {
       onError: () => {
         stopResync();
+        emitConnection("error");
         schedulePollingFallback();
       },
       onOpen: () => {
         cancelFallbackSchedule();
         stopPolling();
+        emitConnection("open");
         startResync();
       },
     });
@@ -354,4 +375,6 @@ export function useSeatEventStream(
 
     return () => clearInterval(timerId);
   }, [performanceId, enabled, queryClient, syncUserSelection]);
+
+  return { connectionStatus };
 }

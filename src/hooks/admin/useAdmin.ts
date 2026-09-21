@@ -77,13 +77,17 @@ export function useAdminDashboard(params: AdminDashboardParams) {
   });
 }
 
-export function useAdminConcerts(params: AdminConcertListParams = {}) {
+export function useAdminConcerts(
+  params: AdminConcertListParams = {},
+  options?: { refetchOnMount?: boolean | "always" },
+) {
   return useQuery({
     queryKey: adminKeys.concerts(params),
     queryFn: () => api.fetchAdminConcerts(params),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
     retry: retryUnlessClientError,
+    refetchOnMount: options?.refetchOnMount,
   });
 }
 
