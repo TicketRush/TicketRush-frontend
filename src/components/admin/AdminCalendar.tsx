@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
+  dashboardCalendarView,
   inclusiveDayCount,
   MAX_DASHBOARD_PERIOD_DAYS,
 } from "@/utils/admin/dashboardPeriod";
@@ -24,8 +25,9 @@ export default function AdminCalendar({
   maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
   onRangeReject,
 }: AdminCalendarProps) {
-  const [viewYear, setViewYear] = useState(selectedRange.start.getFullYear());
-  const [viewMonth, setViewMonth] = useState(selectedRange.start.getMonth());
+  const initialView = dashboardCalendarView(selectedRange);
+  const [viewYear, setViewYear] = useState(initialView.year);
+  const [viewMonth, setViewMonth] = useState(initialView.month);
   const [pickerMode, setPickerMode] = useState<null | "month" | "year">(null);
   const [yearPageStart, setYearPageStart] = useState(YEAR_RANGE_START);
 

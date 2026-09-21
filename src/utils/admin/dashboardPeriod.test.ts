@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  dashboardCalendarView,
+  defaultDashboardRange,
   fillDailyRevenueGaps,
   inclusiveDayCount,
   isDashboardPeriodWithinLimit,
   parseLocalDateKey,
+  toLocalDateKey,
 } from "./dashboardPeriod";
 
 describe("inclusiveDayCount", () => {
@@ -33,6 +36,34 @@ describe("inclusiveDayCount", () => {
         parseLocalDateKey("2026-07-09"),
       ),
     ).toBe(false);
+  });
+});
+
+describe("dashboardCalendarView", () => {
+  it("월초에 기본 30일이면 지난달이 아니라 당월을 보여준다", () => {
+    const today = parseLocalDateKey("2026-09-01");
+    const range = defaultDashboardRange(today);
+
+    expect(toLocalDateKey(range.start)).toBe("2026-08-03");
+    expect(toLocalDateKey(range.end)).toBe("2026-09-01");
+    expect(inclusiveDayCount(range.start, range.end)).toBe(30);
+    expect(dashboardCalendarView(range)).toEqual({ year: 2026, month: 8 });
+  });
+
+  it("조회 기간이 당월에만 있어도 종료일 월을 보여준다", () => {
+    const range = {
+      start: parseLocalDateKey("2026-09-01"),
+      end: parseLocalDateKey("2026-09-22"),
+    };
+    expect(dashboardCalendarView(range)).toEqual({ year: 2026, month: 8 });
+  });
+
+  it("과거 기간만 고르면 종료일이 있는 달을 보여준다", () => {
+    const range = {
+      start: parseLocalDateKey("2026-07-01"),
+      end: parseLocalDateKey("2026-07-31"),
+    };
+    expect(dashboardCalendarView(range)).toEqual({ year: 2026, month: 6 });
   });
 });
 
