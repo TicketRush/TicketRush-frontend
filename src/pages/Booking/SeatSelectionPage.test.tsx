@@ -156,6 +156,7 @@ describe("SeatSelectionPage live updates (#335)", () => {
     const html = renderPage();
     expect(html).not.toContain("예매 가능 여부를 확인하는 중...");
     expect(html).toContain("좌석 선택");
+    expect(html).toContain("overflow-x-auto");
     expect(html).toContain("예매 가능");
     expect(html).toContain("임시예매");
   });
