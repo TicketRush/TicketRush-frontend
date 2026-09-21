@@ -31,6 +31,27 @@ const GENRE_LABELS: Record<Genre, string> = {
   BALLET: "발레",
 };
 
+const CENTERED_COLUMN_IDS = new Set([
+  "id",
+  "genre",
+  "date",
+  "sales",
+  "occupancyRate",
+  "revenue",
+  "status",
+  "actions",
+]);
+
+const NUMERIC_COLUMN_IDS = new Set(["date", "sales", "occupancyRate", "revenue"]);
+
+function columnAlignClass(columnId: string) {
+  return CENTERED_COLUMN_IDS.has(columnId) ? "text-center" : "text-left";
+}
+
+function columnNumericClass(columnId: string) {
+  return NUMERIC_COLUMN_IDS.has(columnId) ? " tabular-nums whitespace-nowrap" : "";
+}
+
 const STATUS_STYLES: Record<string, string> = {
   판매중: "bg-green-100 text-green-700",
   매진: "bg-red-100 text-red-700",
@@ -153,7 +174,7 @@ export default function AdminConcertTable({
       id: "actions",
       header: "관리",
       cell: ({ row }) => (
-        <div className="flex gap-1">
+        <div className="flex justify-center gap-1">
           <button
             type="button"
             onClick={() => onEdit(row.original.id)}
@@ -196,7 +217,7 @@ export default function AdminConcertTable({
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
-                  className="py-3 px-3 text-xs font-semibold text-gray-500"
+                  className={`py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap ${columnAlignClass(h.column.id)}`}
                 >
                   {flexRender(h.column.columnDef.header, h.getContext())}
                 </th>
@@ -211,7 +232,10 @@ export default function AdminConcertTable({
               className="border-b border-gray-100 hover:bg-gray-50"
             >
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="py-3 px-3 text-gray-800">
+                <td
+                  key={cell.id}
+                  className={`py-3 px-3 text-gray-800 ${columnAlignClass(cell.column.id)}${columnNumericClass(cell.column.id)}`}
+                >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}

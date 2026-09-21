@@ -1,7 +1,8 @@
 // 장르별 매출 분포 파이 차트
-// 우측 진행률 바: 각 장르 박스로 감싸기 + 영어 라벨
+// 범례는 subgrid로 %·금액을 같은 열에 두고, 자릿수는 오른쪽(끝)에 맞춘다.
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { GenreRevenue } from "@/types/domain/admin";
+import { formatAdminWon } from "@/utils/admin/formatAdminMetric";
 
 interface GenrePieChartProps {
   data: GenreRevenue[] | undefined;
@@ -81,42 +82,38 @@ export default function GenrePieChart({ data, isLoading }: GenrePieChartProps) {
             </PieChart>
           </ResponsiveContainer>
 
-          <div className="space-y-3">
+          <div className="grid w-full max-w-md grid-cols-[minmax(0,1fr)_auto] gap-3 lg:justify-self-end">
             {data.map((entry, idx) => {
               const color = colorFor(entry.genre, idx);
               return (
                 <div
                   key={entry.genre}
-                  className="border-2 border-admin-card-border rounded-lg p-3"
+                  className="col-span-2 grid grid-cols-subgrid items-center gap-x-3 gap-y-2 border-2 border-admin-card-border rounded-lg p-3"
                 >
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="font-semibold text-gray-900">
-                        {entry.label}
-                      </span>
-                    </div>
-                    <span className="text-gray-500">
-                      {entry.percentage.toFixed(0)}%
+                  <div className="flex min-w-0 items-center gap-2 text-xs">
+                    <span
+                      className="w-3 h-3 rounded shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="font-semibold text-gray-900 truncate">
+                      {entry.label}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${entry.percentage}%`,
-                          backgroundColor: color,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-500 min-w-[70px] text-right">
-                      ₩{entry.revenue.toLocaleString()}
-                    </span>
+                  <span className="justify-self-end text-xs tabular-nums text-gray-500">
+                    {entry.percentage.toFixed(0)}%
+                  </span>
+                  <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${entry.percentage}%`,
+                        backgroundColor: color,
+                      }}
+                    />
                   </div>
+                  <span className="justify-self-end text-xs tabular-nums text-gray-500">
+                    {formatAdminWon(entry.revenue)}
+                  </span>
                 </div>
               );
             })}
