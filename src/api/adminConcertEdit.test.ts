@@ -100,7 +100,7 @@ describe("admin edit contract", () => {
     expect(JSON.parse(adapter.mock.calls[0][0].data).character_config).toEqual(value.form.characterConfig);
   });
 
-  it.each(["2027-02-29T12:30", "2027-01-01T24:00", "invalid", ""])(
+  it.each(["2027-02-29T12:30", "2027-01-01T24:00", "2028--T", "202-01-31T20:30:45", "0999-01-31T20:30", "2028-02-T20:30", "2028-02-29T", "invalid", ""])(
     "rejects invalid or cleared booking time before HTTP (%s)", async (bookingOpenAt) => {
       const value = await input();
       value.form.bookingOpenAt = bookingOpenAt;

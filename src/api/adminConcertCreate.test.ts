@@ -55,6 +55,7 @@ describe("performance multipart request", () => {
     ["2026-09-30T20:00", "2026-09-30 20:00:00"],
     ["2026-09-30T20:00:45", "2026-09-30 20:00:45"],
     ["2028-02-29T00:00", "2028-02-29 00:00:00"],
+    ["2028-02-29T20:30", "2028-02-29 20:30:00"],
   ])("maps local booking time %s into snake_case multipart JSON", async (value, expected) => {
     const data = input();
     data.form.bookingOpenAt = value;
@@ -193,6 +194,7 @@ describe("createConcertApi with the real axios interceptors", () => {
 
   it.each([
     "invalid", " ", "2026-02-30T20:00", "2027-02-29T20:00",
+    "2028--T", "202-01-31T20:30:45", "0999-01-31T20:30", "2028-02-T20:30", "2028-02-29T", "--T20:30",
     "2026-09-30T24:00", "2026-09-30T20:60", "2026-09-30T20:00:60",
     "2026-09-30T20:00Z", "2026-09-30T20:00+09:00",
   ])("rejects invalid booking time %s before HTTP", async (bookingOpenAt) => {
