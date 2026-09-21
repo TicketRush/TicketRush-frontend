@@ -2,10 +2,12 @@
 import { Clock, AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AdminSeatDetail } from "@/types/domain/admin";
+import type { SeatStatus } from "@/types/domain/seat";
 import {
   formatAdminDateTime,
   formatAdminText,
 } from "@/utils/admin/formatAdminMetric";
+import { resolveAdminDetailViewStatus } from "@/utils/admin/adminSeatLiveUpdate";
 
 const BOOKER_LOAD_FAILED = "불러오지 못했습니다";
 
@@ -26,6 +28,8 @@ interface AdminSeatDetailPanelProps {
   isLoading: boolean;
   isError?: boolean;
   isReleasing?: boolean;
+  /** 맵에서 본 현재 상태. 상세 refetch보다 먼저 SOLD/AVAILABLE이 올 수 있다. */
+  mapStatus?: SeatStatus;
   onRelease: (seatId: number, bookingNumber?: string) => void;
   onRefund: (bookingNumber?: string) => void;
   onShowReserver: (bookingNumber?: string) => void;
@@ -37,12 +41,13 @@ export default function AdminSeatDetailPanel({
   isLoading,
   isError = false,
   isReleasing = false,
+  mapStatus,
   onRelease,
   onRefund,
   onShowReserver,
   onHoldExpired,
 }: AdminSeatDetailPanelProps) {
-  if (isLoading) {
+  if (isLoading && !detail) {
     return (
       <Panel>
         <div className="text-center text-admin-text-secondary py-8">
@@ -78,8 +83,10 @@ export default function AdminSeatDetailPanel({
     );
   }
 
-  // 상태별 분기
-  if (detail.status === "HOLD") {
+  const viewStatus = resolveAdminDetailViewStatus(mapStatus, detail.status);
+
+  // 상태별 분기 — 맵이 먼저 SOLD면 해제 버튼을 보여 주지 않는다
+  if (viewStatus === "HOLD") {
     return (
       <HoldDetail
         key={detail.seatId}
@@ -90,7 +97,7 @@ export default function AdminSeatDetailPanel({
       />
     );
   }
-  if (detail.status === "SOLD") {
+  if (viewStatus === "SOLD") {
     return (
       <SoldDetail
         detail={detail}

@@ -119,6 +119,17 @@ describe("shouldRefetchUnknownSeat", () => {
     );
     expect(shouldRefetchUnknownSeat(map)).toBe(true);
   });
+
+  it("배치가 없거나 좌석이 비면 재조회하지 않는다", () => {
+    expect(
+      shouldRefetchUnknownSeat({
+        layout: null,
+        layoutReady: false,
+        seats: [],
+      }),
+    ).toBe(false);
+    expect(shouldRefetchUnknownSeat({ ...map, seats: [] })).toBe(false);
+  });
 });
 
 describe("shouldResyncCountsOnMapReady", () => {
@@ -126,5 +137,12 @@ describe("shouldResyncCountsOnMapReady", () => {
     expect(shouldResyncCountsOnMapReady(false, undefined)).toBe(false);
     expect(shouldResyncCountsOnMapReady(false, map)).toBe(true);
     expect(shouldResyncCountsOnMapReady(true, map)).toBe(false);
+    expect(
+      shouldResyncCountsOnMapReady(false, {
+        layout: null,
+        layoutReady: false,
+        seats: [],
+      }),
+    ).toBe(false);
   });
 });

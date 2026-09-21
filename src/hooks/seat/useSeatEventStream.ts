@@ -1,4 +1,4 @@
-// 좌석 상태 SSE 구독 hook (이슈 #123 / #335)
+// 좌석 상태 SSE 구독 hook (이슈 #123 / #335 / #336)
 // - SSE(named event: seat-status-changed)가 주 경로
 // - 이벤트는 좌석맵·seat-counts 캐시를 setQueryData로 패치 (맵 언마운트·카운트 재조회 없음)
 // - 맵에 없는 좌석·카운트 불일치면 counts/맵을 백그라운드 재조회
@@ -10,8 +10,14 @@
 // - 선택 좌석이 HOLD/SOLD 등으로 바뀌면 seatStore 선택 해제 (+ 토스트)
 // - QA: URL `?forceHoldSelected=1` 이면 mock/실API와 무관하게 선택 좌석을 주기적으로 HOLD
 // - enabled=false (#181 예매 가능 가드 판정 전/불가) 이면 SSE·polling·QA 타이머 모두 열지 않음
+// - #336: getMapQueryKey로 관리자 monitoring 캐시를 같은 공개 스트림으로 패치
+// - syncUserSelection=false면 예매 선택 해제·토스트·QA HOLD를 하지 않음
 import { useEffect, useRef } from "react";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
+} from "@tanstack/react-query";
 import { subscribeSeatStream } from "@/api/seats";
 import { queryKeys } from "@/constants/queryKeys";
 import useSeatStore from "@/stores/reservation/seatStore";
@@ -49,6 +55,24 @@ interface UseSeatEventStreamOptions {
   shouldPreserveSelection?: (seatId: number) => boolean;
   /** 판매 종료 안내가 뜰 때는 선택 해제 토스트를 생략 */
   concertStatus?: ConcertStatus;
+  /**
+   * 패치·재조회할 좌석맵 캐시 키. 기본은 공개 seat-layouts.
+   * 관리자 모니터링은 admin seat-monitoring 키를 넘긴다 (#336).
+   */
+  getMapQueryKey?: (performanceId: number) => QueryKey;
+  /**
+   * 예매 선택 해제·토스트·QA HOLD. 관리자 맵에서는 false.
+   * @default true
+   */
+  syncUserSelection?: boolean;
+}
+
+function defaultMapQueryKey(performanceId: number): QueryKey {
+  return queryKeys.seats.byPerformance(performanceId);
+}
+
+function queryKeysEqual(a: QueryKey, b: QueryKey): boolean {
+  return a.length === b.length && a.every((part, i) => Object.is(part, b[i]));
 }
 
 function isForceHoldSelectedEnabled(): boolean {
@@ -61,29 +85,25 @@ function isForceHoldSelectedEnabled(): boolean {
 
 function refetchSeatCaches(
   queryClient: QueryClient,
-  performanceId: number,
+  mapKey: QueryKey,
+  countsKey: QueryKey,
   targets: { map?: boolean; counts?: boolean } = { map: true, counts: true },
 ) {
   if (targets.map !== false) {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.seats.byPerformance(performanceId),
-    });
+    void queryClient.invalidateQueries({ queryKey: mapKey });
   }
   if (targets.counts !== false) {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.seats.counts(performanceId),
-    });
+    void queryClient.invalidateQueries({ queryKey: countsKey });
   }
 }
 
 function patchSeatCaches(
   queryClient: QueryClient,
-  performanceId: number,
+  mapKey: QueryKey,
+  countsKey: QueryKey,
   seatId: number,
   status: SeatStatus,
 ) {
-  const mapKey = queryKeys.seats.byPerformance(performanceId);
-  const countsKey = queryKeys.seats.counts(performanceId);
   const previousStatus = findSeatStatus(
     queryClient.getQueryData<SeatMapData>(mapKey),
     seatId,
@@ -98,7 +118,7 @@ function patchSeatCaches(
   // 화면에 없는 좌석 → 맵이 뜬 뒤에만 서버에서 다시 맞춤
   if (!previousStatus) {
     if (shouldRefetchUnknownSeat(seatMap)) {
-      refetchSeatCaches(queryClient, performanceId);
+      refetchSeatCaches(queryClient, mapKey, countsKey);
     }
     return;
   }
@@ -109,7 +129,10 @@ function patchSeatCaches(
     !currentCounts ||
     shouldResyncSeatCounts(currentCounts, previousStatus, status)
   ) {
-    refetchSeatCaches(queryClient, performanceId, { map: false, counts: true });
+    refetchSeatCaches(queryClient, mapKey, countsKey, {
+      map: false,
+      counts: true,
+    });
     return;
   }
 
@@ -129,6 +152,11 @@ export function useSeatEventStream(
   preserveRef.current = shouldPreserveSelection;
   const concertStatusRef = useRef(options?.concertStatus);
   concertStatusRef.current = options?.concertStatus;
+  const getMapQueryKeyRef = useRef(options?.getMapQueryKey);
+  getMapQueryKeyRef.current = options?.getMapQueryKey;
+  const syncUserSelection = options?.syncUserSelection !== false;
+  const syncUserSelectionRef = useRef(syncUserSelection);
+  syncUserSelectionRef.current = syncUserSelection;
 
   useEffect(() => {
     if (!performanceId || !enabled) return;
@@ -137,6 +165,10 @@ export function useSeatEventStream(
     let pollingId: ReturnType<typeof setInterval> | null = null;
     let resyncId: ReturnType<typeof setInterval> | null = null;
     let fallbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    const mapKey = (getMapQueryKeyRef.current ?? defaultMapQueryKey)(
+      performanceId,
+    );
+    const countsKey = queryKeys.seats.counts(performanceId);
 
     const applySeatUpdate = (event: SeatUpdateEvent) => {
       if (
@@ -146,10 +178,16 @@ export function useSeatEventStream(
         return;
       }
 
-      patchSeatCaches(queryClient, performanceId, event.seatId, event.status);
+      patchSeatCaches(
+        queryClient,
+        mapKey,
+        countsKey,
+        event.seatId,
+        event.status,
+      );
 
-      const mapKey = queryKeys.seats.byPerformance(performanceId);
-      const countsKey = queryKeys.seats.counts(performanceId);
+      if (!syncUserSelectionRef.current) return;
+
       const counts = queryClient.getQueryData<SeatCounts>(countsKey);
       const seatMap = queryClient.getQueryData<SeatMapData>(mapKey);
 
@@ -182,7 +220,7 @@ export function useSeatEventStream(
     };
 
     const pollOnce = () => {
-      refetchSeatCaches(queryClient, performanceId);
+      refetchSeatCaches(queryClient, mapKey, countsKey);
     };
 
     const startPolling = () => {
@@ -231,30 +269,26 @@ export function useSeatEventStream(
   useEffect(() => {
     if (!performanceId || !enabled) return;
 
-    const mapKey = queryKeys.seats.byPerformance(performanceId);
-    let hadSeats = Array.isArray(
-      queryClient.getQueryData<SeatMapData>(mapKey)?.seats,
+    const mapKey = (getMapQueryKeyRef.current ?? defaultMapQueryKey)(
+      performanceId,
+    );
+    const countsKey = queryKeys.seats.counts(performanceId);
+    let hadSeats = shouldRefetchUnknownSeat(
+      queryClient.getQueryData<SeatMapData>(mapKey),
     );
 
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type !== "updated") return;
-      const key = event.query.queryKey;
-      if (
-        key[0] !== "seats" ||
-        key[1] !== "byPerformance" ||
-        key[2] !== performanceId
-      ) {
-        return;
-      }
+      if (!queryKeysEqual(event.query.queryKey, mapKey)) return;
 
       const next = event.query.state.data as SeatMapData | undefined;
       if (shouldResyncCountsOnMapReady(hadSeats, next)) {
-        refetchSeatCaches(queryClient, performanceId, {
+        refetchSeatCaches(queryClient, mapKey, countsKey, {
           map: false,
           counts: true,
         });
       }
-      hadSeats = Array.isArray(next?.seats);
+      hadSeats = shouldRefetchUnknownSeat(next);
     });
 
     return unsubscribe;
@@ -262,11 +296,23 @@ export function useSeatEventStream(
 
   // ── QA 전용: ?forceHoldSelected=1 (mock 여부 무관) ──
   useEffect(() => {
-    if (!performanceId || !enabled || !isForceHoldSelectedEnabled()) return;
+    if (
+      !performanceId ||
+      !enabled ||
+      !syncUserSelection ||
+      !isForceHoldSelectedEnabled()
+    ) {
+      return;
+    }
 
     console.warn(
       "[QA] forceHoldSelected=1 — 좌석을 선택하면 약 2초 뒤 HOLD로 바뀌고 선택이 해제됩니다. 고를 좌석이 남아 있으면 토스트가 납니다.",
     );
+
+    const mapKey = (getMapQueryKeyRef.current ?? defaultMapQueryKey)(
+      performanceId,
+    );
+    const countsKey = queryKeys.seats.counts(performanceId);
 
     const timerId = setInterval(() => {
       const selected = useSeatStore.getState().selectedSeat;
@@ -274,21 +320,15 @@ export function useSeatEventStream(
       if (preserveRef.current?.(selected.id)) return;
 
       const current = findSeatStatus(
-        queryClient.getQueryData<SeatMapData>(
-          queryKeys.seats.byPerformance(performanceId),
-        ),
+        queryClient.getQueryData<SeatMapData>(mapKey),
         selected.id,
       );
       if (current && current !== "AVAILABLE") return;
 
-      patchSeatCaches(queryClient, performanceId, selected.id, "HOLD");
+      patchSeatCaches(queryClient, mapKey, countsKey, selected.id, "HOLD");
 
-      const mapAfter = queryClient.getQueryData<SeatMapData>(
-        queryKeys.seats.byPerformance(performanceId),
-      );
-      const countsAfter = queryClient.getQueryData<SeatCounts>(
-        queryKeys.seats.counts(performanceId),
-      );
+      const mapAfter = queryClient.getQueryData<SeatMapData>(mapKey);
+      const countsAfter = queryClient.getQueryData<SeatCounts>(countsKey);
 
       clearSelectedSeatIfTaken(selected.id, "HOLD", {
         preserve: preserveRef.current?.(selected.id) ?? false,
@@ -301,5 +341,5 @@ export function useSeatEventStream(
     }, FORCE_HOLD_INTERVAL_MS);
 
     return () => clearInterval(timerId);
-  }, [performanceId, enabled, queryClient]);
+  }, [performanceId, enabled, queryClient, syncUserSelection]);
 }

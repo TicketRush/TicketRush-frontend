@@ -20,7 +20,7 @@ import {
   parseLocalDateKey,
 } from "@/utils/admin/dashboardPeriod";
 
-const adminKeys = {
+export const adminKeys = {
   all: ["admin"] as const,
   dashboard: (params?: AdminDashboardParams) =>
     ["admin", "dashboard", params] as const,

@@ -24,6 +24,8 @@ import {
 } from "./bookings";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import type { AdminBookingBookerResponse } from "../adminSeatMapper";
+import { mockGetSeats, mockReleaseSeat } from "./seats";
+import type { SeatMapData } from "@/types/domain/seat";
 import type {
   AdminConcertItem,
   AdminConcertListParams,
@@ -37,7 +39,6 @@ import type {
   AdminBookingItem,
   AdminBookingListParams,
   AdminBookingListResponse,
-  AdminSeatStats,
   AdminSeatDetail,
   ConcertFormData,
 } from "@/types/domain/admin";
@@ -381,75 +382,11 @@ export async function mockAdminRefundBooking(
 }
 
 // ── 좌석 모니터링 ─────────────────────────────────────
-// mock 좌석 데이터는 seats.ts와 별도로 관리. 앞열=낮은 행.
-// price 필드는 개별 좌석에 없음 (백엔드 스펙).
+// 공개 좌석 mock과 같은 상태를 써서 SSE 패치·재조회가 맵을 뒤섞지 않게 한다 (#336).
 export async function mockGetAdminSeatMonitoring(
-  _performanceId: number,
-): Promise<{
-  layout: { totalRows: number; maxCols: number };
-  layoutReady: true;
-  stats: AdminSeatStats;
-  seats: Array<{
-    id: number;
-    seatLayoutId: number;
-    seatNumber: string;
-    row: string;
-    col: number;
-    status: import("@/types/domain/seat").SeatStatus;
-  }>;
-}> {
-  await mockDelay(400);
-
-  const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
-  const COLS = 12;
-  const seats: Array<{
-    id: number;
-    seatLayoutId: number;
-    seatNumber: string;
-    row: string;
-    col: number;
-    status: import("@/types/domain/seat").SeatStatus;
-  }> = [];
-  let id = 1;
-  let available = 0,
-    sold = 0,
-    holding = 0;
-  ROWS.forEach((row) => {
-    for (let col = 1; col <= COLS; col++) {
-      const r = Math.random();
-      let status: import("@/types/domain/seat").SeatStatus = "AVAILABLE";
-      if (r < 0.2) {
-        status = "HOLD";
-        holding++;
-      } else if (r < 0.55) {
-        status = "SOLD";
-        sold++;
-      } else {
-        available++;
-      }
-      seats.push({
-        id,
-        seatLayoutId: id,
-        seatNumber: `${row}-${col}`,
-        row,
-        col,
-        status,
-      });
-      id++;
-    }
-  });
-
-  return {
-    layout: { totalRows: ROWS.length, maxCols: COLS },
-    layoutReady: true,
-    stats: {
-      totalSeats: seats.length,
-      availableSeats: available,
-      soldSeats: sold,
-      holdingSeats: holding,
-    },
-    seats,
-  };
+  performanceId: number,
+): Promise<SeatMapData> {
+  return mockGetSeats(performanceId);
 }
 
 export async function mockGetAdminSeatDetail(
@@ -498,11 +435,10 @@ export async function mockGetAdminSeatDetail(
 }
 
 export async function mockAdminReleaseSeat(
-  _performanceId: number,
-  _seatId: number,
+  performanceId: number,
+  seatId: number,
   bookingNumber: string,
 ): Promise<void> {
-  await mockDelay(300);
   if (!bookingNumber.trim()) {
     await mockError(
       ERROR_CODES.VALIDATION_ERROR,
@@ -511,6 +447,7 @@ export async function mockAdminReleaseSeat(
       400,
     );
   }
+  await mockReleaseSeat(performanceId, seatId);
 }
 
 // ── 공연 CRUD ────────────────────────────────────────
