@@ -10,6 +10,8 @@ import type { MyBookingsParams } from "@/types/domain/booking";
 
 /** infinite list 캐시 부분 매칭용. `list(params)`의 앞 두 칸과 같아야 한다 (#203). */
 const CONCERTS_LIST_PREFIX = ["concerts", "list"] as const;
+/** 내 예매 목록 부분 매칭용. `mine(params)`의 앞 두 칸과 같아야 한다 (#338). */
+const BOOKINGS_MINE_PREFIX = ["bookings", "mine"] as const;
 
 export const queryKeys = {
   auth: {
@@ -39,7 +41,9 @@ export const queryKeys = {
   },
   bookings: {
     all: ["bookings"] as const,
-    mine: (params?: MyBookingsParams) => ["bookings", "mine", params] as const,
+    minePrefix: BOOKINGS_MINE_PREFIX,
+    mine: (params?: MyBookingsParams) =>
+      [BOOKINGS_MINE_PREFIX[0], BOOKINGS_MINE_PREFIX[1], params] as const,
     detail: (bookingNumber: string) =>
       ["bookings", "detail", bookingNumber] as const,
   },

@@ -1,11 +1,11 @@
-// 환불 모니터링 — booking-service 실 API (2026-07-18 swagger-ui 실측으로 확인)
+// 환불 모니터링 — 실패·고착 전용 (#135 / #338)
 //
-// ⚠️ 이전에는 useAdminBookings({status:"CANCELED"}) mock 데이터를 재활용해
-// "환불 내역"을 흉내내고 있었음. 실제 백엔드에는 그런 범용 "취소 예매 목록"
-// 환불 API가 없고, 대신 다음 2개의 구체적인 모니터링 엔드포인트만 존재:
+// 이 화면은 전체 환불 목록이 아니다. 정상 신청·진행 중(REFUNDING) 건은 안 나온다.
+// 백엔드에 범용 "환불 내역" API가 없고, 아래 모니터링 엔드포인트만 존재:
 //   - GET /booking/admin/bookings/refund-failed    (환불 처리 자체가 실패한 건)
 //   - GET /booking/admin/bookings/refunding-stuck  (REFUNDING 상태로 오래 멈춰있는 건)
 //   - POST /booking/admin/{bookingNumber}/refund-retry (재시도)
+// 전체 환불 목록이 필요하면 별도 이슈.
 //
 // ⚠️ 응답에 사용자 이름/이메일이 없음 (userId만 존재, 조회 가능한 공개 API 없음).
 // 공연명/좌석번호는 performance/seat 서비스에서 aggregation (api/bookings.ts).
@@ -66,7 +66,8 @@ export default function AdminRefundsPage() {
           </span>
           <h1 className="text-3xl font-bold mt-2">환불 모니터링</h1>
           <p className="text-sm text-admin-text-secondary mt-1">
-            환불 처리가 실패했거나 오래 지연된 예매를 조회하고 재시도합니다
+            실패하거나 오래 멈춘 환불만 보여 줍니다. 정상 신청·진행 중 환불은
+            이 목록에 없습니다.
           </p>
         </div>
         <button

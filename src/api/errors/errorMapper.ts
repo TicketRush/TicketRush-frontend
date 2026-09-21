@@ -120,6 +120,10 @@ const ERROR_MESSAGE_OVERRIDES: Partial<Record<ErrorCode | string, string>> = {
     "현재 상태에서는 취소하거나 환불할 수 없습니다.",
   [ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED_TICKET_USED]:
     "이미 입장한 예매는 환불할 수 없습니다.",
+  [ERROR_CODES.PAYMENT_REFUND_DEADLINE_EXCEEDED]:
+    "환불 가능 기간이 지났습니다.",
+  [ERROR_CODES.PAYMENT_REFUND_FAILED]:
+    "환불 처리에 실패했습니다. 잠시 후 다시 시도해주세요.",
 
   [ERROR_CODES.SEAT_NOT_HELD]:
     "이미 해제된 좌석입니다. 좌석 현황을 다시 확인하세요.",

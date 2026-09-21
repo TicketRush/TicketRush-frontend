@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchBookingDetail } from "@/api/bookings";
 import { queryKeys } from "@/constants/queryKeys";
+import { overlayBookingDetail } from "@/utils/booking/userRefund";
 
 export function useBookingDetail(bookingNumber: string | undefined) {
   return useQuery({
@@ -9,6 +10,7 @@ export function useBookingDetail(bookingNumber: string | undefined) {
       ? queryKeys.bookings.detail(bookingNumber)
       : ["booking", "invalid"],
     queryFn: () => fetchBookingDetail(bookingNumber!),
+    select: overlayBookingDetail,
     enabled: !!bookingNumber,
   });
 }

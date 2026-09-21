@@ -94,12 +94,32 @@ export function isRefundableBooking(
   return Math.round((showMs - todayMs) / MS_PER_DAY) >= 7;
 }
 
+/** 마이페이지 뱃지. REFUNDING은 신청 접수 완료로 보여 준다 (#338). */
+export function userBookingStatusLabel(status: BookingStatus): string {
+  switch (status) {
+    case "CONFIRMED":
+      return "예매 확정";
+    case "PENDING":
+      return "결제 대기";
+    case "CANCELED":
+      return "취소됨";
+    case "REFUNDING":
+      return "환불 신청 완료";
+    case "REFUNDED":
+      return "환불 완료";
+    case "EXPIRED":
+      return "만료됨";
+  }
+}
+
 export function canFetchTicketQr(status: BookingStatus): boolean {
   return status === "CONFIRMED";
 }
 
 export function bookingQrPlaceholder(status: BookingStatus): string {
   if (status === "PENDING") return "결제 완료 후 입장 QR이 발급됩니다";
+  if (status === "REFUNDING") return "환불 신청이 완료된 예매입니다";
+  if (status === "REFUNDED") return "환불이 완료된 예매입니다";
   return "입장할 수 없는 예매입니다";
 }
 
@@ -134,6 +154,18 @@ export function ticketDetailHeading(status: BookingStatus): {
     return {
       title: "결제 대기 중",
       subtitle: "결제를 완료하면 디지털 티켓이 발급됩니다",
+    };
+  }
+  if (status === "REFUNDING") {
+    return {
+      title: "환불 신청 완료",
+      subtitle: "환불이 처리되면 예매 상태가 업데이트됩니다",
+    };
+  }
+  if (status === "REFUNDED") {
+    return {
+      title: "환불 완료",
+      subtitle: "이 예매로는 입장 QR을 사용할 수 없습니다",
     };
   }
   return {

@@ -6,6 +6,7 @@
 //   fetchMyBookings      → GET    /api/v1/booking/me (BookingMySummaryResponse)
 //   countMyBookingsApi   → GET    /api/v1/booking/me/count
 //   cancelBookingApi     → DELETE /api/v1/booking/{bookingNumber}
+//   requestRefundApi     → DELETE /api/v1/booking/{bookingNumber} (CONFIRMED → REFUNDING)
 //   fetchPendingBookingExpiresAt → GET /api/v1/booking/{bookingNumber} 의 expires_at
 //
 // 변경 이력:
@@ -272,10 +273,6 @@ export async function countMyBookingsApi(
   return { count: res.data.count };
 }
 
-// -------------------------------------------------------
-// 예매 취소 (DELETE /api/v1/booking/{bookingNumber})
-// -------------------------------------------------------
-
 export async function fetchPendingBookingExpiresAt(
   bookingNumber: string,
 ): Promise<string | null> {
@@ -301,10 +298,27 @@ export async function fetchPendingBookingExpiresAt(
   }
 }
 
+// 사용자용 /refund 는 없다. 같은 DELETE가 상태로 분기한다 (#338):
+//   PENDING   → CANCELED
+//   CONFIRMED → REFUNDING
+// 관리자 강제 환불은 POST /booking/admin/{bookingNumber}/refund.
 export async function cancelBookingApi(bookingNumber: string): Promise<void> {
-  if (USE_MOCK) return mockCancelBooking(bookingNumber);
+  try {
+    if (USE_MOCK) {
+      await mockCancelBooking(bookingNumber);
+      return;
+    }
+    await apiClient.delete(
+      `/api/v1/booking/${encodeURIComponent(bookingNumber)}`,
+    );
+  } catch (error) {
+    throw ApiError.fromUnknown(error);
+  }
+}
 
-  await apiClient.delete(`/api/v1/booking/${bookingNumber}`);
+/** CONFIRMED 예매 환불 신청. HTTP는 cancelBookingApi와 같다. */
+export function requestRefundApi(bookingNumber: string): Promise<void> {
+  return cancelBookingApi(bookingNumber);
 }
 
 // -------------------------------------------------------

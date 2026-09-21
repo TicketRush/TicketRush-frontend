@@ -75,4 +75,13 @@ describe("mapErrorToMessage", () => {
       ),
     ).toBe("이미 입장한 예매는 환불할 수 없습니다.");
   });
+
+  it("환불 기한·처리 실패는 결제 코드 안내를 쓴다", () => {
+    expect(
+      mapErrorToMessage(ERROR_CODES.PAYMENT_REFUND_DEADLINE_EXCEEDED, "be"),
+    ).toBe("환불 가능 기간이 지났습니다.");
+    expect(mapErrorToMessage(ERROR_CODES.PAYMENT_REFUND_FAILED, "be")).toBe(
+      "환불 처리에 실패했습니다. 잠시 후 다시 시도해주세요.",
+    );
+  });
 });

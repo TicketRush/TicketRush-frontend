@@ -4,6 +4,9 @@
 //   - booking.seatNumber → booking.seatNumber
 // 변경 이력 (이슈 #285):
 //   - 환불·취소 확인을 window.confirm → 공통 Modal로 교체
+// 변경 이력 (이슈 #338):
+//   - 환불 신청이 DELETE /booking/{bookingNumber} 를 호출하고
+//     성공 시 뱃지를 「환불 신청 완료」(REFUNDING)로 표시
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, MapPin, Ticket, AlertCircle } from "lucide-react";
@@ -18,9 +21,11 @@ import {
   displayBookingText,
   formatPerformanceSchedule,
   isRefundableBooking,
+  userBookingStatusLabel,
 } from "@/utils/booking";
 import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
+import { useRequestRefund } from "@/hooks/mutations/useRequestRefund";
 import Modal from "@/components/common/Modal/Modal";
 
 interface BookingCardProps {
@@ -30,37 +35,28 @@ interface BookingCardProps {
 
 type ConfirmKind = "refund" | "cancel" | null;
 
-const STATUS_BADGE: Record<
-  BookingStatus,
-  { label: string; bg: string; text: string }
-> = {
+const STATUS_BADGE: Record<BookingStatus, { bg: string; text: string }> = {
   CONFIRMED: {
-    label: "예매 확정",
     bg: "bg-[#00C950]/15",
     text: "text-[#00C950]",
   },
   PENDING: {
-    label: "결제 대기",
     bg: "bg-amber-100",
     text: "text-amber-700",
   },
   CANCELED: {
-    label: "취소됨",
     bg: "bg-[#FB2C36]/15",
     text: "text-[#FB2C36]",
   },
   REFUNDING: {
-    label: "환불 중",
     bg: "bg-blue-100",
     text: "text-blue-700",
   },
   REFUNDED: {
-    label: "환불 완료",
     bg: "bg-gray-100",
     text: "text-gray-500",
   },
   EXPIRED: {
-    label: "만료됨",
     bg: "bg-gray-100",
     text: "text-gray-500",
   },
@@ -88,6 +84,7 @@ const STATUS_BADGE: Record<
 export function BookingCard({ booking, tab }: BookingCardProps) {
   const navigate = useNavigate();
   const cancelBooking = useCancelBooking();
+  const requestRefund = useRequestRefund();
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null);
 
   const isRefundable = isRefundableBooking(booking);
@@ -95,9 +92,11 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   // ─ 지난 공연 여부 ─
   const isPastTab = tab === "past";
 
-  const statusBadge = STATUS_BADGE[booking.status] ?? STATUS_BADGE.EXPIRED;
+  const status = booking.status;
+  const statusBadge = STATUS_BADGE[status] ?? STATUS_BADGE.EXPIRED;
   const confirmPending =
-    confirmKind === "cancel" && cancelBooking.isPending;
+    (confirmKind === "cancel" && cancelBooking.isPending) ||
+    (confirmKind === "refund" && requestRefund.isPending);
 
   // ─ 핸들러 ─
   const handleViewTicket = () => {
@@ -111,9 +110,13 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
 
   async function handleConfirmAction() {
     if (confirmKind === "refund") {
-      // TODO: Sprint 9 환불 모달 연동 (Feat #27)
-      // refundMutation.mutate(booking.bookingNumber);
-      setConfirmKind(null);
+      try {
+        await requestRefund.mutateAsync(booking.bookingNumber);
+        toast.success("환불 신청이 완료되었습니다.");
+        setConfirmKind(null);
+      } catch {
+        // mutationCache.onError가 토스트. 모달은 열어 재시도할 수 있게 둔다.
+      }
       return;
     }
 
@@ -123,10 +126,8 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       await cancelBooking.mutateAsync(booking.bookingNumber);
       toast.info("예매를 취소했습니다.");
       setConfirmKind(null);
-    } catch (error: unknown) {
-      const err =
-        error instanceof Error ? error : new Error("예매 취소에 실패했습니다.");
-      toast.error(err.message);
+    } catch {
+      // mutationCache.onError가 토스트. 모달은 열어 재시도할 수 있게 둔다.
     }
   }
 
@@ -137,9 +138,9 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   );
 
   const isTerminal =
-    booking.status === "CANCELED" ||
-    booking.status === "EXPIRED" ||
-    booking.status === "REFUNDED";
+    status === "CANCELED" ||
+    status === "EXPIRED" ||
+    status === "REFUNDED";
 
   return (
     <article className="bg-white border border-gray-200 rounded-lg p-6">
@@ -152,7 +153,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
           <span
             className={`text-xs px-2.5 py-1 rounded font-medium ${statusBadge.bg} ${statusBadge.text}`}
           >
-            {statusBadge.label}
+            {userBookingStatusLabel(status)}
           </span>
         </div>
         <div className="text-right shrink-0 ml-4">
@@ -199,7 +200,7 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
       </div>
 
       {/* ─── 액션 버튼 ─── */}
-      {booking.status === "PENDING" ? (
+      {status === "PENDING" ? (
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -259,12 +260,14 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
             <button
               type="button"
               onClick={() => setConfirmKind("refund")}
+              disabled={requestRefund.isPending}
               className="flex items-center justify-center gap-2
                          border border-[#FB2C36] text-[#FB2C36]
-                         py-3 rounded-lg font-medium hover:bg-[#FB2C36]/5 transition-colors"
+                         py-3 rounded-lg font-medium hover:bg-[#FB2C36]/5 transition-colors
+                         disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <AlertCircle className="w-4 h-4" />
-              환불 신청
+              {requestRefund.isPending ? "신청 중..." : "환불 신청"}
             </button>
           ) : (
             <button
@@ -275,13 +278,13 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
                          py-3 rounded-lg font-medium cursor-not-allowed"
             >
               <AlertCircle className="w-4 h-4" />
-              {booking.status === "CANCELED"
+              {status === "CANCELED"
                 ? "취소된 예매"
-                : booking.status === "REFUNDING"
-                  ? "환불 진행 중"
-                  : booking.status === "REFUNDED"
+                : status === "REFUNDING"
+                  ? "환불 신청 완료"
+                  : status === "REFUNDED"
                     ? "환불 완료"
-                    : booking.status === "EXPIRED"
+                    : status === "EXPIRED"
                       ? "만료된 예매"
                       : booking.performanceDate?.trim()
                         ? "환불 불가 (D-7 미만)"
@@ -319,7 +322,9 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
               className="px-4 py-2 rounded bg-[#FB2C36] text-white font-semibold disabled:opacity-60"
             >
               {confirmKind === "refund"
-                ? "환불 신청"
+                ? confirmPending
+                  ? "신청 중..."
+                  : "환불 신청"
                 : confirmPending
                   ? "취소 중..."
                   : "예매 취소"}

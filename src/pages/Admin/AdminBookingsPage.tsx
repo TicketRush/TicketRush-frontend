@@ -24,7 +24,6 @@ import {
   useAdminRefundBooking,
 } from "@/hooks/admin/useAdmin";
 import type { BookingStatus } from "@/types/domain/booking";
-import type { AdminBookingItem } from "@/types/domain/admin";
 import {
   formatAdminCount,
   formatAdminDateTime,
@@ -35,6 +34,10 @@ import {
   parseAdminBookingHandoff,
   resolveAdminBookingHandoff,
 } from "@/utils/admin/resolveAdminBookingHandoff";
+import {
+  overlayRequestedRefundStatus,
+  withRequestedRefunds,
+} from "@/utils/booking/userRefund";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import Modal from "@/components/common/Modal/Modal";
 
@@ -47,30 +50,6 @@ function matchesTab(status: BookingStatus, tab: Tab): boolean {
   if (tab === "CANCELED") return status === "CANCELED" || status === "REFUNDED";
   if (tab === "PENDING") return status === "PENDING" || status === "REFUNDING";
   return status === tab;
-}
-
-function overlayRequestedRefundStatus(
-  status: BookingStatus | undefined,
-  bookingNumber: string,
-  requested: ReadonlySet<string>,
-): BookingStatus | undefined {
-  if (status === "CONFIRMED" && requested.has(bookingNumber)) return "REFUNDING";
-  return status;
-}
-
-function withRequestedRefunds(
-  items: AdminBookingItem[],
-  requested: ReadonlySet<string>,
-): AdminBookingItem[] {
-  if (requested.size === 0) return items;
-  return items.map((item) => {
-    const status = overlayRequestedRefundStatus(
-      item.status,
-      item.bookingNumber,
-      requested,
-    );
-    return status === item.status ? item : { ...item, status: status! };
-  });
 }
 
 export default function AdminBookingsPage() {
