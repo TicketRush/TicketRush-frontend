@@ -94,7 +94,7 @@ export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
     name: "재즈",
     description: "재즈 공연 의상",
     icon: "🎷",
-    modelUrl: null,
+    modelUrl: "/models/outfits/jazz_outfit.glb",
   },
   {
     id: "festival",
