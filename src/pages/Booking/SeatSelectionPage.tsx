@@ -24,6 +24,7 @@
 // - #123: SSE/polling으로 선택 좌석이 AVAILABLE이 아니게 되면 선택 해제
 // - #335: 진입 가드는 최초 판정만. SSE는 캐시 패치, 폴링/포커스 refetch는 맵을 유지
 //   입장 후 잔여 0·판매 종료는 안내 후 확인 시 공연 상세로 이동
+// - #340: 새로고침 시 window·좌석맵 가로 스크롤을 공연 ID 기준으로 복원
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -35,6 +36,7 @@ import SeatLegend from "@/components/seat/SeatLegend";
 import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
 import { useSeats, useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
+import { useSeatSelectionScroll } from "@/hooks/seat/useSeatSelectionScroll";
 import { useCreateBooking } from "@/hooks/mutations/useCreateBooking";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
 import { useCancelPendingReservation } from "@/hooks/booking/useCancelPendingReservation";
@@ -171,6 +173,20 @@ export default function SeatSelectionPage() {
     performanceId,
     stayOnSeatMap,
   );
+  const mapScrollRef = useRef<HTMLDivElement>(null);
+  const { onMapScroll } = useSeatSelectionScroll({
+    performanceId:
+      performanceId != null && Number.isSafeInteger(performanceId)
+        ? performanceId
+        : null,
+    ready:
+      stayOnSeatMap &&
+      !!seatMap?.layoutReady &&
+      !guardPending &&
+      !concertError &&
+      !seatCountsError,
+    containerRef: mapScrollRef,
+  });
   const createBookingMutation = useCreateBooking();
   const releaseSeatMutation = useReleaseSeat(performanceId ?? 0);
   useSeatEventStream(performanceId, stayOnSeatMap, {
@@ -483,7 +499,11 @@ export default function SeatSelectionPage() {
             flex w-max min-w-full justify-center:
             좁을 때 콘텐츠 폭만큼 늘어나 왼쪽부터 스크롤, 넓을 때 가운데 정렬.
             패딩은 툴팁·포커스 링이 overflow에 잘리지 않게 확보. */}
-        <div className="overflow-x-auto pt-8 pb-3 px-2">
+        <div
+          ref={mapScrollRef}
+          onScroll={onMapScroll}
+          className="overflow-x-auto pt-8 pb-3 px-2"
+        >
           <div className="flex w-max min-w-full justify-center">
             <div className="flex flex-row items-center gap-6">
               {isLoading && !seatMap ? (
