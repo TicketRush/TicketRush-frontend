@@ -91,6 +91,17 @@ describe("detail empty states (#322)", () => {
 });
 
 describe("detail character API data", () => {
+  it("forwards independent jazz colors and legacy fallback to the viewer", () => {
+    const colors = { jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" };
+    render({ characterConfig: { ...config, outfitModelId: "rainbow-blouse", ...colors } });
+    expect(mocks.viewer.mock.calls[0][0]).toMatchObject(colors);
+    mocks.viewer.mockClear();
+    const legacy = { ...config, outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF" } as Record<string, unknown>;
+    for (const key of Object.keys(colors)) delete legacy[key];
+    render({ characterConfig: legacy });
+    expect(mocks.viewer.mock.calls[0][0]).toMatchObject({ jazzShirtColor: "#ABCDEF", jazzInnerColor: "#ABCDEF", jazzPantsColor: "#ABCDEF" });
+  });
+
   it("renders the API character, all restored viewer settings and its message", () => {
     const html = render();
     expectBody(html);

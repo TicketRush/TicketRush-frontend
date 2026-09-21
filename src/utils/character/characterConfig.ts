@@ -69,6 +69,21 @@ export function restoreCharacterDraft(value: unknown): CharacterDraft | null {
 
   const legacyOutfitColor = resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR;
 
+  const resolvedJazzShirtColor =
+    typeof parsed.jazzShirtColor === "string"
+      ? normalizeHexColor(parsed.jazzShirtColor)
+      : null;
+
+  const resolvedJazzInnerColor =
+    typeof parsed.jazzInnerColor === "string"
+      ? normalizeHexColor(parsed.jazzInnerColor)
+      : null;
+
+  const resolvedJazzPantsColor =
+    typeof parsed.jazzPantsColor === "string"
+      ? normalizeHexColor(parsed.jazzPantsColor)
+      : null;
+
   const resolvedBalletWearColor =
     typeof parsed.balletWearColor === "string"
       ? normalizeHexColor(parsed.balletWearColor)
@@ -157,6 +172,9 @@ export function restoreCharacterDraft(value: unknown): CharacterDraft | null {
     outfitModelId: resolvedOutfitModelId,
     outfitName: resolvedOutfit.name,
     outfitColor: resolvedOutfitColor ?? DEFAULT_OUTFIT_COLOR,
+    jazzShirtColor: resolvedJazzShirtColor ?? legacyOutfitColor,
+    jazzInnerColor: resolvedJazzInnerColor ?? legacyOutfitColor,
+    jazzPantsColor: resolvedJazzPantsColor ?? legacyOutfitColor,
     balletWearColor: resolvedBalletWearColor ?? legacyOutfitColor,
     balletShortsColor: resolvedBalletShortsColor ?? legacyOutfitColor,
     jacketColor: resolvedJacketColor ?? legacyOutfitColor,
@@ -223,6 +241,9 @@ export function createCharacterConfig(
     hairColor: character.hairColor,
     outfitModelId: character.outfitModelId,
     outfitColor: character.outfitColor,
+    jazzShirtColor: character.jazzShirtColor,
+    jazzInnerColor: character.jazzInnerColor,
+    jazzPantsColor: character.jazzPantsColor,
     balletWearColor: character.balletWearColor,
     balletShortsColor: character.balletShortsColor,
     jacketColor: character.jacketColor,

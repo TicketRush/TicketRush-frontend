@@ -202,12 +202,15 @@ describe("createConcertApi with the real axios interceptors", () => {
     expect(adapter).not.toHaveBeenCalled();
   });
 
-  it("preserves opaque character keys and nested values through request transforms", async () => {
+  it.each(["theater", "rainbow-blouse"])("preserves opaque character keys and nested values through request transforms (%s)", async (outfitModelId) => {
     const value = input();
     const characterConfig = {
       ...createCharacterConfig(restoreCharacterDraft({
-        outfitModelId: "theater",
+        outfitModelId,
         fanmeetCardiganColor: "#ABCDEF",
+        jazzShirtColor: "#FF0000",
+        jazzInnerColor: "#00FF00",
+        jazzPantsColor: "#0000FF",
         fanmeetInnerColor: "#123456",
         fanmeetShortsColor: "#654321",
         fanmeetSkirtColor: "#FEDCBA",
@@ -223,7 +226,7 @@ describe("createConcertApi with the real axios interceptors", () => {
     );
     expect(request.character_config).toEqual(characterConfig);
     expect(request.character_config).toMatchObject({
-      outfitModelId: "theater",
+      outfitModelId,
       fanmeetCardiganColor: "#ABCDEF",
       fanmeetInnerColor: "#123456",
       fanmeetShortsColor: "#654321",

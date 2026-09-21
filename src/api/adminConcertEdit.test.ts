@@ -22,6 +22,9 @@ const character = {
     restoreCharacterDraft({
       outfitModelId: "theater",
       fanmeetCardiganColor: "#123456",
+      jazzShirtColor: "#FF0000",
+      jazzInnerColor: "#00FF00",
+      jazzPantsColor: "#0000FF",
       fanmeetInnerColor: "#234567",
       fanmeetShortsColor: "#345678",
       fanmeetSkirtColor: "#456789",
@@ -86,6 +89,17 @@ async function input() {
 }
 
 describe("admin edit contract", () => {
+  it("restores jazz from the API and PATCHes independent colors without changing opaque keys", async () => {
+    const jazz = { ...character, outfitModelId: "rainbow-blouse" as const };
+    adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, character_config: jazz } }) });
+    const value = await input();
+    const restored = restoreCharacterDraft(value.form.characterConfig)!;
+    expect(restored).toMatchObject({ outfitModelId: "rainbow-blouse", jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" });
+    value.form.characterConfig = createCharacterConfig({ ...restored, jazzInnerColor: "#ABCDEF" });
+    await updateConcertApi(42, value);
+    expect(JSON.parse(adapter.mock.calls[0][0].data).character_config).toEqual(value.form.characterConfig);
+  });
+
   it.each(["2027-02-29T12:30", "2027-01-01T24:00", "invalid", ""])(
     "rejects invalid or cleared booking time before HTTP (%s)", async (bookingOpenAt) => {
       const value = await input();
