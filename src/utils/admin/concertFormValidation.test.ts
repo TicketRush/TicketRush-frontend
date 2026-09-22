@@ -10,6 +10,9 @@ import {
   isValidTime,
   sanitizeConcertForm,
   validateConcertForm,
+  validateConcertDate,
+  validateConcertTime,
+  validateBookingOpenAt,
 } from "./concertFormValidation";
 
 const baseForm = {
@@ -26,6 +29,27 @@ const baseForm = {
   notices: ["공연 10분 전 입장"],
   facilities: [{ icon: "parking", label: "주차 가능" }],
 };
+
+describe("shared live and submit schedule validation", () => {
+  const today = new Date(2026, 8, 22);
+  it.each(["", "0999--", "10000-01-01", "2028--", "2028-02-", "2027-02-29", "2028-04-31", "2020-01-01", "2035-01-01", "2028-02-29"])("shares date policy for %s", (date) => {
+    expect(validateConcertDate(date, undefined, today)).toBe(validateConcertForm({ form: { ...baseForm, date }, totalSeats: 100, today }));
+    expect(validateConcertDate(date, undefined, today) === null).toBe(date === "2028-02-29");
+  });
+  it.each(["", "25:00", "12:70", "19:30"])("shares time policy for %s", (time) => {
+    expect(validateConcertTime(time)).toBe(validateConcertForm({ form: { ...baseForm, date: "2028-02-29", time }, totalSeats: 100, today }));
+    expect(validateConcertTime(time) === null).toBe(time === "19:30");
+  });
+  it.each(["", "--T20:30", "2028--T", "2028-02-T", "2028-02-29T", "2028-02-29T20:30", "2028-02-29 20:30:45"])("shares optional booking policy for %s", (bookingOpenAt) => {
+    expect(validateBookingOpenAt(bookingOpenAt)).toBe(validateConcertForm({ form: { ...baseForm, date: "2028-02-29", bookingOpenAt }, totalSeats: 100, today }));
+    expect(validateBookingOpenAt(bookingOpenAt) === null).toBe(!bookingOpenAt || bookingOpenAt.includes("20:30") && bookingOpenAt.startsWith("2028-02-29"));
+  });
+  it("preserves unchanged edit exceptions", () => {
+    expect(validateConcertDate("2020-01-01", "2020-01-01", today)).toBeNull();
+    expect(validateConcertDate("2035-01-01", "2035-01-01", today)).toBeNull();
+    expect(validateBookingOpenAt("legacy", "legacy")).toBeNull();
+  });
+});
 
 describe("isValidDate", () => {
   it("실제로 존재하는 날짜를 허용한다", () => {

@@ -7,6 +7,8 @@ interface Props {
   onChange: (value: DateParts) => void;
   onKeyDown?: KeyboardEventHandler<HTMLInputElement | HTMLSelectElement>;
   "data-form-focus"?: "true";
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
 }
 
 const inputClass = "w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50 xl:px-4 xl:py-3 xl:text-base";
