@@ -1,8 +1,9 @@
 // 관리자 API
 //
 // 대시보드·관리자 공연 목록 (#191 / BE #563):
-//   GET /api/v1/performance/admin/dashboard
-//   GET /api/v1/performance/admin
+//   GET    /api/v1/performance/admin/dashboard
+//   GET    /api/v1/performance/admin
+//   DELETE /api/v1/performance/admin/{id}  — 논리 삭제 (#342)
 // 예매 내역 (#174 / BE #561):
 //   GET  /api/v1/booking/admin/bookings
 //   GET  /api/v1/booking/admin/bookings/stats
@@ -282,8 +283,7 @@ export async function updateConcertApi(id: number, input: UpdateConcertInput) {
 
 export async function deleteConcertApi(id: number) {
   if (USE_MOCK) return mocks.mockDeleteConcert(id);
-  // await apiClient.delete(`/api/v1/performance/admin/${id}`);
-  throw new Error("Real API not implemented");
+  await apiClient.delete(`/api/v1/performance/admin/${id}`);
 }
 
 export async function fetchConcertForEdit(id: number) {

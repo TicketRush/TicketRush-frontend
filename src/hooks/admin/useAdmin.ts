@@ -264,8 +264,14 @@ export function useDeleteConcert() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.deleteConcertApi(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: adminKeys.all });
+    onSuccess: (_data, id) => {
+      // 재조회 실패가 이미 끝난 삭제를 실패로 바꾸지 않도록 기다리지 않는다.
+      void qc.invalidateQueries({ queryKey: adminKeys.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.concerts.all });
+      void qc.invalidateQueries({
+        queryKey: queryKeys.seats.byPerformance(id),
+      });
+      void qc.invalidateQueries({ queryKey: queryKeys.seats.counts(id) });
     },
   });
 }
