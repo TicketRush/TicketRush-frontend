@@ -6,9 +6,17 @@
 // 통계 카드는 목록 필터와 무관한 전체 모집단이다. CANCELED는 환불로 세지 않는다.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckSquare,
+  Clock3,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { ApiError } from "@/api/errors/errorMapper";
+import StatCard from "@/components/admin/StatCard";
 import {
   useAdminRefundList,
   useAdminRefundStats,
@@ -39,23 +47,15 @@ const STATUS_STYLES: Record<RefundProcessStatus, { bg: string }> = {
   FAILED: { bg: "#FB2C36" },
 };
 
-const FILTERS: { status?: RefundProcessStatus; label: string; stat: keyof StatsShape }[] =
-  [
-    { label: "전체 환불", stat: "totalRefunds" },
-    { status: "IN_PROGRESS", label: "진행 중", stat: "inProgressRefunds" },
-    { status: "COMPLETED", label: "완료", stat: "completedRefunds" },
-    { status: "FAILED", label: "미해결 실패", stat: "failedRefunds" },
-  ];
-
-type StatsShape = {
-  totalRefunds: number;
-  inProgressRefunds: number;
-  completedRefunds: number;
-  failedRefunds: number;
-};
+const FILTERS: { status?: RefundProcessStatus; label: string }[] = [
+  { label: "전체" },
+  { status: "IN_PROGRESS", label: "진행 중" },
+  { status: "COMPLETED", label: "완료" },
+  { status: "FAILED", label: "실패" },
+];
 
 export default function AdminRefundsPage() {
-  useDocumentTitle("환불 관리");
+  useDocumentTitle("환불 내역 관리");
 
   const navigate = useNavigate();
   const [refundStatus, setRefundStatus] = useState<
@@ -64,6 +64,7 @@ export default function AdminRefundsPage() {
   const [page, setPage] = useState(0);
 
   const stats = useAdminRefundStats();
+  const statsPending = stats.isLoading && stats.data == null;
   const list = useAdminRefundList({ page, size: PAGE_SIZE, refundStatus });
   const retryMutation = useRetryRefund();
 
@@ -86,12 +87,11 @@ export default function AdminRefundsPage() {
       <div className="flex items-start justify-between">
         <div>
           <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-1 rounded">
-            REFUNDS
+            REFUND MANAGEMENT
           </span>
-          <h1 className="text-3xl font-bold mt-2">환불 관리</h1>
+          <h1 className="text-3xl font-bold mt-2">환불 내역 관리</h1>
           <p className="text-sm text-admin-text-secondary mt-1">
-            진행 중, 완료, 미해결 실패를 한 목록에서 봅니다. 결제 전 취소와
-            만료는 포함하지 않습니다.
+            환불 내역을 조회하고 관리합니다
           </p>
         </div>
         <button
@@ -104,6 +104,53 @@ export default function AdminRefundsPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={<RefreshCw size={24} />}
+          badge="TOTAL"
+          badgeColor="red"
+          iconClassName="text-admin-status-cancelled"
+          value={
+            statsPending ? "..." : formatAdminCount(stats.data?.totalRefunds)
+          }
+          label="전체 환불"
+        />
+        <StatCard
+          icon={<Clock3 size={24} />}
+          badge="IN PROGRESS"
+          badgeColor="blue"
+          iconClassName="text-admin-kpi-events"
+          value={
+            statsPending
+              ? "..."
+              : formatAdminCount(stats.data?.inProgressRefunds)
+          }
+          label="진행 중"
+        />
+        <StatCard
+          icon={<CheckSquare size={24} />}
+          badge="COMPLETED"
+          badgeColor="green"
+          iconClassName="text-admin-kpi-tickets"
+          value={
+            statsPending
+              ? "..."
+              : formatAdminCount(stats.data?.completedRefunds)
+          }
+          label="완료된 환불"
+        />
+        <StatCard
+          icon={<AlertCircle size={24} />}
+          badge="FAILED"
+          badgeColor="orange"
+          iconClassName="text-admin-kpi-revenue"
+          value={
+            statsPending ? "..." : formatAdminCount(stats.data?.failedRefunds)
+          }
+          label="미해결 실패"
+        />
+      </div>
+
+      <div className="bg-admin-card border border-admin-border rounded-xl p-2 flex gap-1 inline-flex">
         {FILTERS.map((filter) => {
           const selected = refundStatus === filter.status;
           return (
@@ -112,16 +159,13 @@ export default function AdminRefundsPage() {
               type="button"
               aria-pressed={selected}
               onClick={() => selectFilter(filter.status)}
-              className={`bg-admin-card rounded-xl p-6 text-left border-2 ${
-                selected ? "border-admin-register" : "border-admin-border"
+              className={`px-4 py-2 text-sm rounded-lg transition ${
+                selected
+                  ? "bg-primary text-white font-semibold"
+                  : "text-admin-text-secondary hover:bg-admin-border/50"
               }`}
             >
-              <p className="text-xs text-admin-text-secondary mb-2">
-                {filter.label}
-              </p>
-              <p className="text-3xl font-bold text-admin-text">
-                {formatAdminCount(stats.data?.[filter.stat])}
-              </p>
+              {filter.label}
             </button>
           );
         })}

@@ -86,7 +86,11 @@ describe("AdminRefundsPage (#397)", () => {
         <AdminRefundsPage />
       </MemoryRouter>,
     );
-    expect(html).toContain("진행 중, 완료, 미해결 실패를 한 목록에서 봅니다");
+    expect(html).toContain("환불 내역을 조회하고 관리합니다");
+    expect(html).not.toContain("진행·완료·실패 합");
+    expect(html).not.toContain("정상 진행과 고착 포함");
+    expect(html).not.toContain("환불이 끝난 예매");
+    expect(html).not.toContain("실패 이력이 남은 확정 예매");
     expect(html).toContain(">12<");
     expect(html).toContain(">3<");
     expect(html).toContain(">8<");
