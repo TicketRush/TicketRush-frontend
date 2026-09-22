@@ -39,21 +39,24 @@ vi.mock("@/hooks/common/useDocumentTitle", () => ({
   useDocumentTitle: vi.fn(),
 }));
 vi.mock("@/hooks/admin/useAdmin", () => ({
-  useAdminBookings: () => ({
-    data: {
-      items: bookingsState.items,
-      pagination: {
-        pageIndex: 0,
-        size: 10,
-        totalElements: bookingsState.totalElements,
-        totalPages: 1,
-        hasNext: false,
+  useAdminBookings: (params: { tab?: string; size?: number }) => {
+    const refundedKpi = params.tab === "REFUNDED" && params.size === 1;
+    return {
+      data: {
+        items: refundedKpi ? [] : bookingsState.items,
+        pagination: {
+          pageIndex: 0,
+          size: params.size ?? 10,
+          totalElements: refundedKpi ? 7 : bookingsState.totalElements,
+          totalPages: 1,
+          hasNext: false,
+        },
       },
-    },
-    isLoading: false,
-    isError: false,
-    isPlaceholderData: false,
-  }),
+      isLoading: false,
+      isError: false,
+      isPlaceholderData: false,
+    };
+  },
   useAdminBookingStats: () => ({
     data: {
       totalBookings: 3,
@@ -97,6 +100,9 @@ describe("AdminBookingsPage (#337/#339)", () => {
     expect(html).toContain(">12개의 예매<");
     expect(html).toContain("KPI「전체 예매」");
     expect(html).toContain("KPI「취소된 예매」");
+    expect(html).toContain("환불 완료만");
+    expect(html).toContain(">7</p>");
+    expect(html).not.toContain("미결제 취소");
     expect(html).not.toContain("다른 페이지를 확인해 주세요");
   });
 });

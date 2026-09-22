@@ -57,4 +57,4 @@ export function adminBookingTabLabel(tab: AdminBookingListTab): string {
 }
 
 export const ADMIN_BOOKING_TABS_HINT =
-  "환불 완료 탭은 환불이 끝난 예매만 보여 줍니다. 전체 탭 건수는 KPI「전체 예매」와 다를 수 있습니다(결제 전 취소·만료 제외). KPI「취소된 예매」는 미결제 취소+환불 완료라 [환불 완료] 탭과도 다릅니다. 환불 전용 집계는 환불 관리 화면(BE #675 / FE #397)을 씁니다.";
+  "환불 완료 탭은 환불이 끝난 예매만 보여 줍니다. 전체 탭 건수는 KPI「전체 예매」와 다를 수 있습니다(결제 전 취소·만료 제외). KPI「취소된 예매」는 환불 완료만 집계해 [환불 완료] 탭 건수와 같습니다.";
