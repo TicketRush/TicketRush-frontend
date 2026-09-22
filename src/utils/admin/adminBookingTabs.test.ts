@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BookingStatus } from "@/types/domain/booking";
 import {
   ADMIN_BOOKING_LIST_TABS,
+  adminBookingServerFilterApplied,
   adminBookingTabLabel,
   adminBookingTabStatuses,
   matchesAdminBookingTab,
@@ -59,5 +60,40 @@ describe("adminBookingTabLabel", () => {
     ]);
     expect(adminBookingTabLabel("REFUNDED")).toBe("환불 완료");
     expect(adminBookingTabLabel("PENDING")).toBe("대기·환불 중");
+  });
+});
+
+describe("adminBookingServerFilterApplied", () => {
+  it("행에 탭 밖 상태가 있으면 서버가 안 거른 것이다", () => {
+    expect(
+      adminBookingServerFilterApplied(
+        ["REFUNDED"],
+        [{ status: "CONFIRMED" }],
+        10,
+        10,
+      ),
+    ).toBe(false);
+  });
+
+  it("거른 건수와 전체 건수가 같으면 서버가 안 거른 것이다", () => {
+    expect(
+      adminBookingServerFilterApplied(
+        ["REFUNDED"],
+        [{ status: "REFUNDED" }],
+        10,
+        10,
+      ),
+    ).toBe(false);
+  });
+
+  it("거른 건수가 전체보다 작으면 서버 필터를 쓴다", () => {
+    expect(
+      adminBookingServerFilterApplied(
+        ["REFUNDED"],
+        [{ status: "REFUNDED" }],
+        2,
+        10,
+      ),
+    ).toBe(true);
   });
 });

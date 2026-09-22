@@ -41,7 +41,6 @@ import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import Modal from "@/components/common/Modal/Modal";
 import {
   ADMIN_BOOKING_LIST_TABS,
-  ADMIN_BOOKING_TABS_HINT,
   adminBookingTabLabel,
   matchesAdminBookingTab,
   type AdminBookingListTab,
@@ -271,7 +270,6 @@ export default function AdminBookingsPage() {
             statsPending ? "..." : formatAdminCount(stats?.totalBookings)
           }
           label="전체 예매"
-          hint="모든 상태"
         />
         <StatCard
           icon={<CheckSquare size={24} />}
@@ -282,7 +280,6 @@ export default function AdminBookingsPage() {
             statsPending ? "..." : formatAdminCount(stats?.completedBookings)
           }
           label="완료된 예매"
-          hint="결제 완료만"
         />
         <StatCard
           icon={<DollarSign size={24} />}
@@ -291,7 +288,6 @@ export default function AdminBookingsPage() {
           iconClassName="text-admin-kpi-revenue"
           value={statsPending ? "..." : formatAdminWon(stats?.totalRevenue)}
           label="총 매출"
-          hint="결제 완료 금액 합"
         />
         <StatCard
           icon={<UserMinus size={24} />}
@@ -304,7 +300,6 @@ export default function AdminBookingsPage() {
               : formatAdminCount(refundedBookings)
           }
           label="취소된 예매"
-          hint="환불 완료만"
         />
       </div>
 
@@ -335,9 +330,6 @@ export default function AdminBookingsPage() {
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-admin-text-secondary mt-2">
-          {ADMIN_BOOKING_TABS_HINT}
-        </p>
       </div>
 
       {focusBookingNumber && !focusListHidden ? (

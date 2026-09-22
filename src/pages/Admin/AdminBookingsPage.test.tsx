@@ -89,7 +89,7 @@ describe("AdminBookingsPage (#337/#339)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("서버 totalElements를 제목으로 쓰고 탭 힌트를 보여 준다", () => {
+  it("목록 건수와 환불 완료 KPI를 보여 주고 안내 문구는 빼 둔다", () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
         <AdminBookingsPage />
@@ -98,11 +98,13 @@ describe("AdminBookingsPage (#337/#339)", () => {
     expect(html).toContain("환불 완료");
     expect(html).toContain("환불 완료 공연");
     expect(html).toContain(">12개의 예매<");
-    expect(html).toContain("KPI「전체 예매」");
-    expect(html).toContain("KPI「취소된 예매」");
-    expect(html).toContain("환불 완료만");
     expect(html).toContain(">7</p>");
     expect(html).not.toContain("미결제 취소");
+    expect(html).not.toContain("모든 상태");
+    expect(html).not.toContain("결제 완료만");
+    expect(html).not.toContain("결제 완료 금액 합");
+    expect(html).not.toContain("환불 완료만");
+    expect(html).not.toContain("환불 완료 탭은");
     expect(html).not.toContain("다른 페이지를 확인해 주세요");
   });
 });

@@ -35,6 +35,7 @@ import type {
 } from "@/types/domain/admin";
 import type { BookingStatus } from "@/types/domain/booking";
 import {
+  adminBookingServerFilterApplied,
   adminBookingTabStatuses,
   type AdminBookingListTab,
 } from "@/utils/admin/adminBookingTabs";
@@ -153,7 +154,14 @@ export async function fetchAdminBookings(
   };
 }
 
-/** 탭별 예매 목록 — BE #667/#674 status(합집합) 한 번 조회 (#337/#339). */
+const CLIENT_FILTER_PAGE_SIZE = 50;
+const CLIENT_FILTER_MAX_PAGES = 40;
+
+/**
+ * 탭별 예매 목록.
+ * BE #674가 배포된 서버는 status 합집합으로 페이지를 맞춘다.
+ * 그 이전 실서버는 status를 무시하므로, 건수가 전체와 같으면 받아 온 목록을 탭으로 거른다.
+ */
 export async function fetchAdminBookingsForTab(
   tab: AdminBookingListTab,
   params: { page?: number; size?: number } = {},
@@ -161,7 +169,50 @@ export async function fetchAdminBookingsForTab(
   const page = params.page ?? 0;
   const size = Math.min(params.size ?? 10, 50);
   const statuses = adminBookingTabStatuses(tab);
-  return fetchAdminBookings({ page, size, status: statuses });
+  const filtered = await fetchAdminBookings({ page, size, status: statuses });
+  const probe = await fetchAdminBookings({ page: 0, size: 1 });
+  const applied = adminBookingServerFilterApplied(
+    statuses,
+    filtered.items,
+    filtered.pagination.totalElements,
+    probe.pagination.totalElements,
+  );
+  if (applied) return filtered;
+  return collectBookingsForStatuses(statuses, page, size);
+}
+
+async function collectBookingsForStatuses(
+  statuses: readonly BookingStatus[],
+  page: number,
+  size: number,
+): Promise<AdminBookingListResponse> {
+  const matched: AdminBookingListResponse["items"] = [];
+  let serverPage = 0;
+  let hasNext = true;
+  while (hasNext && serverPage < CLIENT_FILTER_MAX_PAGES) {
+    const batch = await fetchAdminBookings({
+      page: serverPage,
+      size: CLIENT_FILTER_PAGE_SIZE,
+    });
+    for (const item of batch.items) {
+      if (statuses.includes(item.status)) matched.push(item);
+    }
+    hasNext = batch.pagination.hasNext && batch.items.length > 0;
+    serverPage += 1;
+  }
+  const start = page * size;
+  const totalElements = matched.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / size) || 1);
+  return {
+    items: matched.slice(start, start + size),
+    pagination: {
+      pageIndex: page,
+      size,
+      totalElements,
+      totalPages,
+      hasNext: start + size < totalElements,
+    },
+  };
 }
 
 export async function fetchAdminBookingStats(): Promise<AdminBookingStats> {

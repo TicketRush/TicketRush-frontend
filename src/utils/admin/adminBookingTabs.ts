@@ -56,5 +56,16 @@ export function adminBookingTabLabel(tab: AdminBookingListTab): string {
   }
 }
 
-export const ADMIN_BOOKING_TABS_HINT =
-  "환불 완료 탭은 환불이 끝난 예매만 보여 줍니다. 전체 탭 건수는 KPI「전체 예매」와 다를 수 있습니다(결제 전 취소·만료 제외). KPI「취소된 예매」는 환불 완료만 집계해 [환불 완료] 탭 건수와 같습니다.";
+/**
+ * 실서버(main, 2026-09-17)는 status 파라미터를 무시하고 전체 목록을 준다.
+ * 거른 건수와 안 거른 건수가 같거나, 행에 탭 밖 상태가 있으면 서버 필터가 안 먹은 것이다.
+ */
+export function adminBookingServerFilterApplied(
+  requested: readonly BookingStatus[],
+  items: readonly { status: BookingStatus }[],
+  filteredTotal: number,
+  unfilteredTotal: number,
+): boolean {
+  if (items.some((item) => !requested.includes(item.status))) return false;
+  return filteredTotal !== unfilteredTotal;
+}
