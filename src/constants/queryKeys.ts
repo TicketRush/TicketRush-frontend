@@ -44,6 +44,7 @@ export const queryKeys = {
     minePrefix: BOOKINGS_MINE_PREFIX,
     mine: (params?: MyBookingsParams) =>
       [BOOKINGS_MINE_PREFIX[0], BOOKINGS_MINE_PREFIX[1], params] as const,
+    count: () => ["bookings", "count"] as const,
     detail: (bookingNumber: string) =>
       ["bookings", "detail", bookingNumber] as const,
   },

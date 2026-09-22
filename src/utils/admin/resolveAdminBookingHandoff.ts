@@ -1,4 +1,5 @@
 import type { BookingStatus } from "@/types/domain/booking";
+import { matchesAdminBookingTab } from "./adminBookingTabs";
 
 /** #169 좌석 모니터링 → 예매 내역 쿼리. 목록 API 검색은 없다. */
 export type AdminBookingHandoff = {
@@ -10,6 +11,8 @@ export type AdminBookingHandoffResult = {
   expandBookingNumber: string | null;
   refundTarget: string | null;
   refundBlocked: boolean;
+  /** 목록 정책상 숨기는 상태(CANCELED/EXPIRED). Focus·표에 올리지 않는다 (#339). */
+  listHidden: boolean;
 };
 
 type HandoffBooking = {
@@ -36,14 +39,25 @@ export function resolveAdminBookingHandoff(
   const match = items?.find(
     (item) => item.bookingNumber === handoff.bookingNumber,
   );
-  const expandBookingNumber = match?.bookingNumber ?? null;
   const status = match?.status ?? knownStatus;
+
+  if (status != null && !matchesAdminBookingTab(status, "ALL")) {
+    return {
+      expandBookingNumber: null,
+      refundTarget: null,
+      refundBlocked: handoff.intentRefund,
+      listHidden: true,
+    };
+  }
+
+  const expandBookingNumber = match?.bookingNumber ?? null;
 
   if (!handoff.intentRefund) {
     return {
       expandBookingNumber,
       refundTarget: null,
       refundBlocked: false,
+      listHidden: false,
     };
   }
 
@@ -53,6 +67,7 @@ export function resolveAdminBookingHandoff(
       expandBookingNumber,
       refundTarget: handoff.bookingNumber,
       refundBlocked: false,
+      listHidden: false,
     };
   }
 
@@ -61,6 +76,7 @@ export function resolveAdminBookingHandoff(
       expandBookingNumber,
       refundTarget: null,
       refundBlocked: true,
+      listHidden: false,
     };
   }
 
@@ -68,5 +84,6 @@ export function resolveAdminBookingHandoff(
     expandBookingNumber,
     refundTarget: null,
     refundBlocked: false,
+    listHidden: false,
   };
 }

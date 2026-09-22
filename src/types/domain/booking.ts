@@ -39,6 +39,13 @@ export type BookingStatus =
   | "REFUNDED"
   | "EXPIRED";
 
+/** 내 예매 목록·건수에 노출하는 상태 (#339). PENDING/CANCELED/EXPIRED는 숨긴다. */
+export const MY_PAGE_BOOKING_STATUSES: readonly BookingStatus[] = [
+  "CONFIRMED",
+  "REFUNDING",
+  "REFUNDED",
+];
+
 //  ── 예매 생성 (백엔드 확정) ──────────────────────────
 
 //  백엔드 BookingPendingRequest 대응.

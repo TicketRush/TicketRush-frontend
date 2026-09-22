@@ -9,6 +9,12 @@ function item(bookingNumber: string, status: BookingStatus) {
   return { bookingNumber, status };
 }
 
+const visible = {
+  refundTarget: null as string | null,
+  refundBlocked: false,
+  listHidden: false,
+};
+
 describe("parseAdminBookingHandoff", () => {
   it("bookingNumber가 없으면 null이다", () => {
     expect(parseAdminBookingHandoff(new URLSearchParams())).toBeNull();
@@ -54,8 +60,7 @@ describe("resolveAdminBookingHandoff", () => {
       ),
     ).toEqual({
       expandBookingNumber: "X7B29-KLPW1",
-      refundTarget: null,
-      refundBlocked: false,
+      ...visible,
     });
   });
 
@@ -67,8 +72,7 @@ describe("resolveAdminBookingHandoff", () => {
       ),
     ).toEqual({
       expandBookingNumber: null,
-      refundTarget: null,
-      refundBlocked: false,
+      ...visible,
     });
   });
 
@@ -82,6 +86,7 @@ describe("resolveAdminBookingHandoff", () => {
       expandBookingNumber: "X7B29-KLPW1",
       refundTarget: "X7B29-KLPW1",
       refundBlocked: false,
+      listHidden: false,
     });
   });
 
@@ -95,6 +100,7 @@ describe("resolveAdminBookingHandoff", () => {
       expandBookingNumber: "X7B29-KLPW2",
       refundTarget: null,
       refundBlocked: true,
+      listHidden: false,
     });
   });
 
@@ -109,6 +115,7 @@ describe("resolveAdminBookingHandoff", () => {
       expandBookingNumber: null,
       refundTarget: "OFF-PAGE",
       refundBlocked: false,
+      listHidden: false,
     });
   });
 
@@ -123,6 +130,7 @@ describe("resolveAdminBookingHandoff", () => {
       expandBookingNumber: null,
       refundTarget: null,
       refundBlocked: true,
+      listHidden: false,
     });
     expect(
       resolveAdminBookingHandoff(
@@ -134,6 +142,7 @@ describe("resolveAdminBookingHandoff", () => {
       expandBookingNumber: null,
       refundTarget: null,
       refundBlocked: true,
+      listHidden: false,
     });
   });
 
@@ -145,8 +154,7 @@ describe("resolveAdminBookingHandoff", () => {
       ),
     ).toEqual({
       expandBookingNumber: null,
-      refundTarget: null,
-      refundBlocked: false,
+      ...visible,
     });
     expect(
       resolveAdminBookingHandoff(
@@ -155,8 +163,34 @@ describe("resolveAdminBookingHandoff", () => {
       ),
     ).toEqual({
       expandBookingNumber: null,
+      ...visible,
+    });
+  });
+
+  it("CANCELED·EXPIRED는 목록·Focus에 올리지 않는다 (#339)", () => {
+    expect(
+      resolveAdminBookingHandoff(
+        { bookingNumber: "GONE", intentRefund: false },
+        [confirmed],
+        "CANCELED",
+      ),
+    ).toEqual({
+      expandBookingNumber: null,
       refundTarget: null,
       refundBlocked: false,
+      listHidden: true,
+    });
+    expect(
+      resolveAdminBookingHandoff(
+        { bookingNumber: "GONE", intentRefund: true },
+        undefined,
+        "EXPIRED",
+      ),
+    ).toEqual({
+      expandBookingNumber: null,
+      refundTarget: null,
+      refundBlocked: true,
+      listHidden: true,
     });
   });
 });

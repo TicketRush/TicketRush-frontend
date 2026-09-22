@@ -7,7 +7,8 @@ interface ProfileCardProps {
   /** 카카오 등은 비어 있을 수 있다 (#217) */
   email?: string | null;
   joinedAt: string; // ISO 8601 Instant (UTC)
-  totalBookings: number;
+  /** count 로딩 중에는 비워 둔다 (#339) */
+  totalBookings?: number;
 }
 
 /**
@@ -52,7 +53,9 @@ export function ProfileCard({
       {/* 우측: 총 예매 수 카드 */}
       <div className="border-2 border-primary/30 rounded-lg px-6 py-3 text-center min-w-[88px]">
         <p className="text-xs text-gray-500 mb-1">총 예매 수</p>
-        <p className="text-2xl font-bold text-primary">{totalBookings}</p>
+        <p className="text-2xl font-bold text-primary">
+          {totalBookings == null ? "—" : totalBookings}
+        </p>
       </div>
     </div>
   );

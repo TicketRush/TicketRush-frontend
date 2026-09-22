@@ -307,12 +307,24 @@ export async function mockGetAdminBookings(
 ): Promise<AdminBookingListResponse> {
   await mockDelay(400);
 
-  const size = params.size ?? 10;
+  const size = Math.min(params.size ?? 10, 50);
   const pageIndex = params.page ?? 0;
-  const totalElements = ADMIN_BOOKINGS.length;
-  const totalPages = Math.max(1, Math.ceil(totalElements / size));
+  const statusFilter =
+    params.status == null
+      ? null
+      : Array.isArray(params.status)
+        ? params.status
+        : [params.status];
+  const filtered =
+    statusFilter && statusFilter.length > 0
+      ? ADMIN_BOOKINGS.filter((b) => statusFilter.includes(b.status))
+      : ADMIN_BOOKINGS;
+  // 목록은 id(bookingId) desc — BE 정렬과 맞춤
+  const sorted = [...filtered].sort((a, b) => b.bookingId - a.bookingId);
+  const totalElements = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / size) || 1);
   const start = pageIndex * size;
-  const items = ADMIN_BOOKINGS.slice(start, start + size);
+  const items = sorted.slice(start, start + size);
 
   return {
     items,

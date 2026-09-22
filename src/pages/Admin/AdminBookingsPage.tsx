@@ -23,7 +23,6 @@ import {
   useAdminBookingStats,
   useAdminRefundBooking,
 } from "@/hooks/admin/useAdmin";
-import type { BookingStatus } from "@/types/domain/booking";
 import {
   formatAdminCount,
   formatAdminDateTime,
@@ -40,24 +39,22 @@ import {
 } from "@/utils/booking/userRefund";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import Modal from "@/components/common/Modal/Modal";
-
-type Tab = "ALL" | "CONFIRMED" | "PENDING" | "CANCELED";
+import {
+  ADMIN_BOOKING_LIST_TABS,
+  ADMIN_BOOKING_TABS_HINT,
+  adminBookingTabLabel,
+  matchesAdminBookingTab,
+  type AdminBookingListTab,
+} from "@/utils/admin/adminBookingTabs";
 
 const PAGE_SIZE = 10;
-
-function matchesTab(status: BookingStatus, tab: Tab): boolean {
-  if (tab === "ALL") return true;
-  if (tab === "CANCELED") return status === "CANCELED" || status === "REFUNDED";
-  if (tab === "PENDING") return status === "PENDING" || status === "REFUNDING";
-  return status === tab;
-}
 
 export default function AdminBookingsPage() {
   useDocumentTitle("예매 관리");
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>("ALL");
+  const [tab, setTab] = useState<AdminBookingListTab>("ALL");
   const [page, setPage] = useState(0);
   const [refundTarget, setRefundTarget] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -70,6 +67,7 @@ export default function AdminBookingsPage() {
 
   const focusBookingNumber = searchParams.get("bookingNumber")?.trim() || null;
   const { data, isLoading, isError, isPlaceholderData } = useAdminBookings({
+    tab,
     page,
     size: PAGE_SIZE,
   });
@@ -92,13 +90,18 @@ export default function AdminBookingsPage() {
 
   const visibleItems = useMemo(() => {
     if (!data) return [];
-    const items = withRequestedRefunds(data.items, requestedRefunds);
-    if (tab === "ALL") return items;
-    return items.filter((item) => matchesTab(item.status, tab));
-  }, [data, tab, requestedRefunds]);
+    return withRequestedRefunds(data.items, requestedRefunds);
+  }, [data, requestedRefunds]);
 
-  const pageHasRows = (data?.items.length ?? 0) > 0;
-  const filterEmpty = pageHasRows && visibleItems.length === 0;
+  const totalElements = data?.pagination.totalElements;
+  const listEmpty = !isLoading && !isError && visibleItems.length === 0;
+  const focusStatus = overlayRequestedRefundStatus(
+    focusBooking?.bookingStatus,
+    focusBooking?.bookingNumber ?? focusBookingNumber ?? "",
+    requestedRefunds,
+  );
+  const focusListHidden =
+    focusStatus != null && !matchesAdminBookingTab(focusStatus, "ALL");
 
   useEffect(() => {
     const handoff = parseAdminBookingHandoff(searchParams);
@@ -110,17 +113,25 @@ export default function AdminBookingsPage() {
       (item) => item.bookingNumber === handoff.bookingNumber,
     );
     if (handoff.intentRefund && !onCurrentPage && focusLoading) return;
+    // 목록에 없는 상태(CANCELED/EXPIRED)는 단건 조회가 끝나야 listHidden을 알 수 있다.
+    if (!onCurrentPage && focusLoading) return;
 
     const result = resolveAdminBookingHandoff(
       handoff,
       data?.items,
       focusBooking?.bookingStatus,
     );
+    setAppliedHandoffKey(key);
+    if (result.listHidden) {
+      toast.info("결제 전 취소·만료 예매는 목록에 표시하지 않습니다.");
+      stripBookingQuery();
+      return;
+    }
     if (result.expandBookingNumber) {
       setTab("ALL");
+      setPage(0);
       setExpandedId(result.expandBookingNumber);
     }
-    setAppliedHandoffKey(key);
     if (result.refundBlocked) {
       toast.error(
         mapErrorToMessage(ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED, ""),
@@ -149,8 +160,22 @@ export default function AdminBookingsPage() {
     setSearchParams(next, { replace: true });
   }
 
-  function handleTabChange(next: Tab) {
+  function stripBookingQuery() {
+    if (
+      searchParams.get("bookingNumber") == null &&
+      searchParams.get("intent") == null
+    ) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("bookingNumber");
+    next.delete("intent");
+    setSearchParams(next, { replace: true });
+  }
+
+  function handleTabChange(next: AdminBookingListTab) {
     setTab(next);
+    setPage(0);
     setExpandedId(null);
   }
 
@@ -258,7 +283,7 @@ export default function AdminBookingsPage() {
             statsPending ? "..." : formatAdminCount(stats?.canceledBookings)
           }
           label="취소된 예매"
-          hint="취소·환불 완료 (만료 제외)"
+          hint="미결제 취소 + 환불 완료 (만료 제외)"
         />
       </div>
 
@@ -274,7 +299,7 @@ export default function AdminBookingsPage() {
 
       <div>
         <div className="bg-admin-card border border-admin-border rounded-xl p-2 flex gap-1 inline-flex">
-          {(["ALL", "CONFIRMED", "PENDING", "CANCELED"] as Tab[]).map((t) => (
+          {ADMIN_BOOKING_LIST_TABS.map((t) => (
             <button
               key={t}
               type="button"
@@ -285,16 +310,16 @@ export default function AdminBookingsPage() {
                   : "text-admin-text-secondary hover:bg-admin-border/50"
               }`}
             >
-              {labelFor(t)}
+              {adminBookingTabLabel(t)}
             </button>
           ))}
         </div>
         <p className="text-[11px] text-admin-text-secondary mt-2">
-          이 탭은 지금 보고 있는 페이지의 예매만 걸러 보여 줍니다.
+          {ADMIN_BOOKING_TABS_HINT}
         </p>
       </div>
 
-      {focusBookingNumber ? (
+      {focusBookingNumber && !focusListHidden ? (
         <FocusBookingCard
           bookingNumber={focusBookingNumber}
           booking={focusBooking}
@@ -311,12 +336,8 @@ export default function AdminBookingsPage() {
         </span>
         <h3 className="text-base font-bold mb-4 text-admin-text">
           {isPlaceholderData
-            ? `${data?.pagination.totalElements ?? 0}개의 예매`
-            : listHeading(
-                data?.pagination.totalElements,
-                visibleItems.length,
-                tab,
-              )}
+            ? "불러오는 중..."
+            : listHeading(totalElements)}
         </h3>
 
         {isLoading && !data ? (
@@ -351,26 +372,19 @@ export default function AdminBookingsPage() {
               onChange={handlePageChange}
             />
           </>
-        ) : !pageHasRows ? (
+        ) : listEmpty ? (
           <div className="text-center py-12 text-admin-text-secondary">
-            예매 내역이 없습니다.
+            이 상태의 예매가 없습니다.
           </div>
         ) : (
           <>
-            {filterEmpty ? (
-              <div className="text-center py-12 text-admin-text-secondary">
-                이 페이지에는 해당 상태의 예매가 없습니다. 다른 페이지를 확인해
-                주세요.
-              </div>
-            ) : (
-              <AdminBookingTable
-                data={visibleItems}
-                onRefund={handleRefund}
-                expandedId={expandedId}
-                onExpandedIdChange={setExpandedId}
-                focusedBookingNumber={focusBookingNumber}
-              />
-            )}
+            <AdminBookingTable
+              data={visibleItems}
+              onRefund={handleRefund}
+              expandedId={expandedId}
+              onExpandedIdChange={setExpandedId}
+              focusedBookingNumber={focusBookingNumber}
+            />
             <Pagination
               pageIndex={page}
               totalPages={totalPages}
@@ -419,16 +433,9 @@ export default function AdminBookingsPage() {
   );
 }
 
-function listHeading(
-  totalElements: number | undefined,
-  visibleCount: number,
-  tab: Tab,
-): string {
+function listHeading(totalElements: number | undefined): string {
   if (totalElements == null) return "불러오는 중...";
-  if (tab === "ALL") {
-    return `${totalElements}개의 예매 (${visibleCount}개 중)`;
-  }
-  return `${totalElements}개의 예매 · 이 페이지 ${visibleCount}건`;
+  return `${totalElements}개의 예매`;
 }
 
 const FOCUS_STATUS_LABEL: Record<string, string> = {
@@ -552,17 +559,3 @@ function FocusField({
   );
 }
 
-function labelFor(t: Tab) {
-  switch (t) {
-    case "ALL":
-      return "전체";
-    case "CONFIRMED":
-      return "완료";
-    case "PENDING":
-      return "대기·환불 중";
-    case "CANCELED":
-      return "취소";
-    default:
-      return t;
-  }
-}
