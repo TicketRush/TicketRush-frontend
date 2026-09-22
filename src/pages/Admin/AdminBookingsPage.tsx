@@ -81,6 +81,17 @@ export default function AdminBookingsPage() {
     isLoading: isStatsLoading,
     isError: isStatsError,
   } = useAdminBookingStats();
+  // stats.canceledBookings는 CANCELED+REFUNDED라 미결제 취소가 섞인다.
+  // KPI는 환불 완료 목록의 totalElements만 쓴다 (#339).
+  const {
+    data: refundedCountData,
+    isLoading: isRefundedCountLoading,
+    isError: isRefundedCountError,
+  } = useAdminBookings({
+    tab: "REFUNDED",
+    page: 0,
+    size: 1,
+  });
   const {
     data: focusBooking,
     isLoading: focusLoading,
@@ -216,6 +227,9 @@ export default function AdminBookingsPage() {
   }
 
   const statsPending = isStatsLoading && !stats;
+  const refundedBookings = refundedCountData?.pagination.totalElements;
+  const refundedCountPending =
+    isRefundedCountLoading && refundedBookings == null;
 
   return (
     <div className="p-8 space-y-6">
@@ -240,6 +254,11 @@ export default function AdminBookingsPage() {
 
       {isStatsError && !stats ? (
         <p className="text-sm text-red-400">예매 통계를 불러올 수 없습니다.</p>
+      ) : null}
+      {isRefundedCountError && refundedBookings == null ? (
+        <p className="text-sm text-red-400">
+          취소된 예매 수를 불러올 수 없습니다.
+        </p>
       ) : null}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -280,10 +299,12 @@ export default function AdminBookingsPage() {
           badgeColor="red"
           iconClassName="text-admin-status-cancelled"
           value={
-            statsPending ? "..." : formatAdminCount(stats?.canceledBookings)
+            refundedCountPending
+              ? "..."
+              : formatAdminCount(refundedBookings)
           }
           label="취소된 예매"
-          hint="미결제 취소 + 환불 완료 (만료 제외)"
+          hint="환불 완료만"
         />
       </div>
 

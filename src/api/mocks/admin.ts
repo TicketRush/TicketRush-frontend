@@ -348,6 +348,7 @@ export async function mockGetAdminBookingStats(): Promise<AdminBookingStats> {
     totalBookings: ADMIN_BOOKINGS.length,
     completedBookings: confirmed.length,
     totalRevenue: confirmed.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0),
+    // BE 계약 그대로(CANCELED + REFUNDED). 화면 KPI는 REFUNDED 목록 건수를 쓴다.
     canceledBookings: ADMIN_BOOKINGS.filter(
       (b) => b.status === "CANCELED" || b.status === "REFUNDED",
     ).length,
