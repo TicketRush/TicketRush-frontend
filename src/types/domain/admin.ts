@@ -149,6 +149,11 @@ export interface AdminBookingItem {
 export interface AdminBookingListParams {
   page?: number;
   size?: number;
+  /**
+   * BE #667/#674 — 단건 또는 복수(`status=A&status=B`).
+   * 빈 배열·미지정은 보내지 않는다(미지정 시 BE는 전체, CANCELED·EXPIRED 포함).
+   */
+  status?: BookingStatus | readonly BookingStatus[];
 }
 
 export interface AdminBookingListResponse {

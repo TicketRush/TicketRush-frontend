@@ -32,6 +32,11 @@ import type {
   AdminDashboardParams,
   AdminSeatDetail,
 } from "@/types/domain/admin";
+import type { BookingStatus } from "@/types/domain/booking";
+import {
+  adminBookingTabStatuses,
+  type AdminBookingListTab,
+} from "@/utils/admin/adminBookingTabs";
 import { isPageInfo } from "./types/pagination";
 import { USE_MOCK } from "./useMock";
 import apiClient from "./instance";
@@ -101,6 +106,14 @@ export async function fetchAdminConcerts(
 }
 
 // ── 예매 내역 ──────────────────────────────────────────
+function normalizeAdminBookingStatuses(
+  status: AdminBookingListParams["status"],
+): BookingStatus[] {
+  if (status == null) return [];
+  const list = Array.isArray(status) ? status : [status];
+  return Array.from(new Set(list));
+}
+
 export async function fetchAdminBookings(
   params: AdminBookingListParams = {},
 ): Promise<AdminBookingListResponse> {
@@ -108,9 +121,18 @@ export async function fetchAdminBookings(
 
   const page = params.page ?? 0;
   const size = Math.min(params.size ?? 10, 50);
+  const statuses = normalizeAdminBookingStatuses(params.status);
   const res = await apiClient.get<BookingAdminSummaryResponse[]>(
     "/api/v1/booking/admin/bookings",
-    { params: { page, size } },
+    {
+      params: {
+        page,
+        size,
+        ...(statuses.length > 0 ? { status: statuses } : {}),
+      },
+      // Spring 반복 파라미터: status=A&status=B (#674). seatIds와 동일.
+      paramsSerializer: { indexes: null },
+    },
   );
   const pagination =
     res.pagination && isPageInfo(res.pagination)
@@ -128,6 +150,17 @@ export async function fetchAdminBookings(
       totalPages: pagination?.totalPages ?? 1,
     },
   };
+}
+
+/** 탭별 예매 목록 — BE #667/#674 status(합집합) 한 번 조회 (#337/#339). */
+export async function fetchAdminBookingsForTab(
+  tab: AdminBookingListTab,
+  params: { page?: number; size?: number } = {},
+): Promise<AdminBookingListResponse> {
+  const page = params.page ?? 0;
+  const size = Math.min(params.size ?? 10, 50);
+  const statuses = adminBookingTabStatuses(tab);
+  return fetchAdminBookings({ page, size, status: statuses });
 }
 
 export async function fetchAdminBookingStats(): Promise<AdminBookingStats> {

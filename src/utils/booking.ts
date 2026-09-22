@@ -1,7 +1,9 @@
-import type {
-  BookingListItem,
-  BookingStatus,
-  BookingTab,
+import {
+  MY_PAGE_BOOKING_STATUSES,
+  type BookingListItem,
+  type BookingStatus,
+  type BookingTab,
+  type MyBookingsResponse,
 } from "@/types/domain/booking";
 import { formatSeoulDate } from "@/utils/datetime/formatSeoulInstant";
 
@@ -192,4 +194,32 @@ export function filterBookingsByTab(
   now: Date = new Date(),
 ): BookingListItem[] {
   return bookings.filter((b) => getBookingTab(b, now) === tab);
+}
+
+/**
+ * 내 예매에 노출하는 상태 (#339).
+ * PENDING(임시예매)·CANCELED(미결제 취소)·EXPIRED는 목록·총 예매 수에서 숨긴다.
+ */
+export function isVisibleOnMyBookings(status: BookingStatus): boolean {
+  return MY_PAGE_BOOKING_STATUSES.includes(status);
+}
+
+export function filterVisibleMyBookings(
+  bookings: BookingListItem[],
+): BookingListItem[] {
+  return bookings.filter((b) => isVisibleOnMyBookings(b.status));
+}
+
+export function withVisibleMyBookings(
+  data: MyBookingsResponse,
+): MyBookingsResponse {
+  const items = filterVisibleMyBookings(data.items);
+  return items.length === data.items.length ? data : { ...data, items };
+}
+
+/** 내 예매 총 건수 — 상태별 `/booking/me/count` 합 (#339). */
+export function sumMyPageBookingCounts(
+  counts: ReadonlyArray<{ count: number }>,
+): number {
+  return counts.reduce((sum, item) => sum + item.count, 0);
 }

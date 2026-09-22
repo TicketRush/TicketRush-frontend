@@ -14,22 +14,24 @@ export default function MyBookingsPage() {
   const [tab, setTab] = useState<BookingTab>("upcoming");
   const user = useAuthStore((s) => s.user);
 
-  const { data, isLoading, isError } = useMyBookings();
+  const { data, isLoading, isError, totalCount, isCountError } =
+    useMyBookings();
 
   const allBookings = data?.items ?? [];
+  const totalBookings = isCountError ? allBookings.length : totalCount;
   // 탭 전환 시 API 재요청 없이 프론트에서 필터
   // 목록 API에 공연 시간이 없어 공연 날짜(performanceDate) 기준 (#168)
   const bookings = filterBookingsByTab(allBookings, tab);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* 사용자 정보 카드 — 총 예매 수는 전체 목록 길이 */}
+      {/* 총 예매 수는 /booking/me/count 합(확정·환불). 실패 시 목록 길이 (#339) */}
       {user && (
         <ProfileCard
           name={user.name}
           email={user.email}
           joinedAt={user.joinedAt}
-          totalBookings={allBookings.length}
+          totalBookings={totalBookings}
         />
       )}
 

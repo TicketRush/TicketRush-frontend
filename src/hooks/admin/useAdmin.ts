@@ -15,6 +15,7 @@ import type {
   AdminConcertListParams,
   AdminDashboardParams,
 } from "@/types/domain/admin";
+import type { AdminBookingListTab } from "@/utils/admin/adminBookingTabs";
 import {
   isDashboardPeriodWithinLimit,
   parseLocalDateKey,
@@ -36,8 +37,9 @@ export const adminKeys = {
     ["admin", "dashboard", params] as const,
   concerts: (params?: AdminConcertListParams) =>
     ["admin", "concerts", params] as const,
-  bookings: (params?: AdminBookingListParams) =>
-    ["admin", "bookings", params] as const,
+  bookings: (
+    params?: AdminBookingListParams & { tab?: AdminBookingListTab },
+  ) => ["admin", "bookings", params] as const,
   bookingByNumber: (bookingNumber: string) =>
     ["admin", "booking", bookingNumber] as const,
   bookingStats: () => ["admin", "bookings", "stats"] as const,
@@ -92,10 +94,15 @@ export function useAdminConcerts(
 }
 
 // ── 예매 내역 ─────────────────────────────────────────
-export function useAdminBookings(params: AdminBookingListParams = {}) {
+export function useAdminBookings(params: {
+  tab: AdminBookingListTab;
+  page?: number;
+  size?: number;
+}) {
+  const listParams = { page: params.page, size: params.size };
   return useQuery({
-    queryKey: adminKeys.bookings(params),
-    queryFn: () => api.fetchAdminBookings(params),
+    queryKey: adminKeys.bookings({ ...listParams, tab: params.tab }),
+    queryFn: () => api.fetchAdminBookingsForTab(params.tab, listParams),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
     retry: retryUnlessClientError,

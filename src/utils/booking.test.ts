@@ -1,17 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+  MY_PAGE_BOOKING_STATUSES,
+  type BookingListItem,
+} from "@/types/domain/booking";
+import {
   bookingQrPlaceholder,
   canFetchTicketQr,
   displayBookingText,
+  filterBookingsByTab,
+  filterVisibleMyBookings,
   formatPaymentAmount,
   formatPerformanceSchedule,
   getBookingTab,
   isRefundableBooking,
+  isVisibleOnMyBookings,
   userBookingStatusLabel,
   paymentCompleteHeading,
   showScheduleToMs,
+  sumMyPageBookingCounts,
   ticketDetailHeading,
   toShowDateTime,
+  withVisibleMyBookings,
 } from "./booking";
 
 describe("getBookingTab", () => {
@@ -211,5 +220,75 @@ describe("displayBookingText", () => {
     expect(displayBookingText("")).toBe("-");
     expect(displayBookingText("  ")).toBe("-");
     expect(displayBookingText("A-1")).toBe("A-1");
+  });
+});
+
+describe("isVisibleOnMyBookings (#339)", () => {
+  it("확정·환불 신청·환불 완료만 내 예매에 남긴다", () => {
+    expect(MY_PAGE_BOOKING_STATUSES).toEqual([
+      "CONFIRMED",
+      "REFUNDING",
+      "REFUNDED",
+    ]);
+    expect(isVisibleOnMyBookings("CONFIRMED")).toBe(true);
+    expect(isVisibleOnMyBookings("REFUNDING")).toBe(true);
+    expect(isVisibleOnMyBookings("REFUNDED")).toBe(true);
+    expect(isVisibleOnMyBookings("PENDING")).toBe(false);
+    expect(isVisibleOnMyBookings("CANCELED")).toBe(false);
+    expect(isVisibleOnMyBookings("EXPIRED")).toBe(false);
+  });
+
+  it("목록·총 예매 수에서 임시예매와 미결제 취소를 뺀다", () => {
+    const item = (
+      bookingId: number,
+      status: BookingListItem["status"],
+      date: string,
+    ): BookingListItem => ({
+      bookingId,
+      bookingNumber: `N-${bookingId}`,
+      status,
+      performanceTitle: `공연-${status}`,
+      performanceVenue: "서울",
+      performanceDate: date,
+      seatNumber: "A-1",
+      createdAt: "2026-09-01T00:00:00Z",
+    });
+    const items = [
+      item(1, "CONFIRMED", "2099-01-01"),
+      item(2, "PENDING", "2099-01-02"),
+      item(3, "CANCELED", "2099-01-03"),
+      item(4, "EXPIRED", "2020-01-01"),
+      item(5, "REFUNDING", "2099-01-04"),
+      item(6, "REFUNDED", "2020-01-02"),
+    ];
+    const visible = filterVisibleMyBookings(items);
+    expect(visible.map((b) => b.status)).toEqual([
+      "CONFIRMED",
+      "REFUNDING",
+      "REFUNDED",
+    ]);
+
+    const now = new Date("2026-09-22T03:00:00.000Z");
+    expect(
+      filterBookingsByTab(visible, "upcoming", now).map((b) => b.status),
+    ).toEqual(["CONFIRMED", "REFUNDING"]);
+    expect(
+      filterBookingsByTab(visible, "past", now).map((b) => b.status),
+    ).toEqual(["REFUNDED"]);
+
+    const data = { items, hasNext: false };
+    expect(withVisibleMyBookings(data).items).toEqual(visible);
+    expect(
+      withVisibleMyBookings({ items: visible, hasNext: false }).items,
+    ).toBe(visible);
+  });
+});
+
+describe("sumMyPageBookingCounts (#339)", () => {
+  it("상태별 count를 합친다", () => {
+    expect(
+      sumMyPageBookingCounts([{ count: 2 }, { count: 1 }, { count: 4 }]),
+    ).toBe(7);
+    expect(sumMyPageBookingCounts([])).toBe(0);
   });
 });

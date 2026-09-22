@@ -11,21 +11,23 @@
 
 import { mockDelay, mockError } from "./_helpers";
 import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
-import type {
-  BookingPendingRequest,
-  BookingPendingResponse,
-  BookingDetail,
-  BookingListItem,
-  MyBookingsParams,
-  MyBookingsResponse,
-  BookingStatus,
-  AdminRefundBookingItem,
-  AdminRefundBookingListParams,
-  AdminRefundBookingListResponse,
+import {
+  MY_PAGE_BOOKING_STATUSES,
+  type BookingPendingRequest,
+  type BookingPendingResponse,
+  type BookingDetail,
+  type BookingListItem,
+  type MyBookingsParams,
+  type MyBookingsResponse,
+  type BookingStatus,
+  type AdminRefundBookingItem,
+  type AdminRefundBookingListParams,
+  type AdminRefundBookingListResponse,
 } from "@/types/domain/booking";
 import type { AdminBookingBookerResponse } from "../adminSeatMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import { nextStatusAfterUserBookingDelete } from "@/utils/booking/userRefund";
+import { isVisibleOnMyBookings, sumMyPageBookingCounts } from "@/utils/booking";
 import { MOCK_CONCERTS } from "./concerts";
 import { applyMockSeatHold, mockReleaseSeat } from "./seats";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -125,6 +127,42 @@ const bookingStore: BookingDetail[] = [
     createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     cancelledAt: null,
   },
+  {
+    bookingId: 6,
+    bookingNumber: "F2N88-RFND1",
+    status: "REFUNDING",
+    performanceId: 1,
+    performanceTitle: "BTS World Tour: Beyond the Stars",
+    performancePerformer: "BTS",
+    performanceVenue: "잠실 올림픽 주경기장",
+    performanceDate: "2027-04-10",
+    performanceTime: "18:00",
+    performanceImageMainUrl: POSTER,
+    seatId: 25,
+    seatNumber: "B-13",
+    price: 132000,
+    paidAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    cancelledAt: null,
+  },
+  {
+    bookingId: 7,
+    bookingNumber: "G4P10-DONE1",
+    status: "REFUNDED",
+    performanceId: 4,
+    performanceTitle: "Jazz Night Live",
+    performancePerformer: "나윤선 트리오",
+    performanceVenue: "LG아트센터",
+    performanceDate: "2026-05-01",
+    performanceTime: "20:00",
+    performanceImageMainUrl: POSTER,
+    seatId: 51,
+    seatNumber: "E-3",
+    price: 66000,
+    paidAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
+    cancelledAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
 ];
 
 function genBookingNumber(): string {
@@ -221,7 +259,7 @@ export async function mockGetMyBookings(
   const size = params.size ?? 20;
   const filtered = params.status
     ? bookingStore.filter((b) => b.status === params.status)
-    : bookingStore;
+    : bookingStore.filter((b) => isVisibleOnMyBookings(b.status));
   const start = page * size;
   const sliced = filtered.slice(start, start + size);
 
@@ -246,9 +284,21 @@ export async function mockGetMyBookings(
 }
 
 /** 내 예매 수 조회 — GET /booking/me/count 대응 */
-export async function mockGetMyBookingCount(): Promise<{ count: number }> {
+export async function mockGetMyBookingCount(
+  status?: BookingStatus,
+): Promise<{ count: number }> {
   await mockDelay(200);
-  return { count: bookingStore.length };
+  if (status) {
+    return {
+      count: bookingStore.filter((b) => b.status === status).length,
+    };
+  }
+  const parts = await Promise.all(
+    MY_PAGE_BOOKING_STATUSES.map((itemStatus) =>
+      mockGetMyBookingCount(itemStatus),
+    ),
+  );
+  return { count: sumMyPageBookingCounts(parts) };
 }
 
 export async function mockCancelBooking(bookingNumber: string): Promise<void> {

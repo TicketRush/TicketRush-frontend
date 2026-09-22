@@ -6,6 +6,7 @@ import type {
   BookingListItem,
   MyBookingsResponse,
 } from "@/types/domain/booking";
+import { withVisibleMyBookings } from "@/utils/booking";
 import {
   applyRefundRequestedToBookingCaches,
   markBookingRefundRequested,
@@ -133,5 +134,18 @@ describe("applyRefundRequestedToBookingCaches", () => {
         hasNext: false,
       }).items[0].status,
     ).toBe("CONFIRMED");
+  });
+});
+
+describe("overlay + 내 예매 노출 (#339)", () => {
+  it("방금 신청한 환불 건은 목록에서 빠지지 않는다", () => {
+    applyRefundRequestedToBookingCaches(new QueryClient(), "A");
+    const next = withVisibleMyBookings(
+      overlayMyBookingsResponse({
+        items: [item("A", "CONFIRMED"), item("B", "PENDING")],
+        hasNext: false,
+      }),
+    );
+    expect(next.items.map((i) => i.status)).toEqual(["REFUNDING"]);
   });
 });
