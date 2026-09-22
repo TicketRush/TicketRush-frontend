@@ -51,6 +51,15 @@ function input(): CreateConcertInput {
 }
 
 describe("performance multipart request", () => {
+  it("keeps the selected show date and separate show time in the request Blob", async () => {
+    const value = input();
+    value.form.date = "2028-02-29";
+    const request = JSON.parse(await (createConcertFormData(value).get("request") as Blob).text());
+    expect(request.show_date).toBe("2028-02-29");
+    expect(request.show_time).toBe("19:30:00");
+    expect(request.character_config).toEqual(value.form.characterConfig);
+    expect(request).not.toHaveProperty("showDate");
+  });
   it.each([
     ["2026-09-30T20:00", "2026-09-30 20:00:00"],
     ["2026-09-30T20:00:45", "2026-09-30 20:00:45"],

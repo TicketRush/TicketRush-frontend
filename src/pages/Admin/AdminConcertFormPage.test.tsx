@@ -13,7 +13,22 @@ const hooks = vi.hoisted(() => ({
   query: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
+  control: vi.fn(),
 }));
+vi.mock("react/jsx-dev-runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react/jsx-dev-runtime")>();
+  return {
+    ...actual,
+    jsxDEV: (...args: Parameters<typeof actual.jsxDEV>) => {
+      const [type, props] = args;
+      if (type !== "input" && type !== "select") return actual.jsxDEV(...args);
+      return actual.jsxDEV(function CaptureControl() {
+        hooks.control(props);
+        return actual.jsxDEV(...args);
+      }, {}, args[2], false);
+    },
+  };
+});
 vi.mock("@/hooks/admin/useAdmin", () => ({
   useConcertForEdit: hooks.query,
   useCreateConcert: () => ({ mutateAsync: hooks.create, isPending: false }),
@@ -57,6 +72,7 @@ const initial = mapConcertForEdit({
 beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.clearAllMocks();
+  hooks.control.mockReset();
   // An unrelated creation draft must never override the server's edit data.
   vi.stubGlobal("sessionStorage", {
     getItem: () => JSON.stringify({ form: { title: "다른 공연 초안" } }),
@@ -86,20 +102,125 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
   );
 }
 
+describe.each(["create", "edit"])("show date Enter navigation (%s)", (mode) => {
+  function setup(date: string) {
+    const inputs: Array<{
+      props: Record<string, unknown>;
+      focus: ReturnType<typeof vi.fn>;
+      scrollIntoView: ReturnType<typeof vi.fn>;
+    }> = [];
+    // Capture the actual rendered controls and handlers using the existing Node renderer.
+    hooks.control.mockImplementation((props: Record<string, unknown>) => {
+      inputs.push({ props, focus: vi.fn(), scrollIntoView: vi.fn() });
+    });
+    hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, date } }, isPending: false, isFetchedAfterMount: true });
+    if (mode === "create") {
+      render("/admin/concerts/new", { concertDraft: {
+        pathname: "/admin/concerts/new", form: { ...initial.form, date }, totalSeats: 120,
+      } });
+    } else {
+      render();
+    }
+    const querySelectorAll = vi.fn((selector: string) => {
+      expect(selector).toBe("[data-form-focus='true']:not(:disabled)");
+      return inputs.filter(({ props }) => props["data-form-focus"] === "true" && !props.disabled);
+    });
+    vi.stubGlobal("document", { querySelectorAll });
+    const genre = inputs.find(({ props }) => props.value === "FANMEETING")!;
+    const year = inputs.find(({ props }) => props.id === "show-date-year")!;
+    const month = inputs.find(({ props }) => props.id === "show-date-month")!;
+    const day = inputs.find(({ props }) => props.id === "show-date-day")!;
+    const time = inputs.find(({ props }) => props.value === "19:30")!;
+    function press(current: typeof year, key = "Enter") {
+      const preventDefault = vi.fn();
+      (current.props.onKeyDown as (event: unknown) => void)({ key, currentTarget: current, preventDefault });
+      return preventDefault;
+    }
+    return { inputs, genre, year, month, day, time, press, querySelectorAll };
+  }
+
+  it.each(["", "2028--", "2028-02-", "2028-02-29"])("moves from genre to year (%s)", (date) => {
+    const ui = setup(date);
+    expect(ui.press(ui.genre)).toHaveBeenCalledOnce();
+    expect(ui.year.focus).toHaveBeenCalledOnce();
+  });
+
+  it.each(["", "202--"])("skips disabled month and day (%s)", (date) => {
+    const ui = setup(date);
+    expect(ui.month.props.disabled).toBe(true);
+    expect(ui.day.props.disabled).toBe(true);
+    expect(ui.press(ui.year)).toHaveBeenCalledOnce();
+    expect(ui.time.focus).toHaveBeenCalledOnce();
+    expect(ui.month.focus).not.toHaveBeenCalled();
+    expect(ui.day.focus).not.toHaveBeenCalled();
+  });
+
+  it("moves to enabled month and skips the still disabled day", () => {
+    const ui = setup("2028--");
+    expect(ui.press(ui.year)).toHaveBeenCalledOnce();
+    expect(ui.month.focus).toHaveBeenCalledOnce();
+    expect(ui.press(ui.month)).toHaveBeenCalledOnce();
+    expect(ui.time.focus).toHaveBeenCalledOnce();
+    expect(ui.day.focus).not.toHaveBeenCalled();
+  });
+
+  it.each(["2028-02-", "2028-02-29"])("moves year → month → day → time and prevents Enter's submit default (%s)", (date) => {
+    const ui = setup(date);
+    for (const [current, next] of [[ui.year, ui.month], [ui.month, ui.day], [ui.day, ui.time]]) {
+      expect(ui.press(current)).toHaveBeenCalledOnce();
+      expect(next.focus).toHaveBeenCalledOnce();
+    }
+    expect(hooks.create).not.toHaveBeenCalled();
+    expect(hooks.update).not.toHaveBeenCalled();
+  });
+
+  it("leaves Tab to the browser and does not opt booking inputs into navigation", () => {
+    const ui = setup("2028-02-29");
+    for (const input of [ui.genre, ui.year, ui.month, ui.day]) {
+      expect(ui.press(input, "Tab")).not.toHaveBeenCalled();
+    }
+    expect(ui.querySelectorAll).not.toHaveBeenCalled();
+    for (const input of ui.inputs.filter(({ props }) => String(props.id).startsWith("booking-open-"))) {
+      expect(input.props["data-form-focus"]).toBeUndefined();
+      expect(input.props.onKeyDown).toBeUndefined();
+    }
+  });
+});
+
 describe("admin edit initial rendering", () => {
-  it("restores the booking date parts in edit mode while leaving the show date input unchanged", () => {
+  it("restores booking and show date inputs independently in edit mode", () => {
     hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, bookingOpenAt: "2028-02-29T20:30:00" } }, isPending: false, isFetchedAfterMount: true });
     const html = render();
     expect(html).toContain('value="2028"');
     expect(html).toContain('value="02" selected=""');
     expect(html).toContain('value="29" selected=""');
     expect(html).toContain('value="20:30"');
-    const showDateInput = html.match(/공연 날짜.*?(<input\b[^>]*>)/)?.[1];
-    expect(showDateInput).toContain('type="text"');
-    expect(showDateInput).toContain('value="2027-01-01"');
-    expect(showDateInput).toContain('placeholder="예: 2026-07-20"');
+    const showDate = html.match(/<fieldset aria-label="공연 날짜">(.*?)<\/fieldset>/)?.[1];
+    expect(showDate).toContain('value="2027"');
+    expect(showDate).toContain('value="01" selected=""');
+    for (const part of ["year", "month", "day"]) expect(showDate).toContain(`id="show-date-${part}"`);
     expect(html).toContain("기존 예매 오픈 시각 해제는 지원하지 않습니다.");
     expect(hooks.update).not.toHaveBeenCalled();
+  });
+
+  it("restores a leap show date and preserves the separate show time", () => {
+    hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, date: "2028-02-29", time: "19:30" } }, isPending: false, isFetchedAfterMount: true });
+    const html = render();
+    const showDate = html.match(/<fieldset aria-label="공연 날짜">(.*?)<\/fieldset>/)?.[1];
+    expect(showDate).toContain('value="2028"');
+    expect(showDate).toContain('value="02" selected=""');
+    expect(showDate).toContain('value="29" selected=""');
+    expect(html.match(/공연 시간.*?(<input\b[^>]*>)/)?.[1]).toContain('value="19:30"');
+    expect(hooks.update).not.toHaveBeenCalled();
+  });
+
+  it("starts the create show date with month and day disabled", () => {
+    hooks.query.mockReturnValue({});
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    const html = render("/admin/concerts/new");
+    for (const part of ["month", "day"]) {
+      expect(html.match(new RegExp(`<select[^>]*id="show-date-${part}"[^>]*>`))?.[0]).toContain('disabled=""');
+    }
   });
 
   it("restores independent jazz colors into the edit preview", () => {

@@ -1,4 +1,5 @@
 import type { ConcertFormData } from "@/types/domain/admin";
+import { isValidYear } from "@/utils/datetime/dateParts";
 
 export const MAX_CONCERT_FUTURE_YEARS = 5;
 export const MAX_DURATION_MINUTES = 1440;
@@ -93,7 +94,7 @@ export function validateConcertForm({
     return "공연 날짜를 선택해주세요.";
   }
 
-  if (!isValidDate(form.date)) {
+  if (!isValidYear(form.date.slice(0, 4)) || !isValidDate(form.date)) {
     return "올바른 공연 날짜를 입력해주세요.";
   }
 

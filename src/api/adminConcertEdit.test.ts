@@ -89,6 +89,16 @@ async function input() {
 }
 
 describe("admin edit contract", () => {
+  it("restores a leap show date, skips an unchanged PATCH and changes only show_date", async () => {
+    adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, show_date: "2028-02-29" } }) });
+    const value = await input();
+    expect(value.form.date).toBe("2028-02-29");
+    await updateConcertApi(42, value);
+    expect(adapter).not.toHaveBeenCalled();
+    value.form.date = "2028-04-30";
+    await updateConcertApi(42, value);
+    expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ show_date: "2028-04-30" });
+  });
   it("restores jazz from the API and PATCHes independent colors without changing opaque keys", async () => {
     const jazz = { ...character, outfitModelId: "rainbow-blouse" as const };
     adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, character_config: jazz } }) });

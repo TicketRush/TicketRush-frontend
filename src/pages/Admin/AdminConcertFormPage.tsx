@@ -11,6 +11,7 @@ import {
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import BookingOpenAtInput from "@/components/admin/BookingOpenAtInput";
+import ShowDateInput from "@/components/admin/ShowDateInput";
 import { toast } from "react-toastify";
 import {
   useConcertForEdit,
@@ -301,7 +302,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
     event.preventDefault();
 
     const focusableElements = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-form-focus='true']"),
+      document.querySelectorAll<HTMLElement>("[data-form-focus='true']:not(:disabled)"),
     );
 
     const currentIndex = focusableElements.indexOf(event.currentTarget);
@@ -447,11 +448,10 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
         <Section title="일정 정보">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Field label="공연 날짜" required>
-              <EditableDateInput
+              <ShowDateInput
                 value={form.date}
                 onChange={(v) => update("date", v)}
                 onKeyDown={handleEnterMoveNext}
-                placeholder="예: 2026-07-20"
               />
             </Field>
 
@@ -840,46 +840,6 @@ function UploadBox({
         className="hidden"
       />
     </label>
-  );
-}
-
-function EditableDateInput({
-  value,
-  onChange,
-  onKeyDown,
-  placeholder = "예: 2026-07-20",
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-}) {
-  function formatDateInput(input: string) {
-    const digits = input.replace(/\D/g, "").slice(0, 8);
-
-    if (digits.length <= 4) {
-      return digits;
-    }
-
-    if (digits.length <= 6) {
-      return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-    }
-
-    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
-  }
-
-  return (
-    <input
-      data-form-focus="true"
-      type="text"
-      value={value}
-      onChange={(e) => onChange(formatDateInput(e.target.value))}
-      onKeyDown={onKeyDown}
-      placeholder={placeholder}
-      maxLength={10}
-      inputMode="numeric"
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
-    />
   );
 }
 
