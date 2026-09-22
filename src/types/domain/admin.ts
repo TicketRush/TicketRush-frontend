@@ -115,7 +115,10 @@ export interface AdminBookingStats {
   totalBookings: number;
   /** CONFIRMED만 */
   completedBookings: number;
-  /** CANCELED + REFUNDED. EXPIRED·PENDING·REFUNDING 제외 */
+  /**
+   * BE 값: CANCELED + REFUNDED. EXPIRED·PENDING·REFUNDING 제외.
+   * 화면 KPI「취소된 예매」는 이 필드를 쓰지 않고 REFUNDED 건수만 센다 (#339).
+   */
   canceledBookings: number;
   /** CONFIRMED paid_amount 합. revenueComplete가 false면 실제보다 작을 수 있음 */
   totalRevenue: number;
