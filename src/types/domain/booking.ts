@@ -156,13 +156,13 @@ export interface BookingListItem {
 }
 
 export interface MyBookingsParams {
-  // 백엔드는 offset 페이지네이션 (page, size).
-  // 프론트에서는 전체 조회 가정 (내 예매는 수백 건 이하).
+  // 백엔드는 상태별 offset 페이지네이션 (page, size). size 상한은 50.
+  // 내 예매 기본 목록은 노출 상태마다 같은 page를 받아 합친다. 합친 결과를 size로 자르지 않는다 (#380).
   size?: number;
   page?: number;
 
   // 백엔드 필터: 상태별 조회 (기본 CONFIRMED).
-  // 프론트에서는 전체 상태 조회 후 클라이언트 필터링 or 상태별 호출.
+  // 내 예매 기본 목록은 CONFIRMED/REFUNDING/REFUNDED만 요청한다 (#339).
   status?: BookingStatus;
 }
 

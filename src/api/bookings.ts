@@ -53,6 +53,10 @@ import { ApiError } from "./errors/errorMapper";
 import { ERROR_CODES } from "./errors/errorCodes";
 import { isPageInfo } from "./types/pagination";
 import { sumMyPageBookingCounts } from "@/utils/booking";
+import {
+  MY_BOOKINGS_PAGE_SIZE,
+  mergeMyBookingsById,
+} from "@/utils/booking/myBookingsPages";
 
 // -------------------------------------------------------
 // 백엔드 응답 타입 (원본 스펙)
@@ -125,8 +129,6 @@ export async function createBookingApi(
 
 /** BE `PaginationConstants.MAX_PAGE_SIZE` — `/booking/me`도 동일 상한. */
 const BOOKING_ME_MAX_PAGE_SIZE = 50;
-/** 상태당 prefix 이어받기 상한(50×50). 비정상 루프 방지. */
-const BOOKING_ME_MAX_PAGES = 50;
 
 function resolveBookingCreatedAt(s: BackendMyBookingSummary): string {
   // expiresAt은 결제 마감이라 예매일이 아님. PENDING은 confirmedAt이 없어 updatedAt 사용.
@@ -187,50 +189,23 @@ function mapMyBookingSummaries(
   return { items, hasNext };
 }
 
-/**
- * 한 status에서 최신 `needed`건까지 page를 이어 붙인다 (#339).
- * size>50 요청은 BE가 50으로 자르므로, 한 번에 큰 size를 보내지 않는다.
- */
-async function fetchMyBookingStatusPrefix(
+/** 한 status의 한 페이지. size는 BE 상한(50)을 넘기지 않는다. */
+async function fetchMyBookingSummariesPage(
   status: BookingStatus,
-  needed: number,
-): Promise<{ items: BackendMyBookingSummary[]; mayHaveMore: boolean }> {
-  const items: BackendMyBookingSummary[] = [];
-  let page = 0;
-  let exhausted = false;
-
-  while (items.length < needed && page < BOOKING_ME_MAX_PAGES) {
-    const res = await apiClient.get<BackendMyBookingSummary[]>(
-      "/api/v1/booking/me",
-      {
-        params: {
-          status,
-          page,
-          size: BOOKING_ME_MAX_PAGE_SIZE,
-        },
-      },
-    );
-    const batch = res.data ?? [];
-    if (batch.length === 0) {
-      exhausted = true;
-      break;
-    }
-    items.push(...batch);
-    const hasNext =
-      res.pagination && isPageInfo(res.pagination)
-        ? res.pagination.hasNext
-        : batch.length >= BOOKING_ME_MAX_PAGE_SIZE;
-    if (!hasNext) {
-      exhausted = true;
-      break;
-    }
-    page += 1;
-  }
-
-  return {
-    items: items.slice(0, needed),
-    mayHaveMore: !exhausted && items.length >= needed,
-  };
+  page: number,
+  size: number,
+): Promise<{ items: BackendMyBookingSummary[]; hasNext: boolean }> {
+  const cappedSize = Math.min(size, BOOKING_ME_MAX_PAGE_SIZE);
+  const res = await apiClient.get<BackendMyBookingSummary[]>(
+    "/api/v1/booking/me",
+    { params: { status, page, size: cappedSize } },
+  );
+  const items = res.data ?? [];
+  const hasNext =
+    res.pagination && isPageInfo(res.pagination)
+      ? res.pagination.hasNext
+      : items.length >= cappedSize;
+  return { items, hasNext };
 }
 
 export async function fetchMyBookings(
@@ -239,49 +214,33 @@ export async function fetchMyBookings(
   if (USE_MOCK) return mockGetMyBookings(params);
 
   const page = params.page ?? 0;
-  const size = params.size ?? 20;
+  const size = Math.min(
+    params.size ?? MY_BOOKINGS_PAGE_SIZE,
+    BOOKING_ME_MAX_PAGE_SIZE,
+  );
 
   if (params.status) {
-    const cappedSize = Math.min(size, BOOKING_ME_MAX_PAGE_SIZE);
-    const res = await apiClient.get<BackendMyBookingSummary[]>(
-      "/api/v1/booking/me",
-      { params: { status: params.status, page, size: cappedSize } },
-    );
-    const summaries = res.data ?? [];
-    const hasNext =
-      res.pagination && isPageInfo(res.pagination)
-        ? res.pagination.hasNext
-        : summaries.length >= cappedSize;
-    return mapMyBookingSummaries(summaries, hasNext);
+    const batch = await fetchMyBookingSummariesPage(params.status, page, size);
+    return mapMyBookingSummaries(batch.items, batch.hasNext);
   }
 
-  // status 미지정: 노출 상태만 병렬 prefix 조회 후 merge (#339).
-  // /booking/me·/me/count는 develop 기준 단일 status(기본 CONFIRMED). 관리자 #674 복수 필터는 여기 없음.
-  const neededCount = (page + 1) * size;
-  const prefixes = await Promise.all(
+  // status 미지정: 노출 상태의 같은 page만 받아 합친다 (#339/#380).
+  // page를 올릴 때 앞부분을 다시 받아 자르지 않는다. BE size 상한은 50.
+  const batches = await Promise.all(
     MY_PAGE_BOOKING_STATUSES.map((status) =>
-      fetchMyBookingStatusPrefix(status, neededCount + 1),
+      fetchMyBookingSummariesPage(status, page, size),
     ),
   );
-  const merged = new Map<number, BackendMyBookingSummary>();
-  for (const { items } of prefixes) {
-    for (const s of items) {
-      merged.set(s.bookingId, s);
-    }
-  }
-  const summaries = Array.from(merged.values()).sort((a, b) => {
-    const ta = resolveBookingCreatedAt(a);
-    const tb = resolveBookingCreatedAt(b);
-    return tb.localeCompare(ta);
-  });
+  const summaries = mergeMyBookingsById(
+    batches.map((batch) => batch.items),
+    (item) => item.bookingId,
+    resolveBookingCreatedAt,
+  );
 
-  const start = page * size;
-  const pageSummaries = summaries.slice(start, start + size);
-  const hasNext =
-    start + size < summaries.length ||
-    prefixes.some((prefix) => prefix.mayHaveMore);
-
-  return mapMyBookingSummaries(pageSummaries, hasNext);
+  return mapMyBookingSummaries(
+    summaries,
+    batches.some((batch) => batch.hasNext),
+  );
 }
 
 // -------------------------------------------------------

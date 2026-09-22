@@ -27,7 +27,12 @@ import {
 import type { AdminBookingBookerResponse } from "../adminSeatMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import { nextStatusAfterUserBookingDelete } from "@/utils/booking/userRefund";
-import { isVisibleOnMyBookings, sumMyPageBookingCounts } from "@/utils/booking";
+import { sumMyPageBookingCounts } from "@/utils/booking";
+import {
+  MY_BOOKINGS_PAGE_SIZE,
+  mergeMyBookingsById,
+  pageItems,
+} from "@/utils/booking/myBookingsPages";
 import { MOCK_CONCERTS } from "./concerts";
 import { applyMockSeatHold, mockReleaseSeat } from "./seats";
 import samplePoster from "@/assets/images/sample-poster.svg";
@@ -250,20 +255,8 @@ export async function mockFetchPendingBookingExpiresAt(
   return toBackendDateTime(new Date(created + 5 * 60 * 1000));
 }
 
-export async function mockGetMyBookings(
-  params: MyBookingsParams,
-): Promise<MyBookingsResponse> {
-  await mockDelay(400);
-
-  const page = params.page ?? 0;
-  const size = params.size ?? 20;
-  const filtered = params.status
-    ? bookingStore.filter((b) => b.status === params.status)
-    : bookingStore.filter((b) => isVisibleOnMyBookings(b.status));
-  const start = page * size;
-  const sliced = filtered.slice(start, start + size);
-
-  const items: BookingListItem[] = sliced.map((b) => ({
+function toMyBookingListItem(b: BookingDetail): BookingListItem {
+  return {
     bookingId: b.bookingId,
     bookingNumber: b.bookingNumber,
     status: b.status,
@@ -275,11 +268,43 @@ export async function mockGetMyBookings(
     seatNumber: b.seatNumber,
     price: b.price,
     createdAt: b.createdAt,
-  }));
+  };
+}
+
+function bookingsOfStatus(status: BookingStatus): BookingDetail[] {
+  return bookingStore
+    .filter((b) => b.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function mockGetMyBookings(
+  params: MyBookingsParams,
+): Promise<MyBookingsResponse> {
+  await mockDelay(400);
+
+  const page = params.page ?? 0;
+  const size = Math.min(params.size ?? MY_BOOKINGS_PAGE_SIZE, MY_BOOKINGS_PAGE_SIZE);
+
+  if (params.status) {
+    const paged = pageItems(bookingsOfStatus(params.status), page, size);
+    return {
+      items: paged.items.map(toMyBookingListItem),
+      hasNext: paged.hasNext,
+    };
+  }
+
+  const batches = MY_PAGE_BOOKING_STATUSES.map((status) =>
+    pageItems(bookingsOfStatus(status), page, size),
+  );
+  const merged = mergeMyBookingsById(
+    batches.map((batch) => batch.items),
+    (row) => row.bookingId,
+    (row) => row.createdAt,
+  );
 
   return {
-    items,
-    hasNext: start + size < filtered.length,
+    items: merged.map(toMyBookingListItem),
+    hasNext: batches.some((batch) => batch.hasNext),
   };
 }
 

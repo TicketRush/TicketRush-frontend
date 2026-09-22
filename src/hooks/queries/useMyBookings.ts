@@ -1,31 +1,71 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useRef } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchMyBookings } from "@/api/bookings";
 import { queryKeys } from "@/constants/queryKeys";
 import { withVisibleMyBookings } from "@/utils/booking";
+import {
+  MY_BOOKINGS_MAX_PAGES,
+  MY_BOOKINGS_PAGE_SIZE,
+  flattenMyBookingPages,
+  myBookingsHasMore,
+  myBookingsPagesStalled,
+  nextMyBookingsPageParam,
+} from "@/utils/booking/myBookingsPages";
 import { overlayMyBookingsResponse } from "@/utils/booking/userRefund";
 import { useMyBookingCount } from "./useMyBookingCount";
 
-/** 화면 상한(#380). 요청당 BE max는 50이라 API 레이어가 status별 page를 이어 붙인다. */
-const DEFAULT_SIZE = 100;
-
-/** 내 예매 목록. status 없이 노출 상태만 받고, select에서 한 번 더 거른다 (#339). */
-export function useMyBookings(options: { page?: number; size?: number } = {}) {
-  const normalized = {
-    page: options.page ?? 0,
-    size: options.size ?? DEFAULT_SIZE,
-  };
+/** 내 예매 목록. 상태별 다음 페이지를 기존 목록 뒤에 붙인다 (#339/#380). */
+export function useMyBookings(options: { size?: number } = {}) {
+  const size = Math.min(options.size ?? MY_BOOKINGS_PAGE_SIZE, MY_BOOKINGS_PAGE_SIZE);
   const countQuery = useMyBookingCount();
+  const totalCount = countQuery.data?.count;
+  const totalCountRef = useRef(totalCount);
+  totalCountRef.current = totalCount;
 
-  const query = useQuery({
-    queryKey: queryKeys.bookings.mine(normalized),
-    queryFn: () => fetchMyBookings(normalized),
-    select: (data) => withVisibleMyBookings(overlayMyBookingsResponse(data)),
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.bookings.mine({ size }),
+    queryFn: ({ pageParam }) =>
+      fetchMyBookings({
+        size,
+        page: pageParam,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      nextMyBookingsPageParam(lastPage, allPages, {
+        maxPages: MY_BOOKINGS_MAX_PAGES,
+        totalCount: totalCountRef.current,
+      }),
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map((page) =>
+        withVisibleMyBookings(overlayMyBookingsResponse(page)),
+      ),
+    }),
     staleTime: 30_000,
   });
 
+  const items = useMemo(
+    () => flattenMyBookingPages(query.data?.pages),
+    [query.data?.pages],
+  );
+  const stalled = myBookingsPagesStalled(query.data?.pages);
+  const hasMore = myBookingsHasMore({
+    hasNextPage: query.hasNextPage ?? false,
+    loadedCount: items.length,
+    totalCount,
+    stalled,
+  });
+
   return {
-    ...query,
-    totalCount: countQuery.data?.count,
+    items,
+    totalCount,
     isCountError: countQuery.isError,
+    isLoading: query.isPending || (query.isFetching && !query.data),
+    isError: query.isError && !query.data,
+    hasMore,
+    isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
+    fetchNextPage: query.fetchNextPage,
+    refetch: query.refetch,
   };
 }

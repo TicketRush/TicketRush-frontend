@@ -108,6 +108,25 @@ describe("applyRefundRequestedToBookingCaches", () => {
     );
   });
 
+  it("무한 페이지 캐시도 REFUNDING으로 맞춘다", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(queryKeys.bookings.mine({ size: 50 }), {
+      pages: [
+        { items: [item("A", "CONFIRMED")], hasNext: true },
+        { items: [item("B", "CONFIRMED")], hasNext: false },
+      ],
+      pageParams: [0, 1],
+    });
+
+    applyRefundRequestedToBookingCaches(qc, "A");
+
+    const next = qc.getQueryData<{
+      pages: MyBookingsResponse[];
+    }>(queryKeys.bookings.mine({ size: 50 }));
+    expect(next?.pages[0]?.items.map((row) => row.status)).toEqual(["REFUNDING"]);
+    expect(next?.pages[1]?.items.map((row) => row.status)).toEqual(["CONFIRMED"]);
+  });
+
   it("재조회가 다시 CONFIRMED를 줘도 신청 건은 REFUNDING으로 남는다", () => {
     applyRefundRequestedToBookingCaches(new QueryClient(), "A");
     const refetched: MyBookingsResponse = {
