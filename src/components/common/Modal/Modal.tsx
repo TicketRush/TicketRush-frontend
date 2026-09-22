@@ -5,6 +5,7 @@ import { FocusTrap } from "focus-trap-react";
 import { X } from "lucide-react";
 import clsx from "clsx";
 import { useBodyScrollLock } from "@/hooks/common/useBodyScrollLock";
+import { modalVariantStyles } from "./modalVariant";
 
 export type ModalSize = "sm" | "md" | "lg";
 /** default: 사용자 라이트 / admin: 관리자 다크 카드 (#286) */
@@ -31,38 +32,6 @@ const sizeStyles: Record<ModalSize, string> = {
   lg: "max-w-lg",
 };
 
-const variantStyles: Record<
-  ModalVariant,
-  {
-    panel: string;
-    header: string;
-    title: string;
-    close: string;
-    closeLocked: string;
-    body: string;
-    footer: string;
-  }
-> = {
-  default: {
-    panel: "bg-white shadow-xl",
-    header: "border-border",
-    title: "text-text",
-    close: "text-text-secondary hover:text-text",
-    closeLocked: "text-text-disabled cursor-not-allowed",
-    body: "text-text",
-    footer: "border-border bg-secondary",
-  },
-  admin: {
-    panel: "bg-admin-card border border-admin-border shadow-xl",
-    header: "border-admin-border",
-    title: "text-admin-text",
-    close: "text-admin-text-secondary hover:text-admin-text",
-    closeLocked: "text-admin-text-secondary/50 cursor-not-allowed",
-    body: "text-admin-text",
-    footer: "border-admin-border bg-admin-bg",
-  },
-};
-
 export default function Modal({
   isOpen,
   onClose,
@@ -77,7 +46,7 @@ export default function Modal({
   const titleId = useId();
   // ESC·오버레이가 모두 막힌 요청 진행 중에는 X도 잠근다
   const closeLocked = disableOverlayClose && disableEscClose;
-  const theme = variantStyles[variant];
+  const theme = modalVariantStyles[variant];
   useBodyScrollLock(isOpen);
 
   useEffect(() => {
