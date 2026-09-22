@@ -17,7 +17,7 @@
 //   - cancelBookingApi를 DELETE로 변경 (기존 POST → 백엔드 스펙 일치)
 // - 2026-09-05 (#168 / BE #560):
 //   - fetchBookingDetail를 단건 조회로 교체 (/booking/me 스캔 우회 제거)
-//   - /booking/me 보강 필드 사용. 관리자 환불 목록만 기존 aggregation 유지
+//   - /booking/me 보강 필드 사용. 관리자 환불 목록은 #675 응답을 그대로 쓴다
 
 import {
   MY_PAGE_BOOKING_STATUSES,
@@ -29,9 +29,9 @@ import {
   type MyBookingsParams,
   type MyBookingsResponse,
   type MyBookingCountResponse,
-  type AdminRefundBookingItem,
-  type AdminRefundBookingListParams,
-  type AdminRefundBookingListResponse,
+  type AdminRefundListParams,
+  type AdminRefundListResponse,
+  type AdminRefundStats,
 } from "@/types/domain/booking";
 import type { AdminBookingBookerResponse } from "./adminSeatMapper";
 import {
@@ -40,13 +40,11 @@ import {
   mockGetMyBookings,
   mockGetMyBookingCount,
   mockCancelBooking,
-  mockGetRefundFailedBookings,
-  mockGetRefundingStuckBookings,
+  mockGetAdminRefunds,
+  mockGetAdminRefundStats,
   mockRetryRefund,
   mockGetAdminBookingByNumber,
 } from "./mocks/bookings";
-import { fetchConcertDetail } from "./concerts";
-import { fetchSeatNumbers } from "./seats";
 import apiClient from "./instance";
 import { USE_MOCK } from "./useMock";
 import { ApiError } from "./errors/errorMapper";
@@ -317,28 +315,9 @@ export function requestRefundApi(bookingNumber: string): Promise<void> {
 }
 
 // -------------------------------------------------------
-// 관리자: 환불 모니터링 (booking-service admin, 2026-07-18 실측으로 확인된 실 API)
+// 관리자: 환불 통합 목록 (#675)
 // -------------------------------------------------------
 
-/** 백엔드 BookingSummaryResponse (관리자 환불 조회용, userId/refundFailedAt/updatedAt 포함) */
-interface BackendAdminRefundBooking {
-  bookingId: number;
-  bookingNumber: string;
-  userId: number;
-  performanceId: number;
-  seatId: number;
-  bookingStatus: BookingStatus;
-  confirmedAt: string | null;
-  refundFailedAt: string | null;
-  updatedAt: string;
-}
-
-/**
- * hasNext 결정:
- *   1. interceptor가 분리한 paginationInfo.hasNext 우선
- *   2. 없으면 items.length === requestedSize fallback
- *      (마지막 페이지 항목 수가 size와 같으면 false positive 가능)
- */
 function resolveAdminRefundHasNext(
   paginationHasNext: boolean | undefined,
   itemCount: number,
@@ -348,107 +327,41 @@ function resolveAdminRefundHasNext(
   return itemCount === requestedSize;
 }
 
-async function toAdminRefundListResponse(
-  raw: BackendAdminRefundBooking[],
-  requestedSize: number,
-  paginationHasNext?: boolean,
-): Promise<AdminRefundBookingListResponse> {
-  const items: AdminRefundBookingItem[] = raw.map((b) => ({
-    bookingId: b.bookingId,
-    bookingNumber: b.bookingNumber,
-    userId: b.userId,
-    performanceId: b.performanceId,
-    seatId: b.seatId,
-    status: b.bookingStatus,
-    confirmedAt: b.confirmedAt,
-    refundFailedAt: b.refundFailedAt,
-    updatedAt: b.updatedAt,
-  }));
+/** 백엔드: GET /api/v1/booking/admin/refunds. 쿼리 이름은 refund_status. */
+export async function getAdminRefundsApi(
+  params: AdminRefundListParams = {},
+): Promise<AdminRefundListResponse> {
+  if (USE_MOCK) return mockGetAdminRefunds(params);
 
-  if (items.length === 0) {
-    return { items: [], hasNext: false };
-  }
-
-  const uniquePerformanceIds = Array.from(
-    new Set(items.map((i) => i.performanceId)),
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const res = await apiClient.get<AdminRefundListResponse["items"]>(
+    "/api/v1/booking/admin/refunds",
+    {
+      params: {
+        page,
+        size,
+        ...(params.refundStatus
+          ? { refund_status: params.refundStatus }
+          : {}),
+      },
+    },
   );
-  const concertsMap = new Map<
-    number,
-    Awaited<ReturnType<typeof fetchConcertDetail>>
-  >();
-  await Promise.all(
-    uniquePerformanceIds.map(async (id) => {
-      try {
-        concertsMap.set(id, await fetchConcertDetail(id));
-      } catch (error) {
-        console.warn(`Failed to fetch concert ${id}:`, error);
-      }
-    }),
-  );
-
-  const seatIds = Array.from(new Set(items.map((i) => i.seatId)));
-  let seatNumberMap = new Map<number, string>();
-  try {
-    const seatNumbersArr = await fetchSeatNumbers(seatIds);
-    seatNumberMap = new Map(
-      seatNumbersArr.map((s) => [s.seatId, s.seatNumber]),
-    );
-  } catch (error) {
-    console.warn("Failed to fetch seat numbers for refund list:", error);
-  }
-
-  const richItems = items.map((i) => ({
-    ...i,
-    performanceTitle: concertsMap.get(i.performanceId)?.title ?? "삭제된 공연",
-    seatNumber: seatNumberMap.get(i.seatId) ?? "?",
-  }));
-
+  const items = res.data ?? [];
   return {
-    items: richItems,
-    hasNext: resolveAdminRefundHasNext(
-      paginationHasNext,
-      items.length,
-      requestedSize,
-    ),
+    items,
+    hasNext: resolveAdminRefundHasNext(res.pagination?.hasNext, items.length, size),
   };
 }
 
-/** 백엔드: GET /api/v1/booking/admin/bookings/refund-failed (환불 처리 자체가 실패한 건) */
-export async function getRefundFailedBookingsApi(
-  params: AdminRefundBookingListParams = {},
-): Promise<AdminRefundBookingListResponse> {
-  if (USE_MOCK) return mockGetRefundFailedBookings(params);
+/** 백엔드: GET /api/v1/booking/admin/refunds/stats. 목록 필터와 무관한 전체 모집단. */
+export async function getAdminRefundStatsApi(): Promise<AdminRefundStats> {
+  if (USE_MOCK) return mockGetAdminRefundStats();
 
-  const page = params.page ?? 0;
-  const size = params.size ?? 20;
-  const res = await apiClient.get<BackendAdminRefundBooking[]>(
-    "/api/v1/booking/admin/bookings/refund-failed",
-    { params: { page, size } },
+  const res = await apiClient.get<AdminRefundStats>(
+    "/api/v1/booking/admin/refunds/stats",
   );
-  return toAdminRefundListResponse(
-    res.data ?? [],
-    size,
-    res.pagination?.hasNext,
-  );
-}
-
-/** 백엔드: GET /api/v1/booking/admin/bookings/refunding-stuck (REFUNDING 상태로 멈춰있는 건) */
-export async function getRefundingStuckBookingsApi(
-  params: AdminRefundBookingListParams = {},
-): Promise<AdminRefundBookingListResponse> {
-  if (USE_MOCK) return mockGetRefundingStuckBookings(params);
-
-  const page = params.page ?? 0;
-  const size = params.size ?? 20;
-  const res = await apiClient.get<BackendAdminRefundBooking[]>(
-    "/api/v1/booking/admin/bookings/refunding-stuck",
-    { params: { page, size } },
-  );
-  return toAdminRefundListResponse(
-    res.data ?? [],
-    size,
-    res.pagination?.hasNext,
-  );
+  return res.data;
 }
 
 /** 백엔드: POST /api/v1/booking/admin/{bookingNumber}/refund-retry */

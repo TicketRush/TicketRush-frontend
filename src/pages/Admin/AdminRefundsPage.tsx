@@ -1,52 +1,76 @@
-// 환불 모니터링 — 실패·고착 전용 (#135 / #338)
+// 환불 관리 — 진행·완료·미해결 실패 통합 목록 (#397 / BE #675)
 //
-// 이 화면은 전체 환불 목록이 아니다. 정상 신청·진행 중(REFUNDING) 건은 안 나온다.
-// 백엔드에 범용 "환불 내역" API가 없고, 아래 모니터링 엔드포인트만 존재:
-//   - GET /booking/admin/bookings/refund-failed    (환불 처리 자체가 실패한 건)
-//   - GET /booking/admin/bookings/refunding-stuck  (REFUNDING 상태로 오래 멈춰있는 건)
-//   - POST /booking/admin/{bookingNumber}/refund-retry (재시도)
-// 전체 환불 목록이 필요하면 별도 이슈.
-//
-// ⚠️ 응답에 사용자 이름/이메일이 없음 (userId만 존재, 조회 가능한 공개 API 없음).
-// 공연명/좌석번호는 performance/seat 서비스에서 aggregation (api/bookings.ts).
+//   GET  /booking/admin/refunds
+//   GET  /booking/admin/refunds/stats
+//   POST /booking/admin/{bookingNumber}/refund-retry
+// 통계 카드는 목록 필터와 무관한 전체 모집단이다. CANCELED는 환불로 세지 않는다.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock3, RefreshCw, RotateCcw, ArrowLeft } from "lucide-react";
+import { ArrowLeft, RotateCcw } from "lucide-react";
 import { toast } from "react-toastify";
 import { ApiError } from "@/api/errors/errorMapper";
 import {
-  useRefundFailedBookings,
-  useRefundingStuckBookings,
+  useAdminRefundList,
+  useAdminRefundStats,
   useRetryRefund,
 } from "@/hooks/admin/useAdminRefunds";
-import type { AdminRefundBookingListItem } from "@/types/domain/booking";
+import type {
+  AdminRefundListItem,
+  RefundProcessStatus,
+} from "@/types/domain/booking";
 import {
+  REFUND_PROCESS_STATUS_LABEL,
+  canRetryAdminRefund,
+  formatAdminRefundPerformance,
+} from "@/utils/admin/adminRefunds";
+import {
+  formatAdminCount,
   formatAdminDateTime,
   formatAdminText,
+  formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
-const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
-  CONFIRMED: { label: "완료", bg: "#00C950" },
-  CANCELED: { label: "취소", bg: "#FB2C36" },
-  PENDING: { label: "대기", bg: "#FBBF24" },
-  EXPIRED: { label: "만료", bg: "#9CA3AF" },
-  REFUNDING: { label: "환불 중", bg: "#2B7FFF" },
-  REFUNDED: { label: "환불 완료", bg: "#6B7280" },
+const PAGE_SIZE = 10;
+
+const STATUS_STYLES: Record<RefundProcessStatus, { bg: string }> = {
+  IN_PROGRESS: { bg: "#2B7FFF" },
+  COMPLETED: { bg: "#6B7280" },
+  FAILED: { bg: "#FB2C36" },
 };
 
-const PAGE_SIZE = 10;
+const FILTERS: { status?: RefundProcessStatus; label: string; stat: keyof StatsShape }[] =
+  [
+    { label: "전체 환불", stat: "totalRefunds" },
+    { status: "IN_PROGRESS", label: "진행 중", stat: "inProgressRefunds" },
+    { status: "COMPLETED", label: "완료", stat: "completedRefunds" },
+    { status: "FAILED", label: "미해결 실패", stat: "failedRefunds" },
+  ];
+
+type StatsShape = {
+  totalRefunds: number;
+  inProgressRefunds: number;
+  completedRefunds: number;
+  failedRefunds: number;
+};
 
 export default function AdminRefundsPage() {
   useDocumentTitle("환불 관리");
 
   const navigate = useNavigate();
-  const [failedPage, setFailedPage] = useState(0);
-  const [stuckPage, setStuckPage] = useState(0);
+  const [refundStatus, setRefundStatus] = useState<
+    RefundProcessStatus | undefined
+  >(undefined);
+  const [page, setPage] = useState(0);
 
-  const failed = useRefundFailedBookings({ page: failedPage, size: PAGE_SIZE });
-  const stuck = useRefundingStuckBookings({ page: stuckPage, size: PAGE_SIZE });
+  const stats = useAdminRefundStats();
+  const list = useAdminRefundList({ page, size: PAGE_SIZE, refundStatus });
   const retryMutation = useRetryRefund();
+
+  function selectFilter(next: RefundProcessStatus | undefined) {
+    setRefundStatus(next);
+    setPage(0);
+  }
 
   async function handleRetry(bookingNumber: string) {
     try {
@@ -62,12 +86,12 @@ export default function AdminRefundsPage() {
       <div className="flex items-start justify-between">
         <div>
           <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-1 rounded">
-            REFUND MONITORING
+            REFUNDS
           </span>
-          <h1 className="text-3xl font-bold mt-2">환불 모니터링</h1>
+          <h1 className="text-3xl font-bold mt-2">환불 관리</h1>
           <p className="text-sm text-admin-text-secondary mt-1">
-            실패하거나 오래 멈춘 환불만 보여 줍니다. 정상 신청·진행 중 환불은
-            이 목록에 없습니다.
+            진행 중, 완료, 미해결 실패를 한 목록에서 봅니다. 결제 전 취소와
+            만료는 포함하지 않습니다.
           </p>
         </div>
         <button
@@ -79,97 +103,60 @@ export default function AdminRefundsPage() {
         </button>
       </div>
 
-      {/* 통계 카드 2개 */}
-      <div className="grid grid-cols-2 gap-4 max-w-2xl">
-        <div className="bg-admin-card border border-admin-border rounded-xl p-6">
-          <div className="flex items-start justify-between mb-4">
-            <RefreshCw size={24} className="text-admin-status-cancelled" />
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-red-500/20 text-red-300">
-              FAILED
-            </span>
-          </div>
-          <p className="text-3xl font-bold mb-1 text-admin-status-cancelled">
-            {failed.data?.items.length ?? 0}
-          </p>
-          <p className="text-xs text-admin-text-secondary">
-            환불 처리 실패 (현재 페이지)
-          </p>
-        </div>
-
-        <div className="bg-admin-card border border-admin-border rounded-xl p-6">
-          <div className="flex items-start justify-between mb-4">
-            <Clock3 size={24} className="text-admin-kpi-revenue" />
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-orange-500/20 text-orange-300">
-              STUCK
-            </span>
-          </div>
-          <p className="text-3xl font-bold mb-1 text-admin-kpi-revenue">
-            {stuck.data?.items.length ?? 0}
-          </p>
-          <p className="text-xs text-admin-text-secondary">
-            환불 지연(멈춤) (현재 페이지)
-          </p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {FILTERS.map((filter) => {
+          const selected = refundStatus === filter.status;
+          return (
+            <button
+              key={filter.label}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => selectFilter(filter.status)}
+              className={`bg-admin-card rounded-xl p-6 text-left border-2 ${
+                selected ? "border-admin-register" : "border-admin-border"
+              }`}
+            >
+              <p className="text-xs text-admin-text-secondary mb-2">
+                {filter.label}
+              </p>
+              <p className="text-3xl font-bold text-admin-text">
+                {formatAdminCount(stats.data?.[filter.stat])}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       <RefundTable
-        title="환불 처리 실패"
-        subtitle="환불 요청 자체가 실패해 재시도가 필요한 예매입니다"
-        isLoading={failed.isLoading}
-        isError={failed.isError}
-        onReload={() => void failed.refetch()}
-        items={failed.data?.items ?? []}
-        dateColumnLabel="실패 시각"
-        dateAccessor={(item) => item.refundFailedAt}
+        isLoading={list.isLoading}
+        isError={list.isError}
+        onReload={() => void list.refetch()}
+        items={list.data?.items ?? []}
         onRetry={handleRetry}
         retryPending={retryMutation.isPending}
-        page={failedPage}
-        hasNext={failed.data?.hasNext ?? false}
-        onPageChange={setFailedPage}
-      />
-
-      <RefundTable
-        title="환불 지연 (REFUNDING 멈춤)"
-        subtitle="환불 진행 중 상태(REFUNDING)로 오래 멈춰있는 예매입니다"
-        isLoading={stuck.isLoading}
-        isError={stuck.isError}
-        onReload={() => void stuck.refetch()}
-        items={stuck.data?.items ?? []}
-        dateColumnLabel="최종 업데이트"
-        dateAccessor={(item) => item.updatedAt}
-        onRetry={handleRetry}
-        retryPending={retryMutation.isPending}
-        page={stuckPage}
-        hasNext={stuck.data?.hasNext ?? false}
-        onPageChange={setStuckPage}
+        page={page}
+        hasNext={list.data?.hasNext ?? false}
+        onPageChange={setPage}
       />
     </div>
   );
 }
 
 function RefundTable({
-  title,
-  subtitle,
   isLoading,
   isError,
   onReload,
   items,
-  dateColumnLabel,
-  dateAccessor,
   onRetry,
   retryPending,
   page,
   hasNext,
   onPageChange,
 }: {
-  title: string;
-  subtitle: string;
   isLoading: boolean;
   isError: boolean;
   onReload: () => void;
-  items: AdminRefundBookingListItem[];
-  dateColumnLabel: string;
-  dateAccessor: (item: AdminRefundBookingListItem) => string | null;
+  items: AdminRefundListItem[];
   onRetry: (bookingNumber: string) => void;
   retryPending: boolean;
   page: number;
@@ -178,11 +165,10 @@ function RefundTable({
 }) {
   return (
     <div className="bg-admin-card border-2 border-admin-dark-border rounded-xl p-6">
-      <span className="text-[10px] font-bold tracking-wider bg-admin-dark-bg text-admin-text px-2 py-0.5 rounded inline-block mb-2">
-        {title}
-      </span>
-      <h3 className="text-base font-bold text-admin-text">{title}</h3>
-      <p className="text-xs text-admin-text-secondary mb-4">{subtitle}</p>
+      <h3 className="text-base font-bold text-admin-text">환불 목록</h3>
+      <p className="text-xs text-admin-text-secondary mb-4">
+        금액은 결제액입니다. 진행 중 건은 오래 멈춘 경우에만 재시도됩니다.
+      </p>
 
       {isLoading ? (
         <div className="text-center py-12 text-admin-text-secondary">
@@ -201,82 +187,92 @@ function RefundTable({
         </div>
       ) : items.length === 0 ? (
         <div className="text-center py-12 text-admin-text-secondary">
-          해당하는 예매가 없습니다.
+          해당하는 환불이 없습니다.
         </div>
       ) : (
         <>
-          <table className="w-full text-sm text-center">
-            <thead>
-              <tr className="border-b border-admin-border">
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  예매번호
-                </th>
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  공연명
-                </th>
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  좌석
-                </th>
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  사용자ID
-                </th>
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  상태
-                </th>
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  {dateColumnLabel}
-                </th>
-                <th className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center">
-                  재시도
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((b) => {
-                const s = STATUS_STYLES[b.status] ?? STATUS_STYLES.PENDING;
-                return (
-                  <tr
-                    key={b.bookingNumber}
-                    className="border-b border-admin-border/50 hover:bg-admin-border/30"
-                  >
-                    <td className="py-3 px-3 font-mono text-xs text-blue-400">
-                      {b.bookingNumber}
-                    </td>
-                    <td className="py-3 px-3 font-bold text-admin-text">
-                      {formatAdminText(b.performanceTitle)}
-                    </td>
-                    <td className="py-3 px-3 text-admin-text">
-                      {formatAdminText(b.seatNumber)}
-                    </td>
-                    <td className="py-3 px-3 text-xs text-admin-text-secondary">
-                      #{b.userId}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className="inline-block px-3 py-1 rounded-md text-xs font-bold text-white"
-                        style={{ backgroundColor: s.bg }}
-                      >
-                        {s.label}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-xs text-admin-text-secondary">
-                      {formatAdminDateTime(dateAccessor(b))}
-                    </td>
-                    <td className="py-3 px-3">
-                      <button
-                        type="button"
-                        onClick={() => onRetry(b.bookingNumber)}
-                        disabled={retryPending}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold text-white bg-admin-register disabled:opacity-40"
-                      >
-                        <RotateCcw size={12} /> 재시도
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-center">
+              <thead>
+                <tr className="border-b border-admin-border">
+                  {[
+                    "예매번호",
+                    "공연명",
+                    "공연 일시",
+                    "예매일시",
+                    "예매자",
+                    "결제 금액",
+                    "상태",
+                    "재시도",
+                  ].map((label) => (
+                    <th
+                      key={label}
+                      className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const style = STATUS_STYLES[item.refundStatus];
+                  return (
+                    <tr
+                      key={item.bookingNumber}
+                      className="border-b border-admin-border/50 hover:bg-admin-border/30"
+                    >
+                      <td className="py-3 px-3 font-mono text-xs text-blue-400">
+                        {item.bookingNumber}
+                      </td>
+                      <td className="py-3 px-3 font-bold text-admin-text">
+                        {formatAdminText(item.performanceTitle)}
+                      </td>
+                      <td className="py-3 px-3 text-xs text-admin-text-secondary">
+                        {formatAdminRefundPerformance(
+                          item.performanceDate,
+                          item.performanceTime,
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-xs text-admin-text-secondary">
+                        {formatAdminDateTime(item.bookedAt)}
+                      </td>
+                      <td className="py-3 px-3 text-admin-text">
+                        {formatAdminText(item.bookerName)}
+                      </td>
+                      <td className="py-3 px-3 text-admin-text">
+                        {formatAdminWon(item.paymentAmount)}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span
+                          className="inline-block px-3 py-1 rounded-md text-xs font-bold text-white"
+                          style={{ backgroundColor: style.bg }}
+                        >
+                          {REFUND_PROCESS_STATUS_LABEL[item.refundStatus]}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        {canRetryAdminRefund(item.refundStatus) ? (
+                          <button
+                            type="button"
+                            onClick={() => onRetry(item.bookingNumber)}
+                            disabled={retryPending}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold text-white bg-admin-register disabled:opacity-40"
+                          >
+                            <RotateCcw size={12} /> 재시도
+                          </button>
+                        ) : (
+                          <span className="text-xs text-admin-text-secondary">
+                            -
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           <div className="flex justify-end gap-2 mt-4">
             <button

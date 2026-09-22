@@ -18,10 +18,9 @@
 //   * 단건 조회 BookingDetailResponse 매핑
 //   * /booking/me 는 BookingMySummaryResponse 보강 필드 사용
 //
-// ⚠️ 2026-07-18 swagger-ui 실측: REFUND_FAILED는 실제 enum 값이 아님 (제거).
-// "환불 실패" 판단은 대신 booking-service의 별도 관리자 엔드포인트
-// (GET /booking/admin/bookings/refund-failed, refunding-stuck)로 조회하며,
-// 각 항목의 refundFailedAt 타임스탬프 유무로 구분함.
+// ⚠️ REFUND_FAILED는 예매 상태가 아니다 (#675).
+// 환불 처리 상태는 조회 시 파생한다. REFUNDING → IN_PROGRESS, REFUNDED → COMPLETED,
+// CONFIRMED이면서 실패 이력이 있으면 FAILED. 실패 시각만으로 분류하지 않는다.
 
 // 예매 상태 — 백엔드 booking-service enum과 정확히 일치
 //   PENDING: 결제 대기 (좌석 자동 HOLD 중, 서버 expires_at까지)
@@ -176,42 +175,47 @@ export interface MyBookingCountResponse {
   count: number;
 }
 
-// ── 관리자: 환불 모니터링 (백엔드 확정, 2026-07-18 swagger-ui 실측) ────
-// 백엔드 endpoint:
-//   GET  /api/v1/booking/admin/bookings/refund-failed    (환불 처리 자체가 실패한 건)
-//   GET  /api/v1/booking/admin/bookings/refunding-stuck  (REFUNDING 상태로 오래 멈춰있는 건)
-//   POST /api/v1/booking/admin/{bookingNumber}/refund-retry (재시도)
+// ── 관리자: 환불 통합 목록 (#675) ────────────────────────
+//   GET  /api/v1/booking/admin/refunds?page&size&refund_status
+//   GET  /api/v1/booking/admin/refunds/stats
+//   POST /api/v1/booking/admin/{bookingNumber}/refund-retry
+// 좌석 번호·이메일은 내려주지 않는다. 금액은 결제액이지 PG 환불액이 아니다.
+// stats는 목록 필터와 무관하게 항상 전체 모집단이다. CANCELED는 포함하지 않는다.
 
-// 응답은 BookingSummaryResponse와 동일 shape + userId/refundFailedAt/updatedAt.
-// ⚠️ 사용자 이름/이메일/공연명/좌석번호는 이 응답에 없음
-// userId만 있고
-// 프론트에서 조회 가능한 "userId → 사용자 정보" API가 없어(내부 전용 API만 존재)
-// 사용자 식별 정보는 표시 불가.
-// 공연명/좌석번호는 performance/seat 서비스에서 aggregation.
-export interface AdminRefundBookingItem {
+export type RefundProcessStatus = "IN_PROGRESS" | "COMPLETED" | "FAILED";
+
+export interface AdminRefundListItem {
   bookingId: number;
   bookingNumber: string;
   userId: number;
   performanceId: number;
-  seatId: number;
-  status: BookingStatus;
-  confirmedAt: string | null;
+  bookingStatus: BookingStatus;
+  refundStatus: RefundProcessStatus;
+  bookedAt: string;
+  /** 이력이며 현재 상태가 아니다. 진행·완료 행에도 남을 수 있다. */
   refundFailedAt: string | null;
-  updatedAt: string;
+  performanceTitle: string | null;
+  /** Asia/Seoul 벽시계. UTC로 변환하지 않는다. */
+  performanceDate: string | null;
+  performanceTime: string | null;
+  bookerName: string | null;
+  paymentAmount: number | null;
 }
 
-/** AdminRefundBookingItem + performance/seat aggregation (프론트 표시용) */
-export interface AdminRefundBookingListItem extends AdminRefundBookingItem {
-  performanceTitle: string;
-  seatNumber: string;
-}
-
-export interface AdminRefundBookingListParams {
+export interface AdminRefundListParams {
   page?: number;
   size?: number;
+  refundStatus?: RefundProcessStatus;
 }
 
-export interface AdminRefundBookingListResponse {
-  items: AdminRefundBookingListItem[];
+export interface AdminRefundListResponse {
+  items: AdminRefundListItem[];
   hasNext: boolean;
+}
+
+export interface AdminRefundStats {
+  totalRefunds: number;
+  inProgressRefunds: number;
+  completedRefunds: number;
+  failedRefunds: number;
 }
