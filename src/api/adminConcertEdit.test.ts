@@ -11,6 +11,7 @@ import {
   restoreCharacterDraft,
 } from "@/utils/character/characterConfig";
 import { validateConcertForm } from "@/utils/admin/concertFormValidation";
+import { fetchConcertDetail } from "./concerts";
 
 vi.mock("./useMock", () => ({ USE_MOCK: false }));
 vi.mock("../stores/global/authStore", () => ({
@@ -89,6 +90,22 @@ async function input() {
 }
 
 describe("admin edit contract", () => {
+  it.each(["UPCOMING", "ON_SALE", "CLOSED", "CANCELED"])("maps raw performance_status %s and preserves booking_open_at", async (status) => {
+    adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, performance_status: status, booking_open_at: "2026-09-22 19:00:00" } }) });
+    const result = await fetchConcertDetail(42);
+    expect(result.status).toBe(status);
+    expect(result.bookingOpenAt).toBe("2026-09-22 19:00:00");
+  });
+  it.each(["2027-08-01 20:00:45", "2027-08-01T20:00:45+09:00"])("restores KST seconds and skips unchanged PATCH for %s", async (bookingOpenAt) => {
+    adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, performance_status: "UPCOMING", booking_open_at: bookingOpenAt } }) });
+    const value = await input();
+    expect(value.form.bookingOpenAt).toBe("2027-08-01 20:00:45");
+    await updateConcertApi(42, value);
+    expect(adapter).not.toHaveBeenCalled();
+    value.form.bookingOpenAt = "2027-08-01 20:00:00";
+    await updateConcertApi(42, value);
+    expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ booking_open_at: "2027-08-01 20:00:00" });
+  });
   it("restores a leap show date, skips an unchanged PATCH and changes only show_date", async () => {
     adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, show_date: "2028-02-29" } }) });
     const value = await input();

@@ -45,6 +45,32 @@ it("enables year, month and day sequentially and produces the existing local dat
   expect(formatBookingOpenAt(ui.value())).toBe("2028-02-29 20:30:00");
 });
 
+it("keeps the entered KST 19:00 in the request formatter (#356)", () => {
+  const ui = setup();
+  for (const [part, value] of [["year", "2026"], ["month", "09"], ["day", "22"], ["time", "19:00"]]) ui.change(part, value);
+  expect(ui.value()).toBe("2026-09-22T19:00");
+  expect(formatBookingOpenAt(ui.value())).toBe("2026-09-22 19:00:00");
+});
+
+it.each(["2027-08-01 20:00:00", "2027-08-01 20:00:45"])("preserves restored space-separated values and seconds (%s)", (initial) => {
+  const ui = setup(initial);
+  expect(ui.input("year").props.value).toBe("2027");
+  expect(ui.input("month").props.value).toBe("08");
+  expect(ui.input("day").props.value).toBe("01");
+  expect(ui.onChange).not.toHaveBeenCalled();
+  ui.change("time", ui.input("time").props.value as string);
+  expect(ui.value()).toBe(initial);
+  expect(formatBookingOpenAt(ui.value())).toBe(initial);
+  ui.change("day", "02");
+  expect(formatBookingOpenAt(ui.value())).toBe(initial.replace("08-01", "08-02"));
+});
+
+it("serializes the #673 create UI contract", () => {
+  const ui = setup();
+  for (const [part, value] of [["year", "2027"], ["month", "08"], ["day", "01"], ["time", "20:00"]]) ui.change(part, value);
+  expect(formatBookingOpenAt(ui.value())).toBe("2027-08-01 20:00:00");
+});
+
 it.each([["2027", "02", 28], ["2028", "02", 29], ["1900", "02", 28], ["2000", "02", 29], ["2100", "02", 28], ["2028", "04", 30], ["2028", "05", 31]])(
   "renders only existing days for %s-%s", (year, month, days) => expect(setup(`${year}-${month}-T`).days()).toBe(days),
 );
