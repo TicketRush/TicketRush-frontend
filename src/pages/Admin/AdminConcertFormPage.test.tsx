@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AdminConcertFormPage from "./AdminConcertFormPage";
+import ShowDateInput from "@/components/admin/ShowDateInput";
+import DatePartsInput from "@/components/admin/DatePartsInput";
 import { mapConcertForEdit } from "@/api/adminConcertEdit";
 import {
   createCharacterConfig,
@@ -14,6 +16,7 @@ const hooks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   control: vi.fn(),
+  formRender: vi.fn(),
 }));
 vi.mock("react/jsx-dev-runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react/jsx-dev-runtime")>();
@@ -21,6 +24,15 @@ vi.mock("react/jsx-dev-runtime", async (importOriginal) => {
     ...actual,
     jsxDEV: (...args: Parameters<typeof actual.jsxDEV>) => {
       const [type, props] = args;
+      if (typeof type === "function" && type.name === "ConcertForm" && hooks.formRender.getMockImplementation()) {
+        return actual.jsxDEV(function DriveForm() {
+          // Run inside this React render so the real form's useState can rerender
+          // after each input event, without mocking useState or its updater.
+          const tree = (type as React.FunctionComponent)(props);
+          hooks.formRender(tree);
+          return tree;
+        }, {}, args[2], false);
+      }
       if (type !== "input" && type !== "select") return actual.jsxDEV(...args);
       return actual.jsxDEV(function CaptureControl() {
         hooks.control(props);
@@ -73,6 +85,7 @@ beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.clearAllMocks();
   hooks.control.mockReset();
+  hooks.formRender.mockReset();
   // An unrelated creation draft must never override the server's edit data.
   vi.stubGlobal("sessionStorage", {
     getItem: () => JSON.stringify({ form: { title: "다른 공연 초안" } }),
@@ -101,6 +114,63 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
     </MemoryRouter>,
   );
 }
+
+it("saves the parent form date after selecting year, month and day on the create page", async () => {
+  type Element = React.ReactElement<Record<string, unknown>>;
+  function nodes(node: React.ReactNode): Element[] {
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+    if (node.type === ShowDateInput || node.type === DatePartsInput ||
+        (typeof node.type === "function" && node.type.name === "CaptureControl")) {
+      return nodes((node.type as React.FunctionComponent<Record<string, unknown>>)(node.props) as React.ReactNode);
+    }
+    return [node, ...nodes(node.props.children as React.ReactNode)];
+  }
+  const selections = [["year", "2028"], ["month", "02"], ["day", "29"]];
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = nodes(tree);
+    if (step < selections.length) {
+      const [part, value] = selections[step++];
+      const control = elements.find((element) => element.props.id === `show-date-${part}`)!;
+      expect(control.props.disabled).not.toBe(true);
+      (control.props.onChange as React.ChangeEventHandler<HTMLInputElement | HTMLSelectElement>)({
+        target: { value },
+      } as React.ChangeEvent<HTMLInputElement>);
+      return;
+    }
+    for (const [part, value] of selections) {
+      expect(elements.find((element) => element.props.id === `show-date-${part}`)?.props.value).toBe(value);
+    }
+    save = elements.find((element) => element.type === "button" &&
+      React.Children.toArray(element.props.children as React.ReactNode).includes("공연 등록하기"))?.props.onClick as typeof save;
+  });
+  // Keep the existing date scheduling policy deterministic.
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 8, 22));
+  try {
+    hooks.query.mockReturnValue({});
+    vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+    render("/admin/concerts/new", { concertDraft: {
+      pathname: "/admin/concerts/new",
+      form: { ...initial.form, date: "" },
+      totalSeats: 120,
+      mainImage: new File(["poster"], "poster.png", { type: "image/png" }),
+    } });
+    expect(step).toBe(3);
+    expect(save).toBeTypeOf("function");
+    await save!();
+    expect(hooks.create).toHaveBeenCalledOnce();
+    expect(hooks.create.mock.calls[0][0].form).toEqual(expect.objectContaining({
+      date: "2028-02-29",
+      time: "19:30",
+      bookingOpenAt: initial.form.bookingOpenAt,
+    }));
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 describe.each(["create", "edit"])("show date Enter navigation (%s)", (mode) => {
   function setup(date: string) {
