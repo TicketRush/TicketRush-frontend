@@ -4,10 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ConcertDetailPage from "./ConcertDetailPage";
 import ErrorBoundary from "@/components/common/ErrorBoundary/ErrorBoundary";
+import ImageViewer from "@/components/common/ImageViewer";
 import type { ConcertDetail } from "@/types/domain/concert";
 import { createCharacterConfig, restoreCharacterDraft } from "@/utils/character/characterConfig";
 
-const mocks = vi.hoisted(() => ({ detail: vi.fn(), viewer: vi.fn() }));
+const mocks = vi.hoisted(() => ({ detail: vi.fn(), viewer: vi.fn(), drive: vi.fn() }));
+vi.mock("@/components/common/ImageViewer", () => ({ default: () => null }));
 vi.mock("@/hooks/queries/useConcertDetail", () => ({ useConcertDetail: mocks.detail }));
 vi.mock("@/hooks/queries/useConcertListItem", () => ({ useConcertListItem: () => undefined }));
 vi.mock("@/hooks/queries/useSeats", () => ({ useSeatCounts: () => ({
@@ -37,16 +39,23 @@ const concert: ConcertDetail = {
 };
 
 beforeEach(() => {
+  mocks.drive.mockReset();
   vi.stubGlobal("React", React);
   mocks.viewer.mockReset().mockReturnValue(<span>viewer</span>);
   mocks.detail.mockReturnValue({ data: concert, isLoading: false, isError: false });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+function DrivePage() {
+  const tree = ConcertDetailPage();
+  mocks.drive(tree);
+  return tree;
+}
+
 function render(overrides: Record<string, unknown> = {}) {
   mocks.detail.mockReturnValue({ data: { ...concert, ...overrides }, isLoading: false, isError: false });
   return renderToStaticMarkup(<MemoryRouter initialEntries={["/concerts/42"]}>
-    <Routes><Route path="/concerts/:id" element={<ConcertDetailPage />} /></Routes>
+    <Routes><Route path="/concerts/:id" element={mocks.drive.getMockImplementation() ? <DrivePage /> : <ConcertDetailPage />} /></Routes>
   </MemoryRouter>);
 }
 
@@ -55,6 +64,66 @@ function expectBody(html: string) {
     expect(html).toContain(value);
   }
 }
+
+describe("image full view (#354)", () => {
+  it.each([["포스터", "/poster.png"], ["갤러리 1", "/a.png"], ["갤러리 2", "/b.png"], ["갤러리 3", "/c.png"]])("opens %s in the shared viewer and closes it", (label, url) => {
+    type Element = React.ReactElement<Record<string, unknown>>;
+    function nodes(node: React.ReactNode): Element[] {
+      if (Array.isArray(node)) return node.flatMap(nodes);
+      if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+      if (typeof node.type === "function" && node.type.name === "PosterFrame") {
+        return nodes((node.type as React.FunctionComponent<Record<string, unknown>>)(node.props) as React.ReactNode);
+      }
+      return [node, ...nodes(node.props.children as React.ReactNode)];
+    }
+    let step = 0;
+    mocks.drive.mockImplementation((tree: React.ReactNode) => {
+      const elements = nodes(tree);
+      const viewers = elements.filter((node) => node.type === ImageViewer);
+      expect(viewers).toHaveLength(1);
+      const viewer = viewers[0];
+      if (step++ === 0) {
+        expect(viewer.props.open).toBe(false);
+        const trigger = elements.find((node) => node.type === "button" && node.props["aria-label"] === `API 공연 ${label} 전체보기`)!;
+        (trigger.props.onClick as () => void)();
+      } else if (step === 2) {
+        expect(viewer.props).toMatchObject({ open: true, imageUrl: url, alt: `API 공연 ${label}` });
+        (viewer.props.onClose as () => void)();
+      } else expect(viewer.props.open).toBe(false);
+    });
+    render({ imageGalleryUrls: ["/a.png", "/b.png", "/c.png"] });
+    expect(step).toBe(3);
+  });
+
+  it.each([undefined, null, "", "   "])("has no image interaction for empty images (%s)", (imageMainUrl) => {
+    const html = render({ imageMainUrl, imageGalleryUrls: [] });
+    expect(html).toContain("등록된 포스터가 없습니다");
+    expect(html).not.toContain("전체보기");
+    expect(html).not.toContain("공연장 갤러리");
+  });
+
+  it("removes the full-view trigger when the poster fails to load", () => {
+    let renders = 0;
+    function visit(node: React.ReactNode): React.ReactElement<Record<string, unknown>>[] {
+      if (Array.isArray(node)) return node.flatMap(visit);
+      if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+      return [node, ...visit(node.props.children as React.ReactNode)];
+    }
+    mocks.drive.mockImplementation((tree: React.ReactNode) => {
+      const poster = visit(tree).find((node) => typeof node.type === "function" && node.type.name === "PosterFrame")!;
+      const frame = (poster.type as React.FunctionComponent<Record<string, unknown>>)(poster.props) as React.ReactNode;
+      const nodes = visit(frame);
+      if (renders++ === 0) {
+        (nodes.find((node) => node.type === "img")!.props.onError as () => void)();
+      } else {
+        expect(nodes.some((node) => node.type === "button")).toBe(false);
+        expect(nodes.some((node) => node.props.role === "img")).toBe(true);
+      }
+    });
+    render();
+    expect(renders).toBe(2);
+  });
+});
 
 describe("booking opening uses server status and KST display (#356)", () => {
   it.each(["2026-09-22 19:00:00", "2026-09-22T19:00:00+09:00", "2026-09-22T10:00:00Z"])("displays the same opening for %s", (bookingOpenAt) => {
