@@ -1,14 +1,14 @@
-import { parseBackendDateTime } from "@/utils/booking/parseBackendDateTime";
+import { parseBookingOpenAt } from "./parseBookingOpenAt";
 
 /**
  * 상세 UPCOMING 오픈 안내용 시각 포맷.
- * 백엔드 Instant(UTC `Z` / offset / naive UTC)를 Asia/Seoul 벽시계로 표시한다.
+ * legacy KST 벽시계 또는 명시적 Z/offset을 Asia/Seoul 기준으로 표시한다.
  */
 export function formatBookingOpenAt(
   iso: string,
   timeZone: string = "Asia/Seoul",
 ): string {
-  const ms = parseBackendDateTime(iso);
+  const ms = parseBookingOpenAt(iso);
   if (ms == null) return "";
 
   const d = new Date(ms);
@@ -20,7 +20,7 @@ export function formatBookingOpenAt(
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   }).formatToParts(d);
 
   const get = (type: Intl.DateTimeFormatPartTypes) =>

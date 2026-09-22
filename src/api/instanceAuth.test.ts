@@ -16,6 +16,8 @@ import apiClient from "./instance";
 import { fetchBanners } from "./banners";
 import { fetchConcerts, fetchConcertDetail } from "./concerts";
 import { fetchSeatCounts } from "./seats";
+import { createBookingApi } from "./bookings";
+import { ApiError } from "./errors/errorMapper";
 
 const mode = vi.hoisted(() => ({ mock: false }));
 vi.mock("./useMock", () => ({
@@ -79,6 +81,21 @@ function failure(
 const adapter = vi.fn(async (config: InternalAxiosRequestConfig) =>
   success(config),
 );
+
+it("preserves the #673 booking rejection for the existing UI error handler", async () => {
+  adapter.mockImplementationOnce(async (config) => failure(config, 400, {
+    is_success: false, code: "PERFORMANCE_400_005",
+    message: "예매 가능한 공연이 아닙니다.", result: null,
+  }));
+  const error = await createBookingApi({ performanceId: 42, seatId: 999999 }).catch((error: unknown) => error);
+  expect(error).toBeInstanceOf(ApiError);
+  expect(ApiError.fromUnknown(error)).toMatchObject({
+    httpStatus: 400, code: "PERFORMANCE_400_005", message: "예매 가능한 공연이 아닙니다.",
+  });
+  expect(adapter).toHaveBeenCalledOnce();
+  expect(adapter.mock.calls[0][0].url).toBe("/api/v1/booking");
+  expect(auth.logout).not.toHaveBeenCalled();
+});
 
 function authorizationOf(callIndex = 0): unknown {
   return adapter.mock.calls[callIndex][0].headers.Authorization;

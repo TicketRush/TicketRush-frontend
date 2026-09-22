@@ -1,4 +1,5 @@
 import type { ConcertFormData } from "@/types/domain/admin";
+import { bookingOpenAtForInput } from "@/utils/concert/parseBookingOpenAt";
 import type { ConcertDetail } from "@/types/domain/concert";
 import { validateCharacterConfig } from "@/utils/character/characterConfig";
 import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
@@ -39,7 +40,7 @@ export function mapConcertForEdit(detail: ConcertDetail): ConcertEditData {
       imageGalleryUrls: detail.imageGalleryUrls,
       facilities: detail.facilities,
       notices: detail.notices ?? [],
-      bookingOpenAt: detail.bookingOpenAt?.replace(" ", "T") ?? "",
+      bookingOpenAt: detail.bookingOpenAt ? bookingOpenAtForInput(detail.bookingOpenAt) : "",
       characterConfig: detail.characterConfig,
       characterMessage: detail.characterMessage ?? "",
     },

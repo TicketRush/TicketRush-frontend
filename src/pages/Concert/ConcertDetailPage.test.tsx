@@ -56,6 +56,29 @@ function expectBody(html: string) {
   }
 }
 
+describe("booking opening uses server status and KST display (#356)", () => {
+  it.each(["2026-09-22 19:00:00", "2026-09-22T19:00:00+09:00", "2026-09-22T10:00:00Z"])("displays the same opening for %s", (bookingOpenAt) => {
+    expect(render({ status: "UPCOMING", bookingOpenAt })).toContain("2026년 09월 22일(화) 19:00");
+  });
+  it.each(["2026-09-22T09:59:00Z", "2026-09-22T10:00:00Z", "2030-01-01T00:00:00Z"])("does not let the client clock override server status (%s)", (now) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(now));
+    try {
+      for (const [status, label, disabled] of [["UPCOMING", "오픈 예정", true], ["ON_SALE", "예매하기", false], ["CLOSED", "예매 마감", true], ["CANCELED", "공연 취소", true]] as const) {
+        const html = render({ status, bookingOpenAt: "2026-09-22 19:00:00" });
+        const button = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].find((match) => match[2].includes(label));
+        expect(button).toBeDefined();
+        expect(button![1].includes("disabled")).toBe(disabled);
+      }
+    } finally { vi.useRealTimers(); }
+  });
+  it("uses the existing unknown-opening message for invalid input", () => {
+    const html = render({ status: "UPCOMING", bookingOpenAt: "2026-02-30 19:00:00" });
+    expect(html).toContain("티켓 오픈일이 곧 공개됩니다");
+    expect(html).not.toContain("Invalid Date");
+  });
+});
+
 describe("detail empty states (#322)", () => {
   it.each([undefined, null, "", "   "])("shows the poster empty state for %j", (imageMainUrl) => {
     const html = render({ imageMainUrl });

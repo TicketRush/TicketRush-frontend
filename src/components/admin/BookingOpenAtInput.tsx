@@ -15,7 +15,7 @@ export default function BookingOpenAtInput({ value, onChange }: Props) {
     // Emit nothing on mount: unchanged edit values (including seconds) stay exact.
     onChange(!parts.year && !parts.month && !parts.day && !nextTime
       ? ""
-      : `${parts.year}-${parts.month}-${parts.day}T${nextTime}`);
+      : `${parts.year}-${parts.month}-${parts.day}${value.includes(" ") ? " " : "T"}${nextTime}`);
   }
   return (
     <div className="space-y-3">
