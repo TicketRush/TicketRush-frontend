@@ -110,10 +110,8 @@ export default function AdminDashboardPage() {
       await deleteMutation.mutateAsync(deleteTarget);
       toast.success("공연이 삭제되었습니다.");
       setDeleteTarget(null);
-    } catch (error: unknown) {
-      const err =
-        error instanceof Error ? error : new Error("삭제에 실패했습니다.");
-      toast.error(err.message);
+    } catch {
+      // mutationCache.onError가 서버 메시지를 한 번만 토스트한다. 모달은 재시도용으로 유지.
     }
   }
 
