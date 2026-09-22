@@ -26,6 +26,9 @@ import {
   MAX_TOTAL_SEATS,
   sanitizeConcertForm,
   validateConcertForm,
+  validateConcertDate,
+  validateConcertTime,
+  validateBookingOpenAt,
 } from "@/utils/admin/concertFormValidation";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
 import { MOUTH_STYLE_LABELS } from "@/components/admin/character/characterMouth";
@@ -135,6 +138,10 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
     ...(draft && location.state?.concertDraft?.pathname === location.pathname && location.state?.characterConfig
       ? { characterConfig: location.state.characterConfig } : {}),
   }));
+  const [interacted, setInteracted] = useState<Partial<Record<"date" | "time" | "bookingOpenAt", boolean>>>({});
+  const dateError = interacted.date ? validateConcertDate(form.date, original?.date) : null;
+  const timeError = interacted.time ? validateConcertTime(form.time) : null;
+  const bookingError = interacted.bookingOpenAt ? validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt) : null;
   const [totalSeats, setTotalSeats] = useState(draft?.totalSeats ?? initialData?.totalSeats ?? 0);
   const [mainImage, setMainImage] = useState<File | null>(draft?.mainImage ?? null);
   const [model3d, setModel3d] = useState<File | null>(draft?.model3d ?? null);
@@ -200,6 +207,9 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
     key: K,
     value: ConcertFormData[K],
   ) {
+    if (key === "date" || key === "time" || key === "bookingOpenAt") {
+      setInteracted((prev) => ({ ...prev, [key]: true }));
+    }
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -448,7 +458,10 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
         <Section title="일정 정보">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Field label="공연 날짜" required>
+              {dateError && <p id="show-date-error" className="text-sm text-red-400">{dateError}</p>}
               <ShowDateInput
+                aria-invalid={dateError ? true : undefined}
+                aria-describedby={dateError ? "show-date-error" : undefined}
                 value={form.date}
                 onChange={(v) => update("date", v)}
                 onKeyDown={handleEnterMoveNext}
@@ -456,7 +469,10 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             </Field>
 
             <Field label="공연 시간" required>
+              {timeError && <p id="show-time-error" className="text-sm text-red-400">{timeError}</p>}
               <EditableTimeInput
+                aria-invalid={timeError ? true : undefined}
+                aria-describedby={timeError ? "show-time-error" : undefined}
                 value={form.time}
                 onChange={(v) => update("time", v)}
                 onKeyDown={handleEnterMoveNext}
@@ -482,7 +498,9 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
 
         <Section title="예매 일정">
           <Field label="예매 오픈 시각 (한국 시간)">
-            <BookingOpenAtInput value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
+            {bookingError && <p id="booking-open-error" className="text-sm text-red-400">{bookingError}</p>}
+            <BookingOpenAtInput aria-invalid={bookingError ? true : undefined}
+              aria-describedby={bookingError ? "booking-open-error" : undefined} value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
             {mode === "edit" && <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>}
           </Field>
         </Section>
@@ -848,7 +866,10 @@ function EditableTimeInput({
   onChange,
   onKeyDown,
   placeholder = "예: 19:00",
+  ...accessibilityProps
 }: {
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
   value: string;
   onChange: (value: string) => void;
   onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -866,6 +887,7 @@ function EditableTimeInput({
 
   return (
     <input
+      {...accessibilityProps}
       data-form-focus="true"
       type="text"
       value={value}

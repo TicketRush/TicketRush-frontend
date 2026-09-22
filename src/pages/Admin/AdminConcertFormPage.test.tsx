@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import AdminConcertFormPage from "./AdminConcertFormPage";
 import ShowDateInput from "@/components/admin/ShowDateInput";
 import DatePartsInput from "@/components/admin/DatePartsInput";
+import BookingOpenAtInput from "@/components/admin/BookingOpenAtInput";
 import { mapConcertForEdit } from "@/api/adminConcertEdit";
 import {
   createCharacterConfig,
@@ -114,6 +115,85 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
     </MemoryRouter>,
   );
 }
+
+it.each(["create", "edit"])("validates schedule inputs only after interaction and clears accessible errors (%s)", (mode) => {
+  type Element = React.ReactElement<Record<string, unknown>>;
+  function nodes(node: React.ReactNode): Element[] {
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+    if (node.type === ShowDateInput || node.type === DatePartsInput || node.type === BookingOpenAtInput ||
+        (typeof node.type === "function" && ["EditableTimeInput", "CaptureControl"].includes(node.type.name))) {
+      return nodes((node.type as React.FunctionComponent<Record<string, unknown>>)(node.props));
+    }
+    return [node, ...nodes(node.props.children as React.ReactNode)];
+  }
+  const steps = [
+    ...(mode === "edit" ? [["show-date-day", "", "show-date-error"]] : []),
+    ["show-date-year", "0999", "show-date-error"],
+    ["show-date-year", "2028", "show-date-error"],
+    ["show-date-month", "02", "show-date-error"],
+    ["show-date-day", "29", ""],
+    ["show-date-year", "202", "show-date-error"],
+    ["show-date-year", "2027", "show-date-error"],
+    ["show-date-day", "28", ""],
+    ["show-time", "25:00", "show-time-error"],
+    ["show-time", "12:70", "show-time-error"],
+    ["show-time", "", "show-time-error"],
+    ["show-time", "19:30", ""],
+    ...(mode === "edit" ? [["booking-open-day", "", "booking-open-error"]] : []),
+    ["booking-open-year", "202", "booking-open-error"],
+    ["booking-open-year", "2028", "booking-open-error"],
+    ["booking-open-month", "02", "booking-open-error"],
+    ["booking-open-day", "29", mode === "create" ? "booking-open-error" : ""],
+    ["booking-open-time", "20:30", ""],
+    ["booking-open-time", "", "booking-open-error"],
+    ["booking-open-time", "21:00", ""],
+    ...(mode === "create" ? [
+      ["booking-open-day", "", "booking-open-error"],
+      ["booking-open-month", "", "booking-open-error"],
+      ["booking-open-year", "", "booking-open-error"],
+      ["booking-open-time", "", ""],
+    ] : []),
+  ];
+  let step = 0;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = nodes(tree);
+    const errors = elements.filter((element) => ["show-date-error", "show-time-error", "booking-open-error"].includes(String(element.props.id)));
+    const expected = step ? steps[step - 1][2] : "";
+    expect(errors.map((element) => element.props.id)).toEqual(expected ? [expected] : []);
+    for (const element of elements.filter((element) => element.type === "input" || element.type === "select")) {
+      const id = String(element.props.id ?? "");
+      const group = id.startsWith("show-date-") ? "show-date-error" : id.startsWith("booking-open-") ? "booking-open-error"
+        : element.props.placeholder === "예: 19:00" ? "show-time-error" : null;
+      if (!group) continue;
+      expect(element.props["aria-invalid"]).toBe(expected === group ? true : undefined);
+      expect(element.props["aria-describedby"]).toBe(expected === group ? group : undefined);
+      if (expected === group) expect(elements.indexOf(errors[0])).toBeLessThan(elements.indexOf(element));
+    }
+    if (step === steps.length) return;
+    const [id, value] = steps[step++];
+    const control = elements.find((element) => id === "show-time"
+      ? element.type === "input" && element.props.placeholder === "예: 19:00" : element.props.id === id)!;
+    expect(control.props.disabled).not.toBe(true);
+    (control.props.onChange as (event: { target: { value: string } }) => void)({ target: { value } });
+  });
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 8, 22));
+  try {
+    if (mode === "create") {
+      hooks.query.mockReturnValue({});
+      vi.stubGlobal("sessionStorage", { getItem: () => null });
+      render("/admin/concerts/new");
+    } else {
+      // Preserve a valid, untouched edit value while date partial states are tested.
+      hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, date: "2028-02-29", bookingOpenAt: "2028-02-29T20:00:45" } }, isPending: false, isFetchedAfterMount: true });
+      render();
+    }
+    expect(step).toBe(steps.length);
+    expect(hooks.create).not.toHaveBeenCalled();
+    expect(hooks.update).not.toHaveBeenCalled();
+  } finally { vi.useRealTimers(); }
+});
 
 it("saves the parent form date after selecting year, month and day on the create page", async () => {
   type Element = React.ReactElement<Record<string, unknown>>;

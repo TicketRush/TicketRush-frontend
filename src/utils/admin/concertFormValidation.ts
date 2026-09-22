@@ -72,6 +72,48 @@ function getMaxConcertDate(today: Date): Date {
   );
 }
 
+export function validateConcertDate(value: string, original?: string, today = new Date()): string | null {
+  if (!value) {
+    return "공연 날짜를 선택해주세요.";
+  }
+
+  if (!isValidYear(value.slice(0, 4)) || !isValidDate(value)) {
+    return "올바른 공연 날짜를 입력해주세요.";
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const concertDate = new Date(year, month - 1, day);
+  const todayStart = toStartOfDay(today);
+  const maxConcertDate = getMaxConcertDate(todayStart);
+
+  if (concertDate < todayStart && (!original || value !== original)) {
+    return "과거 날짜는 공연 날짜로 선택할 수 없습니다.";
+  }
+
+  if (concertDate > maxConcertDate && (!original || value !== original)) {
+    return `공연 날짜는 오늘부터 최대 ${MAX_CONCERT_FUTURE_YEARS}년 후까지 입력할 수 있습니다.`;
+  }
+
+  return null;
+}
+
+export function validateConcertTime(value: string): string | null {
+  if (!value) {
+    return "공연 시간을 선택해주세요.";
+  }
+
+  if (!isValidTime(value)) {
+    return "공연 시간은 00:00부터 23:59 사이로 입력해주세요.";
+  }
+
+  return null;
+}
+
+export function validateBookingOpenAt(value?: string, original?: string): string | null {
+  return value && value !== original && !isValidBookingOpenAt(value)
+    ? "올바른 예매 오픈 시각을 입력해주세요." : null;
+}
+
 export function validateConcertForm({
   original,
   form,
@@ -90,34 +132,10 @@ export function validateConcertForm({
     return "장르를 선택해주세요.";
   }
 
-  if (!form.date) {
-    return "공연 날짜를 선택해주세요.";
-  }
-
-  if (!isValidYear(form.date.slice(0, 4)) || !isValidDate(form.date)) {
-    return "올바른 공연 날짜를 입력해주세요.";
-  }
-
-  const [year, month, day] = form.date.split("-").map(Number);
-  const concertDate = new Date(year, month - 1, day);
-  const todayStart = toStartOfDay(today);
-  const maxConcertDate = getMaxConcertDate(todayStart);
-
-  if (concertDate < todayStart && (!original || form.date !== original.date)) {
-    return "과거 날짜는 공연 날짜로 선택할 수 없습니다.";
-  }
-
-  if (concertDate > maxConcertDate && (!original || form.date !== original.date)) {
-    return `공연 날짜는 오늘부터 최대 ${MAX_CONCERT_FUTURE_YEARS}년 후까지 입력할 수 있습니다.`;
-  }
-
-  if (!form.time) {
-    return "공연 시간을 선택해주세요.";
-  }
-
-  if (!isValidTime(form.time)) {
-    return "공연 시간은 00:00부터 23:59 사이로 입력해주세요.";
-  }
+  const dateError = validateConcertDate(form.date, original?.date, today);
+  if (dateError) return dateError;
+  const timeError = validateConcertTime(form.time);
+  if (timeError) return timeError;
 
   if (!isPositiveInteger(form.durationMinutes)) {
     return "공연 러닝타임은 1분 이상의 정수로 입력해주세요.";
@@ -155,13 +173,8 @@ export function validateConcertForm({
     return "공연 상세 설명을 입력해주세요.";
   }
 
-  if (
-    form.bookingOpenAt &&
-    form.bookingOpenAt !== original?.bookingOpenAt &&
-    !isValidBookingOpenAt(form.bookingOpenAt)
-  ) {
-    return "올바른 예매 오픈 시각을 입력해주세요.";
-  }
+  const bookingError = validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt);
+  if (bookingError) return bookingError;
 
   return null;
 }

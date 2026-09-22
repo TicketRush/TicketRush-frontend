@@ -2,11 +2,13 @@ import DatePartsInput from "./DatePartsInput";
 import type { DateParts } from "@/utils/datetime/dateParts";
 
 interface Props {
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
   value: string;
   onChange: (value: string) => void;
 }
 
-export default function BookingOpenAtInput({ value, onChange }: Props) {
+export default function BookingOpenAtInput({ value, onChange, ...accessibilityProps }: Props) {
   const [date = "", time = ""] = value.replace(" ", "T").split("T");
   const [year = "", month = "", day = ""] = date.split("-");
   const displayTime = time.endsWith(":00") && time.length === 8 ? time.slice(0, 5) : time;
@@ -19,10 +21,10 @@ export default function BookingOpenAtInput({ value, onChange }: Props) {
   }
   return (
     <div className="space-y-3">
-      <DatePartsInput id="booking-open" value={{ year, month, day }} onChange={(parts) => update(parts, time)} />
+      <DatePartsInput {...accessibilityProps} id="booking-open" value={{ year, month, day }} onChange={(parts) => update(parts, time)} />
       <label htmlFor="booking-open-time" className="block space-y-1 text-sm">
         <span>시간</span>
-        <input id="booking-open-time" type="time" value={displayTime} step={displayTime.length === 8 ? 1 : 60}
+        <input {...accessibilityProps} id="booking-open-time" type="time" value={displayTime} step={displayTime.length === 8 ? 1 : 60}
           onChange={(event) => {
             const next = event.target.value;
             update({ year, month, day }, next === displayTime ? time
