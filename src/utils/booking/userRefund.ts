@@ -4,10 +4,11 @@
 //   PENDING   → CANCELED  (결제 전 취소, 좌석 HOLD 해제)
 //   CONFIRMED → REFUNDING (환불 신청. 처리는 비동기)
 // 관리자 강제 환불은 POST /booking/admin/{bookingNumber}/refund (#174).
-import type { QueryClient } from "@tanstack/react-query";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/constants/queryKeys";
 import type {
   BookingDetail,
+  BookingListItem,
   BookingStatus,
   MyBookingsResponse,
 } from "@/types/domain/booking";
@@ -87,24 +88,44 @@ export function markBookingRefundRequested<
   return { ...item, status: "REFUNDING" };
 }
 
+function patchMineListItems(
+  items: BookingListItem[],
+  bookingNumber: string,
+): BookingListItem[] {
+  return items.map((item) => markBookingRefundRequested(item, bookingNumber));
+}
+
+function isInfiniteMyBookings(
+  current: MyBookingsResponse | InfiniteData<MyBookingsResponse>,
+): current is InfiniteData<MyBookingsResponse> {
+  return "pages" in current && Array.isArray(current.pages);
+}
+
 /** 성공 직후 목록·상세 캐시를 REFUNDING으로 맞추고, 재조회에도 덮어 유지한다. */
 export function applyRefundRequestedToBookingCaches(
   queryClient: QueryClient,
   bookingNumber: string,
 ): void {
   rememberRefundRequested(bookingNumber);
-  queryClient.setQueriesData<MyBookingsResponse>(
-    { queryKey: queryKeys.bookings.minePrefix },
-    (current) => {
-      if (!current?.items) return current;
+  queryClient.setQueriesData<
+    MyBookingsResponse | InfiniteData<MyBookingsResponse>
+  >({ queryKey: queryKeys.bookings.minePrefix }, (current) => {
+    if (!current) return current;
+    if (isInfiniteMyBookings(current)) {
       return {
         ...current,
-        items: current.items.map((item) =>
-          markBookingRefundRequested(item, bookingNumber),
-        ),
+        pages: current.pages.map((page) => ({
+          ...page,
+          items: patchMineListItems(page.items, bookingNumber),
+        })),
       };
-    },
-  );
+    }
+    if (!("items" in current) || !current.items) return current;
+    return {
+      ...current,
+      items: patchMineListItems(current.items, bookingNumber),
+    };
+  });
   queryClient.setQueryData<BookingDetail>(
     queryKeys.bookings.detail(bookingNumber),
     (current) =>

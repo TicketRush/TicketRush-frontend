@@ -22,14 +22,15 @@ const item = (
 });
 
 const bookingsState = vi.hoisted(() => ({
-  data: {
-    items: [] as BookingListItem[],
-    hasNext: false,
-  },
+  items: [] as BookingListItem[],
   totalCount: undefined as number | undefined,
   isCountError: false,
   isLoading: false,
   isError: false,
+  hasMore: false,
+  isFetchingNextPage: false,
+  isFetchNextPageError: false,
+  fetchNextPage: vi.fn(),
 }));
 
 vi.mock("@/hooks/common/useDocumentTitle", () => ({
@@ -58,13 +59,7 @@ vi.mock("@/stores/global/authStore", () => ({
     }),
 }));
 vi.mock("@/hooks/queries/useMyBookings", () => ({
-  useMyBookings: () => ({
-    data: bookingsState.data,
-    totalCount: bookingsState.totalCount,
-    isCountError: bookingsState.isCountError,
-    isLoading: bookingsState.isLoading,
-    isError: bookingsState.isError,
-  }),
+  useMyBookings: () => bookingsState,
 }));
 vi.mock("@/components/mypage/BookingCard", () => ({
   BookingCard: ({ booking }: { booking: BookingListItem }) => (
@@ -80,21 +75,22 @@ function renderPage() {
   );
 }
 
-describe("MyBookingsPage (#339)", () => {
+describe("MyBookingsPage (#339/#380)", () => {
   beforeEach(() => {
     vi.stubGlobal("React", React);
-    bookingsState.data = {
-      items: [
-        item(1, "CONFIRMED", "확정 예정 공연", "2099-01-01"),
-        item(5, "REFUNDING", "환불 신청 공연", "2099-01-04"),
-        item(6, "REFUNDED", "환불 완료 예정 공연", "2099-01-05"),
-      ],
-      hasNext: false,
-    };
+    bookingsState.items = [
+      item(1, "CONFIRMED", "확정 예정 공연", "2099-01-01"),
+      item(5, "REFUNDING", "환불 신청 공연", "2099-01-04"),
+      item(6, "REFUNDED", "환불 완료 예정 공연", "2099-01-05"),
+    ];
     bookingsState.totalCount = 12;
     bookingsState.isCountError = false;
     bookingsState.isLoading = false;
     bookingsState.isError = false;
+    bookingsState.hasMore = false;
+    bookingsState.isFetchingNextPage = false;
+    bookingsState.isFetchNextPageError = false;
+    bookingsState.fetchNextPage.mockReset();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -121,5 +117,20 @@ describe("MyBookingsPage (#339)", () => {
     bookingsState.isCountError = true;
     const html = renderPage();
     expect(html).toContain(">3<");
+  });
+
+  it("더 있으면 더보기를 보여 준다", () => {
+    bookingsState.hasMore = true;
+    const html = renderPage();
+    expect(html).toContain("더보기");
+  });
+
+  it("탭이 비었는데 더 있으면 없다는 말 대신 이어서 불러온다", () => {
+    bookingsState.items = [];
+    bookingsState.hasMore = true;
+    bookingsState.isFetchingNextPage = true;
+    const html = renderPage();
+    expect(html).toContain("예매 내역을 더 불러오는 중...");
+    expect(html).not.toContain("예정된 예매 내역이 없습니다.");
   });
 });
