@@ -46,6 +46,7 @@ import { useConcertListItem } from "@/hooks/queries/useConcertListItem";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 import Button from "@/components/common/Button/Button";
+import ImageViewer from "@/components/common/ImageViewer";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
@@ -74,6 +75,7 @@ export default function ConcertDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const setConcert = useConcertStore((s) => s.setConcert);
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
 
   const concertId = id ? Number(id) : undefined;
   const { data, isLoading, isError } = useConcertDetail(concertId);
@@ -152,7 +154,7 @@ export default function ConcertDetailPage() {
   const showAddressBox = Boolean(
     address && address !== venueDisplay,
   );
-  const galleryUrls = (data.imageGalleryUrls ?? []).filter(Boolean);
+  const galleryUrls = (data.imageGalleryUrls ?? []).filter((url) => trimOrNull(url));
   const description = trimOrNull(data.description) ?? "";
   const title = trimOrNull(data.title);
   const imageSubject = title ?? "공연";
@@ -225,6 +227,7 @@ export default function ConcertDetailPage() {
         className="mb-6 aspect-[4/3] rounded-xl shadow-card"
         iconSize={40}
         label={EMPTY_POSTER_LABEL}
+        onView={(url, alt) => setSelectedImage({ url, alt })}
       />
 
       {/*
@@ -325,6 +328,7 @@ export default function ConcertDetailPage() {
                     alt={`${imageSubject} 갤러리 ${i + 1}`}
                     className="aspect-square rounded-lg"
                     iconSize={24}
+                    onView={(url, alt) => setSelectedImage({ url, alt })}
                   />
                 ))}
               </div>
@@ -341,6 +345,8 @@ export default function ConcertDetailPage() {
           </div>
         ) : bookingSidebar}
       </div>
+      <ImageViewer open={selectedImage !== null} imageUrl={selectedImage?.url ?? ""}
+        alt={selectedImage?.alt ?? ""} onClose={() => setSelectedImage(null)} />
     </div>
   );
 }
@@ -363,12 +369,14 @@ function PosterFrame({
   className,
   iconSize,
   label,
+  onView,
 }: {
   src: string;
   alt: string;
   className: string;
   iconSize: number;
   label?: string;
+  onView: (url: string, alt: string) => void;
 }) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(trimOrNull(src)) && !failed;
@@ -376,12 +384,15 @@ function PosterFrame({
   return (
     <div className={`overflow-hidden ${POSTER_FALLBACK} ${className}`}>
       {showImage ? (
+        <button type="button" aria-label={`${alt} 전체보기`} onClick={() => onView(src, alt)}
+          className="block h-full w-full cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2">
         <img
           src={src}
           alt={alt}
           className="w-full h-full object-cover"
           onError={() => setFailed(true)}
         />
+        </button>
       ) : (
         <div
           role="img"
