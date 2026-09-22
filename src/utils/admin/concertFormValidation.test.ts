@@ -76,6 +76,13 @@ describe("isPositiveInteger", () => {
 describe("validateConcertForm", () => {
   const today = new Date(2026, 8, 10);
 
+  it.each(["2028", "2028-02", "202-01-31", "2027-02-29", "2028-04-31", "0999-01-31", "10000-01-31"])("blocks invalid show date %s even when editing", (date) => {
+    expect(validateConcertForm({ form: { ...baseForm, date }, original: { ...baseForm, date }, totalSeats: 100, today })).toBe("올바른 공연 날짜를 입력해주세요.");
+  });
+  it.each(["2028-02-29", "2028-04-30", "2028-05-31"])("accepts complete show date %s within the existing scheduling policy", (date) => {
+    expect(validateConcertForm({ form: { ...baseForm, date }, totalSeats: 100, today })).toBeNull();
+  });
+
   it.each([undefined, "", "2026-09-30T20:00", "2026-09-30T20:00:45", "2020-01-01T00:00"])(
     "allows optional valid booking time without date ordering rules (%s)", (bookingOpenAt) => {
       expect(validateConcertForm({ form: { ...baseForm, bookingOpenAt }, totalSeats: 100, today })).toBeNull();
