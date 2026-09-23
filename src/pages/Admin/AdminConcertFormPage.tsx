@@ -1,3 +1,4 @@
+import { formatTimeInput, timeInputClass } from "@/utils/admin/timeInput";
 // 공연 등록/수정 — 라우트로 mode 구분
 // /admin/concerts/new → 등록
 // /admin/concerts/:id/edit → 수정
@@ -456,9 +457,10 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
         </Section>
 
         <Section title="일정 정보">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="공연 날짜" required>
-              {dateError && <p id="show-date-error" className="text-sm text-red-400">{dateError}</p>}
+          {dateError && <p id="show-date-error" className="text-sm text-red-400">{dateError}</p>}
+          {timeError && <p id="show-time-error" className="text-sm text-red-400">{timeError}</p>}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
+            <div className="min-w-0 lg:col-span-3">
               <ShowDateInput
                 aria-invalid={dateError ? true : undefined}
                 aria-describedby={dateError ? "show-date-error" : undefined}
@@ -466,10 +468,9 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
                 onChange={(v) => update("date", v)}
                 onKeyDown={handleEnterMoveNext}
               />
-            </Field>
+            </div>
 
-            <Field label="공연 시간" required>
-              {timeError && <p id="show-time-error" className="text-sm text-red-400">{timeError}</p>}
+            <Field label="공연 시간" required schedule>
               <EditableTimeInput
                 aria-invalid={timeError ? true : undefined}
                 aria-describedby={timeError ? "show-time-error" : undefined}
@@ -480,7 +481,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
               />
             </Field>
 
-            <Field label="러닝타임(분)" required>
+            <Field label="러닝타임(분)" required schedule>
               <FormInput
                 type="number"
                 value={
@@ -754,15 +755,17 @@ function Section({
 function Field({
   label,
   required = false,
+  schedule = false,
   children,
 }: {
   label: string;
   required?: boolean;
+  schedule?: boolean;
   children: ReactNode;
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-medium text-admin-text-secondary">
+      <p className={schedule ? "mb-1 text-sm" : "mb-1 text-xs font-medium text-admin-text-secondary"}>
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
       </p>
@@ -875,15 +878,6 @@ function EditableTimeInput({
   onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   placeholder?: string;
 }) {
-  function formatTimeInput(input: string) {
-    const digits = input.replace(/\D/g, "").slice(0, 4);
-
-    if (digits.length <= 2) {
-      return digits;
-    }
-
-    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-  }
 
   return (
     <input
@@ -896,7 +890,7 @@ function EditableTimeInput({
       placeholder={placeholder}
       maxLength={5}
       inputMode="numeric"
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
+      className={timeInputClass}
     />
   );
 }
