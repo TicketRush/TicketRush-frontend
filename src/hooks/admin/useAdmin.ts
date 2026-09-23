@@ -240,6 +240,7 @@ export function useCreateConcert() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateConcertInput) => api.createConcertApi(data),
+    meta: { skipGlobalErrorToast: true },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminKeys.all });
     },
@@ -250,6 +251,7 @@ export function useUpdateConcert(id: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: UpdateConcertInput) => api.updateConcertApi(id, data),
+    meta: { skipGlobalErrorToast: true },
     onSettled: () => {
       // A file failure can follow a successful JSON PATCH.
       return Promise.all([

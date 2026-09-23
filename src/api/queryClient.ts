@@ -28,6 +28,15 @@ export function handleGlobalError(error: unknown) {
   toast.error(error.message);
 }
 
+/** 공연 저장처럼 사용자 안내를 plain Error로 던지는 mutation은 공통 토스트를 끈다. */
+export function handleMutationError(
+  error: unknown,
+  mutation: { meta?: Record<string, unknown> },
+) {
+  if (mutation.meta?.skipGlobalErrorToast === true) return;
+  handleGlobalError(error);
+}
+
 // -------------------------------------------------------
 // QueryClient 생성
 // -------------------------------------------------------
@@ -48,6 +57,8 @@ export const queryClient = new QueryClient({
     onError: handleGlobalError,
   }),
   mutationCache: new MutationCache({
-    onError: handleGlobalError,
+    onError: (error, _variables, _onMutateResult, mutation) => {
+      handleMutationError(error, mutation);
+    },
   }),
 });

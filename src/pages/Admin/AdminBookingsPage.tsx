@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { ApiError, mapErrorToMessage } from "@/api/errors/errorMapper";
+import { mapErrorToMessage } from "@/api/errors/errorMapper";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
 import type { AdminBookingBookerResponse } from "@/api/adminSeatMapper";
 import StatCard from "@/components/admin/StatCard";
@@ -215,13 +215,13 @@ export default function AdminBookingsPage() {
       );
       setRefundTarget(null);
       stripHandoffIntent();
-    } catch (error: unknown) {
+    } catch {
       setRequestedRefunds((prev) => {
         const next = new Set(prev);
         next.delete(target);
         return next;
       });
-      toast.error(ApiError.fromUnknown(error).message);
+      // mutationCache.onError가 서버 메시지를 한 번만 토스트한다.
     }
   }
 
