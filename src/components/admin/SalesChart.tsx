@@ -1,5 +1,5 @@
-// 공연별 판매 현황 진행률 (이미지 2)
-// 각 공연마다 가로 진행률 바 + 판매수/총수 + 매출 + 매진 뱃지
+// 공연별 판매 현황 진행률
+// 판매 수·매출은 subgrid로 같은 열에 두고, 자릿수는 오른쪽에 맞춘다.
 import ProgressBar from "./ProgressBar";
 import type { ConcertSalesStatus } from "@/types/domain/admin";
 import {
@@ -37,7 +37,7 @@ export default function SalesChart({ data }: SalesChartProps) {
           등록된 공연이 없습니다.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-3">
           {data.map((c) => {
             const soldOut =
               c.isSoldOut === true ||
@@ -48,9 +48,9 @@ export default function SalesChart({ data }: SalesChartProps) {
             return (
               <div
                 key={c.concertId}
-                className="border-2 border-admin-card-border rounded-lg p-4 flex items-center gap-4"
+                className="col-span-3 grid grid-cols-subgrid items-center border-2 border-admin-card-border rounded-lg p-4"
               >
-                <div className="flex-1">
+                <div className="min-w-0">
                   <p className="text-sm text-gray-900">
                     <span className="font-bold">{c.title}</span>
                     <span className="text-gray-500 text-xs ml-2">
@@ -70,17 +70,17 @@ export default function SalesChart({ data }: SalesChartProps) {
                   </div>
                 </div>
 
-                <div className="text-right min-w-[100px]">
-                  <p className="text-sm font-bold text-gray-900">
+                <div className="flex flex-col items-end text-right tabular-nums">
+                  <p className="text-sm font-bold text-gray-900 whitespace-nowrap">
                     {formatAdminSeats(c.soldSeats, c.totalSeats)}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 whitespace-nowrap">
                     {formatAdminOccupancy(c.occupancyRate)}
                   </p>
                 </div>
 
-                <div className="text-right min-w-[110px]">
-                  <p className="text-sm font-bold text-gray-900">
+                <div className="flex flex-col items-end text-right tabular-nums">
+                  <p className="text-sm font-bold text-gray-900 whitespace-nowrap">
                     {formatAdminWon(c.revenue)}
                   </p>
                   {soldOut && (
