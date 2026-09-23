@@ -2,6 +2,14 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BookingListItem } from "@/types/domain/booking";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
+import { ApiError } from "@/api/errors/errorMapper";
+import {
+  applyUserRefundDeleteError,
+  clearRefundDeadlinePassed,
+  clearRefundPerformanceLookup,
+  rememberRefundDeadlinePassed,
+} from "@/utils/booking/userRefund";
 import { BookingCard } from "./BookingCard";
 
 const mocks = vi.hoisted(() => ({
@@ -45,6 +53,8 @@ describe("BookingCard refund request (#338)", () => {
     mocks.refund.isPending = false;
   });
   afterEach(() => {
+    clearRefundDeadlinePassed();
+    clearRefundPerformanceLookup();
     vi.unstubAllGlobals();
   });
 
@@ -58,6 +68,45 @@ describe("BookingCard refund request (#338)", () => {
     const html = render({ ...refundable, status: "REFUNDING" });
     expect(html).toContain("환불 신청 완료");
     expect(html).not.toContain("환불 중");
+  });
+
+  it("서버가 마감으로 거절한 예매는 환불 버튼을 끈다", () => {
+    rememberRefundDeadlinePassed(refundable.bookingNumber);
+    const html = render(refundable);
+    expect(html).toContain("환불 불가 (D-7 미만)");
+    expect(html).not.toContain("환불 신청");
+  });
+
+  it("공연 정보 503 첫 실패는 환불 버튼을 유지한다", () => {
+    applyUserRefundDeleteError(
+      refundable.bookingNumber,
+      new ApiError(
+        {
+          isSuccess: false,
+          code: ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED,
+          message: "서버 문구",
+          result: null,
+        },
+        503,
+      ),
+    );
+    const html = render(refundable);
+    expect(html).toContain("환불 신청");
+  });
+
+  it("같은 예매의 두 번째 공연 정보 실패는 환불 버튼을 끈다", () => {
+    const code = ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED;
+    const failure = () =>
+      new ApiError(
+        { isSuccess: false, code, message: "서버 문구", result: null },
+        503,
+      );
+    applyUserRefundDeleteError(refundable.bookingNumber, failure());
+    applyUserRefundDeleteError(refundable.bookingNumber, failure());
+    const html = render(refundable);
+    expect(html).toContain("환불 불가");
+    expect(html).not.toContain("환불 신청");
+    expect(html).not.toContain("D-7");
   });
 
   it("지난 공연 탭에서는 환불 신청을 보여 주지 않는다", () => {

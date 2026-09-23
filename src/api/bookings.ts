@@ -51,6 +51,7 @@ import { ApiError } from "./errors/errorMapper";
 import { ERROR_CODES } from "./errors/errorCodes";
 import { isPageInfo } from "./types/pagination";
 import { sumMyPageBookingCounts } from "@/utils/booking";
+import { applyUserRefundDeleteError } from "@/utils/booking/userRefund";
 import {
   MY_BOOKINGS_PAGE_SIZE,
   mergeMyBookingsById,
@@ -309,9 +310,17 @@ export async function cancelBookingApi(bookingNumber: string): Promise<void> {
   }
 }
 
-/** CONFIRMED 예매 환불 신청. HTTP는 cancelBookingApi와 같다. */
-export function requestRefundApi(bookingNumber: string): Promise<void> {
-  return cancelBookingApi(bookingNumber);
+/**
+ * CONFIRMED 예매 환불 신청. HTTP는 cancelBookingApi와 같다.
+ * 마감·공연 정보 실패 기록은 환불 신청에만 남긴다.
+ * 결제 대기 취소와 좌석 해제는 같은 DELETE를 써도 이 기록을 타지 않는다 (#370).
+ */
+export async function requestRefundApi(bookingNumber: string): Promise<void> {
+  try {
+    await cancelBookingApi(bookingNumber);
+  } catch (error) {
+    throw applyUserRefundDeleteError(bookingNumber, error);
+  }
 }
 
 // -------------------------------------------------------
