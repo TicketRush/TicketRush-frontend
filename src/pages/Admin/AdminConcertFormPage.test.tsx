@@ -6,7 +6,8 @@ import AdminConcertFormPage from "./AdminConcertFormPage";
 import ShowDateInput from "@/components/admin/ShowDateInput";
 import DatePartsInput from "@/components/admin/DatePartsInput";
 import BookingOpenAtInput from "@/components/admin/BookingOpenAtInput";
-import { mapConcertForEdit } from "@/api/adminConcertEdit";
+import { createPerformancePatch, mapConcertForEdit } from "@/api/adminConcertEdit";
+import { createConcertFormData } from "@/api/adminConcertCreate";
 import {
   createCharacterConfig,
   restoreCharacterDraft,
@@ -115,6 +116,75 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
     </MemoryRouter>,
   );
 }
+
+it.each(["create", "edit"])("keeps banner settings local, restores toggled text, and preserves the submit payload (%s)", async (mode) => {
+  type Element = React.ReactElement<Record<string, unknown>>;
+  function nodes(node: React.ReactNode): Element[] {
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+    if (typeof node.type === "function" && node.type.name === "CaptureControl") {
+      return nodes((node.type as React.FunctionComponent<Record<string, unknown>>)(node.props));
+    }
+    return [node, ...nodes(node.props.children as React.ReactNode)];
+  }
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  const subtitle = "입력 중인 배너 문구";
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = nodes(tree);
+    const checkbox = elements.find((element) => element.props.id === "banner-enabled")!;
+    const input = elements.find((element) => element.props.id === "banner-subtitle");
+    expect(checkbox.props.checked).toBe(step === 1 || step === 2 || step === 4);
+    expect(Boolean(input)).toBe(step === 1 || step === 2 || step === 4);
+    if (input) {
+      expect(input.props.value).toBe(step === 1 ? "" : subtitle);
+      expect(input.props.required).toBeUndefined();
+      expect(input.props.maxLength).toBeUndefined();
+    }
+    expect(elements.find((element) => element.props.placeholder === "예: Neon Dreams Concert")?.props.value).toBe(initial.form.title);
+    expect(elements.find((element) => element.type === "textarea")?.props.value).toBe(initial.form.description);
+    if (step === 4) {
+      save = elements.find((element) => element.type === "button" &&
+        React.Children.toArray(element.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+      return;
+    }
+    const next = step++;
+    if (next === 1) {
+      (input!.props.onChange as React.ChangeEventHandler<HTMLInputElement>)({ target: { value: subtitle } } as React.ChangeEvent<HTMLInputElement>);
+    } else {
+      (checkbox.props.onChange as React.ChangeEventHandler<HTMLInputElement>)({ target: { checked: next !== 2 } } as React.ChangeEvent<HTMLInputElement>);
+    }
+  });
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 8, 22));
+  const mainImage = new File(["poster"], "poster.png", { type: "image/png" });
+  try {
+    vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+    vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(initial.form.characterConfig) });
+    const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
+    render(path, mode === "create" ? { concertDraft: { pathname: path, form: initial.form, totalSeats: 120, mainImage } } : undefined);
+    expect(step).toBe(4);
+    expect(save).toBeTypeOf("function");
+    await save!();
+    const mutation = mode === "create" ? hooks.create : hooks.update;
+    expect(mutation).toHaveBeenCalledOnce();
+    const input = mutation.mock.calls[0][0];
+    expect(input.form).toEqual(initial.form);
+    expect(Object.keys(input).sort()).toEqual((mode === "create"
+      ? ["form", "totalSeats", "mainImage", "gallery"]
+      : ["form", "original", "mainImage", "model3d", "gallery"]).sort());
+    expect(JSON.stringify(input)).not.toMatch(/banner/i);
+    if (mode === "create") {
+      const data = createConcertFormData(input);
+      expect(Array.from(data.keys())).toEqual(["request", "mainImage"]);
+      expect(await (data.get("request") as Blob).text()).not.toMatch(/banner/i);
+    } else {
+      expect(JSON.stringify(createPerformancePatch(input))).toBe("{}");
+    }
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 it.each(["create", "edit"])("validates schedule inputs only after interaction and clears accessible errors (%s)", (mode) => {
   type Element = React.ReactElement<Record<string, unknown>>;
