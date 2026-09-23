@@ -385,10 +385,12 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
       }
       navigate("/admin");
     } catch (error: unknown) {
-      const err =
-        error instanceof Error ? error : new Error("저장에 실패했습니다.");
-
-      toast.error(err.message ?? "저장에 실패했습니다.");
+      // 이 mutation은 공통 토스트를 끄고, 파일 일부 실패·입력 안내를 여기서 한 번만 보여 준다.
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "저장에 실패했습니다.",
+      );
     }
   }
 

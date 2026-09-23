@@ -15,7 +15,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { ApiError } from "@/api/errors/errorMapper";
 import StatCard from "@/components/admin/StatCard";
 import {
   useAdminRefundList,
@@ -77,8 +76,8 @@ export default function AdminRefundsPage() {
     try {
       await retryMutation.mutateAsync(bookingNumber);
       toast.success(`${bookingNumber} 환불 재시도를 요청했습니다.`);
-    } catch (error: unknown) {
-      toast.error(ApiError.fromUnknown(error).message);
+    } catch {
+      // mutationCache.onError가 서버 메시지를 한 번만 토스트한다.
     }
   }
 

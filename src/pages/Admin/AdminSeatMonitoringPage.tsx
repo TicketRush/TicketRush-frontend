@@ -427,7 +427,7 @@ export function AdminSeatMonitoringMap({
       setSelectedSeatId(null);
     } catch (error: unknown) {
       const err = ApiError.fromUnknown(error);
-      toast.error(err.message);
+      // mutationCache.onError가 서버 메시지를 한 번만 토스트한다.
 
       if (err.code === ERROR_CODES.SEAT_NOT_HELD) {
         handleRefresh();
