@@ -24,6 +24,7 @@ import {
   ticketDetailHeading,
 } from "@/utils/booking";
 import { formatBackendDateTimeLabel } from "@/utils/datetime/formatSeoulInstant";
+import SeatMapPopover from "@/components/ticket/SeatMapPopover";
 import {
   TicketDownloadActions,
   TicketInfoBox,
@@ -33,13 +34,8 @@ import {
 import { copyBookingNumber } from "@/utils/ticket/copyBookingNumber";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
-const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
-const COLS_CNT = 12;
 const LONG_PRESS_MS = 500;
 const TOOLTIP_AUTO_HIDE_MS = 3000;
-
-// 팝오버 열린 직후 이 시간 동안은 배경 클릭 무시 (즉시 닫힘 방지)
-const POPOVER_CLICK_GUARD_MS = 200;
 
 export default function TicketDetailPage() {
   const { bookingNumber } = useParams<{ bookingNumber: string }>();
@@ -268,89 +264,6 @@ export default function TicketDetailPage() {
           onClose={() => setShowSeatMap(false)}
         />
       )}
-    </div>
-  );
-}
-
-function SeatMapPopover({
-  seatLabel,
-  onClose,
-}: {
-  seatLabel: string;
-  onClose: () => void;
-}) {
-  const [rowChar, colStr] = seatLabel.split("-");
-  const targetCol = Number(colStr);
-
-  const [canClose, setCanClose] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(
-      () => setCanClose(true),
-      POPOVER_CLICK_GUARD_MS,
-    );
-    return () => window.clearTimeout(t);
-  }, []);
-
-  function handleBackgroundClick() {
-    if (canClose) onClose();
-  }
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4"
-      onClick={handleBackgroundClick}
-    >
-      <div
-        className="bg-white rounded-2xl max-w-sm w-full p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-base">좌석 위치</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-text-secondary hover:text-text"
-            aria-label="닫기"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex justify-center mb-3">
-          <div className="px-6 py-1 rounded border-2 border-primary text-primary font-semibold text-xs">
-            🎤 STAGE
-          </div>
-        </div>
-
-        <div className="space-y-1 mb-4">
-          {ROWS.map((row) => (
-            <div key={row} className="flex items-center gap-0.5">
-              <div className="w-4 text-[10px] font-bold text-text-secondary text-center">
-                {row}
-              </div>
-              {Array.from({ length: COLS_CNT }).map((_, idx) => {
-                const col = idx + 1;
-                const isTarget = row === rowChar && col === targetCol;
-                return (
-                  <div
-                    key={col}
-                    className={`w-4 h-4 rounded ${
-                      isTarget
-                        ? "bg-primary ring-2 ring-primary/40 ring-offset-1"
-                        : "bg-gray-200"
-                    }`}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-primary/5 rounded-lg px-3 py-2 text-center">
-          <p className="text-xs text-text-secondary">내 좌석</p>
-          <p className="text-base font-bold text-primary">{seatLabel}</p>
-        </div>
-      </div>
     </div>
   );
 }
