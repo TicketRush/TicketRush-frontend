@@ -2,6 +2,7 @@ import * as React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import BookingOpenAtInput from "./BookingOpenAtInput";
 import DatePartsInput from "./DatePartsInput";
+import { timeInputClass } from "@/utils/admin/timeInput";
 import { formatBookingOpenAt, isValidBookingOpenAt } from "@/utils/admin/concertFormValidation";
 
 beforeEach(() => vi.stubGlobal("React", React));
@@ -25,6 +26,51 @@ function setup(initial = "") {
     days: () => nodes(input("day")).filter((node) => node.type === "option" && node.props.value !== "").length,
   };
 }
+
+it.each(["0000", "0905", "1900", "2359", "2500", "1270"])("uses the shared text time pattern and existing validation (%s)", (digits) => {
+  const ui = setup("2028-02-29T");
+  expect(ui.input("time").props).toMatchObject({ type: "text", inputMode: "numeric", placeholder: "예: 19:00", className: timeInputClass });
+  ui.change("time", digits);
+  expect(ui.value()).toBe(`2028-02-29T${digits.slice(0, 2)}:${digits.slice(2)}`);
+  expect(isValidBookingOpenAt(ui.value())).toBe(!["2500", "1270"].includes(digits));
+  ui.change("time", "19:00");
+  expect(isValidBookingOpenAt(ui.value())).toBe(true);
+});
+
+it("retains seconds mode while deleting and restoring the last digit", () => {
+  const ui = setup("2027-08-01 20:00:37");
+  expect(ui.input("time").props.value).toBe("20:00:37");
+  ui.change("time", "20:00:3");
+  expect(ui.input("time").props.value).toBe("20:00:3");
+  expect(ui.input("time").props.maxLength).toBe(8);
+  ui.change("time", "20:00:38");
+  expect(ui.value()).toBe("2027-08-01 20:00:38");
+  expect(formatBookingOpenAt(ui.value())).toBe("2027-08-01 20:00:38");
+});
+
+it("retains seconds mode through multiple deletions and minute-only edits", () => {
+  const ui = setup("2027-08-01 20:00:37");
+  for (const value of ["20:00:3", "20:00:", "20:00:4", "20:00:45"]) {
+    ui.change("time", value);
+    expect(ui.input("time").props.maxLength).toBe(8);
+  }
+  expect(ui.value()).toBe("2027-08-01 20:00:45");
+  ui.change("time", "21:30");
+  expect(ui.value()).toBe("2027-08-01 21:30:00");
+});
+
+it("resets to minute mode after clearing, including a fully empty optional value", () => {
+  const ui = setup("2027-08-01 20:00:37");
+  ui.change("time", "");
+  expect(ui.input("time").props.maxLength).toBe(5);
+  for (const part of ["day", "month", "year"]) ui.change(part, "");
+  expect(ui.value()).toBe("");
+  expect(formatBookingOpenAt(ui.value())).toBeUndefined();
+  ui.change("time", "1900");
+  expect(ui.input("time").props.value).toBe("19:00");
+  expect(ui.input("time").props.maxLength).toBe(5);
+  expect(setup().input("time").props.maxLength).toBe(5);
+});
 
 it("enables year, month and day sequentially and produces the existing local datetime", () => {
   const ui = setup();

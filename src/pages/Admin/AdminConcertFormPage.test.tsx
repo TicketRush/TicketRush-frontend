@@ -146,6 +146,8 @@ it.each(["create", "edit"])("validates schedule inputs only after interaction an
     ["booking-open-month", "02", "booking-open-error"],
     ["booking-open-day", "29", mode === "create" ? "booking-open-error" : ""],
     ["booking-open-time", "20:30", ""],
+    ["booking-open-time", "25:00", "booking-open-error"],
+    ["booking-open-time", "1900", ""],
     ["booking-open-time", "", "booking-open-error"],
     ["booking-open-time", "21:00", ""],
     ...(mode === "create" ? [
