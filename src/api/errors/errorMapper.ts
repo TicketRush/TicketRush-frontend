@@ -120,6 +120,11 @@ const ERROR_MESSAGE_OVERRIDES: Partial<Record<ErrorCode | string, string>> = {
     "현재 상태에서는 취소하거나 환불할 수 없습니다.",
   [ERROR_CODES.BOOKING_CANCEL_NOT_ALLOWED_TICKET_USED]:
     "이미 입장한 예매는 환불할 수 없습니다.",
+  // BOOKING_409_007 · PAYMENT_409_004 는 백엔드 문구
+  // "공연 7일 전까지만 환불할 수 있습니다." 를 그대로 쓴다 (#370).
+  // 503 첫 실패는 재시도 안내. 같은 예매의 두 번째는 applyUserRefundDeleteError가 바꾼다.
+  [ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED]:
+    "공연 정보를 확인하지 못해 환불할 수 없습니다. 잠시 후 다시 시도해 주세요.",
   [ERROR_CODES.PAYMENT_REFUND_DEADLINE_EXCEEDED]:
     "환불 가능 기간이 지났습니다.",
   [ERROR_CODES.PAYMENT_REFUND_FAILED]:

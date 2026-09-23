@@ -76,6 +76,30 @@ describe("mapErrorToMessage", () => {
     ).toBe("이미 입장한 예매는 환불할 수 없습니다.");
   });
 
+  it("환불 마감 409는 백엔드 문구를 그대로 쓴다", () => {
+    const backend = "공연 7일 전까지만 환불할 수 있습니다.";
+    expect(
+      mapErrorToMessage(ERROR_CODES.BOOKING_REFUND_DEADLINE_PASSED, backend),
+    ).toBe(backend);
+    expect(
+      mapErrorToMessage(
+        ERROR_CODES.PAYMENT_CANCEL_NOT_ALLOWED_REFUND_DEADLINE,
+        backend,
+      ),
+    ).toBe(backend);
+  });
+
+  it("공연 정보 조회 실패 503은 재시도 안내로 덮어쓴다", () => {
+    expect(
+      mapErrorToMessage(
+        ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED,
+        "공연 정보 조회에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      ),
+    ).toBe(
+      "공연 정보를 확인하지 못해 환불할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    );
+  });
+
   it("환불 기한·처리 실패는 결제 코드 안내를 쓴다", () => {
     expect(
       mapErrorToMessage(ERROR_CODES.PAYMENT_REFUND_DEADLINE_EXCEEDED, "be"),

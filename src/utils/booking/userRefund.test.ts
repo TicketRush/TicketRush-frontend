@@ -6,15 +6,23 @@ import type {
   BookingListItem,
   MyBookingsResponse,
 } from "@/types/domain/booking";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
+import { ApiError } from "@/api/errors/errorMapper";
 import { withVisibleMyBookings } from "@/utils/booking";
 import {
   applyRefundRequestedToBookingCaches,
+  applyUserRefundDeleteError,
   markBookingRefundRequested,
   nextStatusAfterUserBookingDelete,
   overlayBookingDetail,
   overlayMyBookingsResponse,
   overlayRequestedRefundStatus,
   clearRequestedRefunds,
+  clearRefundDeadlinePassed,
+  clearRefundPerformanceLookup,
+  clearRefundRejectionSession,
+  isRefundDeadlinePassed,
+  isRefundPerformanceUnavailable,
   withRequestedRefunds,
 } from "./userRefund";
 
@@ -34,6 +42,8 @@ const item = (
 
 afterEach(() => {
   clearRequestedRefunds();
+  clearRefundDeadlinePassed();
+  clearRefundPerformanceLookup();
 });
 
 describe("nextStatusAfterUserBookingDelete", () => {
@@ -153,6 +163,82 @@ describe("applyRefundRequestedToBookingCaches", () => {
         hasNext: false,
       }).items[0].status,
     ).toBe("CONFIRMED");
+  });
+});
+
+function api(code: string, httpStatus = 409) {
+  return new ApiError(
+    { isSuccess: false, code, message: "서버 문구", result: null },
+    httpStatus,
+  );
+}
+
+describe("applyUserRefundDeleteError (#370)", () => {
+  it("마감 거절은 그 예매의 환불 버튼만 끈다", () => {
+    const error = applyUserRefundDeleteError(
+      "A",
+      api(ERROR_CODES.BOOKING_REFUND_DEADLINE_PASSED),
+    );
+
+    expect(isRefundDeadlinePassed("A")).toBe(true);
+    expect(isRefundDeadlinePassed("B")).toBe(false);
+    expect(error.message).toBe("서버 문구");
+    expect(isRefundPerformanceUnavailable("A")).toBe(false);
+  });
+
+  it("공연 정보 503은 첫 실패에서 재시도 문구를 유지한다", () => {
+    const error = applyUserRefundDeleteError(
+      "A",
+      api(ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED, 503),
+    );
+
+    expect(isRefundPerformanceUnavailable("A")).toBe(false);
+    expect(error.message).toBe(
+      "공연 정보를 확인하지 못해 환불할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    );
+  });
+
+  it("같은 예매의 두 번째 503은 버튼을 끄고 재시도 안내를 뺀다", () => {
+    applyUserRefundDeleteError(
+      "A",
+      api(ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED, 503),
+    );
+    const error = applyUserRefundDeleteError(
+      "A",
+      api(ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED, 503),
+    );
+
+    expect(isRefundPerformanceUnavailable("A")).toBe(true);
+    expect(isRefundPerformanceUnavailable("B")).toBe(false);
+    expect(error.message).toBe(
+      "공연 정보를 확인할 수 없어 지금은 환불할 수 없습니다.",
+    );
+  });
+
+  it("다른 오류는 환불 버튼을 바꾸지 않는다", () => {
+    applyUserRefundDeleteError("A", api(ERROR_CODES.BOOKING_NOT_FOUND, 404));
+    expect(isRefundDeadlinePassed("A")).toBe(false);
+    expect(isRefundPerformanceUnavailable("A")).toBe(false);
+  });
+
+  it("로그아웃하면 마감·공연 정보 실패 기록을 지운다", () => {
+    applyUserRefundDeleteError(
+      "A",
+      api(ERROR_CODES.BOOKING_REFUND_DEADLINE_PASSED),
+    );
+    applyUserRefundDeleteError(
+      "B",
+      api(ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED, 503),
+    );
+    applyUserRefundDeleteError(
+      "B",
+      api(ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED, 503),
+    );
+
+    clearRefundRejectionSession();
+
+    expect(isRefundDeadlinePassed("A")).toBe(false);
+    expect(isRefundPerformanceUnavailable("B")).toBe(false);
   });
 });
 

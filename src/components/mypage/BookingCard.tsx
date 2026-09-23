@@ -26,6 +26,12 @@ import {
 import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
 import { useCancelBooking } from "@/hooks/mutations/useCancelBooking";
 import { useRequestRefund } from "@/hooks/mutations/useRequestRefund";
+import { ApiError } from "@/api/errors/errorMapper";
+import { ERROR_CODES } from "@/api/errors/errorCodes";
+import {
+  isRefundDeadlinePassed,
+  isRefundPerformanceUnavailable,
+} from "@/utils/booking/userRefund";
 import Modal from "@/components/common/Modal/Modal";
 
 interface BookingCardProps {
@@ -74,6 +80,8 @@ const STATUS_BADGE: Record<BookingStatus, { bg: string; text: string }> = {
  *  - 공연 7일 전까지: [환불 신청] 활성화
  *  - 공연 7일 미만: "환불 불가 (D-7 미만)" 비활성화
  *  - 목록에 공연 시각이 없으면 날짜(자정 00:00이 아닌 달력 일수)로 계산
+ *  - 서버가 마감(BOOKING_409_007)으로 거절하면 이번 세션에서 버튼을 끈다 (#370)
+ *  - 공연 정보 503은 한 번 더 실패하면 이번 세션에서 버튼을 끈다 (#370)
  *
  * [표시 기능 — 지난 공연(past 탭)]
  *  - 환불 신청 버튼 미노출 (지난 공연은 환불 기능 제공하지 않음)
@@ -86,8 +94,15 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
   const cancelBooking = useCancelBooking();
   const requestRefund = useRequestRefund();
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null);
+  const [deadlineBlocked, setDeadlineBlocked] = useState(false);
+  const [lookupBlocked, setLookupBlocked] = useState(false);
 
-  const isRefundable = isRefundableBooking(booking);
+  const refundClosed =
+    deadlineBlocked || isRefundDeadlinePassed(booking.bookingNumber);
+  const lookupClosed =
+    lookupBlocked || isRefundPerformanceUnavailable(booking.bookingNumber);
+  const isRefundable =
+    isRefundableBooking(booking) && !refundClosed && !lookupClosed;
 
   // ─ 지난 공연 여부 ─
   const isPastTab = tab === "past";
@@ -114,8 +129,27 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
         await requestRefund.mutateAsync(booking.bookingNumber);
         toast.success("환불 신청이 완료되었습니다.");
         setConfirmKind(null);
-      } catch {
-        // mutationCache.onError가 토스트. 모달은 열어 재시도할 수 있게 둔다.
+      } catch (error) {
+        // 세션 기록은 requestRefundApi가 토스트보다 먼저 해 둔다 (#370).
+        if (
+          error instanceof ApiError &&
+          error.code === ERROR_CODES.BOOKING_REFUND_DEADLINE_PASSED
+        ) {
+          setDeadlineBlocked(true);
+          setConfirmKind(null);
+          return;
+        }
+        if (
+          error instanceof ApiError &&
+          error.code === ERROR_CODES.BOOKING_PERFORMANCE_COMMUNICATION_FAILED &&
+          isRefundPerformanceUnavailable(booking.bookingNumber)
+        ) {
+          setLookupBlocked(true);
+          setConfirmKind(null);
+          return;
+        }
+        // 첫 503과 그 외는 mutationCache.onError가 토스트.
+        // 확인 창은 열어 다시 시도할 수 있게 둔다.
       }
       return;
     }
@@ -286,9 +320,11 @@ export function BookingCard({ booking, tab }: BookingCardProps) {
                     ? "환불 완료"
                     : status === "EXPIRED"
                       ? "만료된 예매"
-                      : booking.performanceDate?.trim()
-                        ? "환불 불가 (D-7 미만)"
-                        : "환불 불가"}
+                      : lookupClosed
+                        ? "환불 불가"
+                        : booking.performanceDate?.trim()
+                          ? "환불 불가 (D-7 미만)"
+                          : "환불 불가"}
             </button>
           )}
         </div>
