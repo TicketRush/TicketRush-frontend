@@ -67,6 +67,49 @@ export function isDashboardPeriodWithinLimit(
   return inclusiveDayCount(from, to) <= MAX_DASHBOARD_PERIOD_DAYS;
 }
 
+function orderedDays(a: Date, b: Date): { start: Date; end: Date } {
+  return a.getTime() <= b.getTime()
+    ? { start: a, end: b }
+    : { start: b, end: a };
+}
+
+/** 시작일을 고른 뒤, 포함 일수가 상한을 넘는 끝점인지. */
+export function isDashboardCalendarDateDisabled(
+  pendingStart: Date | null,
+  date: Date,
+  maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+): boolean {
+  if (!pendingStart) return false;
+  const { start, end } = orderedDays(pendingStart, date);
+  return inclusiveDayCount(start, end) > maxInclusiveDays;
+}
+
+export type DashboardCalendarClick =
+  | { action: "set-start"; date: Date }
+  | { action: "confirm"; start: Date; end: Date }
+  | { action: "ignore" };
+
+/**
+ * 달력 날짜 클릭 결과.
+ * 상한을 넘는 날짜는 시작일(pendingStart)과 조회 기간을 그대로 둔다.
+ */
+export function resolveDashboardCalendarClick(
+  pendingStart: Date | null,
+  clicked: Date,
+  maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+): DashboardCalendarClick {
+  if (
+    isDashboardCalendarDateDisabled(pendingStart, clicked, maxInclusiveDays)
+  ) {
+    return { action: "ignore" };
+  }
+  if (!pendingStart) {
+    return { action: "set-start", date: clicked };
+  }
+  const { start, end } = orderedDays(pendingStart, clicked);
+  return { action: "confirm", start, end };
+}
+
 export function fillDailyRevenueGaps(
   rows: DailyRevenue[],
   from: string,

@@ -254,13 +254,6 @@ export default function AdminDashboardPage() {
         <AdminCalendar
           selectedRange={selectedRange}
           onRangeChange={handleRangeChange}
-          onRangeReject={() =>
-            toast.error(
-              mapErrorToMessage(
-                ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG,
-              ),
-            )
-          }
         />
         <RevenueChart
           data={chartRevenue}

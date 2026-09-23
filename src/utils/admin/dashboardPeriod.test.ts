@@ -4,8 +4,10 @@ import {
   defaultDashboardRange,
   fillDailyRevenueGaps,
   inclusiveDayCount,
+  isDashboardCalendarDateDisabled,
   isDashboardPeriodWithinLimit,
   parseLocalDateKey,
+  resolveDashboardCalendarClick,
   toLocalDateKey,
 } from "./dashboardPeriod";
 
@@ -36,6 +38,81 @@ describe("inclusiveDayCount", () => {
         parseLocalDateKey("2026-07-09"),
       ),
     ).toBe(false);
+  });
+});
+
+describe("isDashboardCalendarDateDisabled", () => {
+  it("시작일을 고르기 전에는 비활성 날짜가 없다", () => {
+    expect(
+      isDashboardCalendarDateDisabled(null, parseLocalDateKey("2026-04-03")),
+    ).toBe(false);
+  });
+
+  it("시작일 기준 92일은 선택 가능하고 93일은 비활성이다", () => {
+    const start = parseLocalDateKey("2026-01-01");
+    expect(
+      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-04-02")),
+    ).toBe(false);
+    expect(
+      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-04-03")),
+    ).toBe(true);
+  });
+
+  it("시작일보다 이전으로도 상한을 넘으면 비활성이다", () => {
+    const start = parseLocalDateKey("2026-04-03");
+    expect(
+      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-01-02")),
+    ).toBe(false);
+    expect(
+      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-01-01")),
+    ).toBe(true);
+  });
+});
+
+describe("resolveDashboardCalendarClick", () => {
+  it("첫 클릭은 시작일만 잡는다", () => {
+    const clicked = parseLocalDateKey("2026-01-01");
+    expect(resolveDashboardCalendarClick(null, clicked)).toEqual({
+      action: "set-start",
+      date: clicked,
+    });
+  });
+
+  it("상한 안의 끝점을 고르면 기간을 확정한다", () => {
+    const start = parseLocalDateKey("2026-01-01");
+    const end = parseLocalDateKey("2026-04-02");
+    expect(resolveDashboardCalendarClick(start, end)).toEqual({
+      action: "confirm",
+      start,
+      end,
+    });
+  });
+
+  it("끝점이 시작일보다 이전이면 기간을 뒤집어서 확정한다", () => {
+    const pendingStart = parseLocalDateKey("2026-04-02");
+    const clicked = parseLocalDateKey("2026-01-01");
+    expect(resolveDashboardCalendarClick(pendingStart, clicked)).toEqual({
+      action: "confirm",
+      start: clicked,
+      end: pendingStart,
+    });
+  });
+
+  it("상한 초과는 시작일을 유지하고 기간을 확정하지 않는다", () => {
+    const start = parseLocalDateKey("2026-01-01");
+    const beyond = parseLocalDateKey("2026-04-03");
+    expect(resolveDashboardCalendarClick(start, beyond)).toEqual({
+      action: "ignore",
+    });
+  });
+
+  it("같은 날을 다시 고르면 하루 기간으로 확정한다", () => {
+    const day = parseLocalDateKey("2026-01-01");
+    expect(resolveDashboardCalendarClick(day, day)).toEqual({
+      action: "confirm",
+      start: day,
+      end: day,
+    });
   });
 });
 
