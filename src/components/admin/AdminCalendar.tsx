@@ -3,8 +3,9 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   dashboardCalendarView,
-  inclusiveDayCount,
+  isDashboardCalendarDateDisabled,
   MAX_DASHBOARD_PERIOD_DAYS,
+  resolveDashboardCalendarClick,
 } from "@/utils/admin/dashboardPeriod";
 
 interface AdminCalendarProps {
@@ -12,8 +13,6 @@ interface AdminCalendarProps {
   selectedRange: { start: Date; end: Date };
   onRangeChange: (range: { start: Date; end: Date }) => void;
   maxInclusiveDays?: number;
-  /** 92일 초과 등 거부된 선택 */
-  onRangeReject?: () => void;
 }
 
 const YEAR_RANGE_SIZE = 24;
@@ -23,7 +22,6 @@ export default function AdminCalendar({
   selectedRange,
   onRangeChange,
   maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
-  onRangeReject,
 }: AdminCalendarProps) {
   const initialView = dashboardCalendarView(selectedRange);
   const [viewYear, setViewYear] = useState(initialView.year);
@@ -89,26 +87,19 @@ export default function AdminCalendar({
 
   function handleDateClick(day: number) {
     const clicked = new Date(viewYear, viewMonth, day);
-    if (!pendingStart) {
+    const result = resolveDashboardCalendarClick(
+      pendingStart,
+      clicked,
+      maxInclusiveDays,
+    );
+    if (result.action === "ignore") return;
+    if (result.action === "set-start") {
       // 첫 클릭은 시작일만 잡고, 확정 전까지는 서버 조회를 치지 않는다.
-      setPendingStart(clicked);
+      setPendingStart(result.date);
       return;
     }
-    const start = pendingStart < clicked ? pendingStart : clicked;
-    const end = pendingStart < clicked ? clicked : pendingStart;
-    if (inclusiveDayCount(start, end) > maxInclusiveDays) {
-      onRangeReject?.();
-      return;
-    }
-    onRangeChange({ start, end });
+    onRangeChange({ start: result.start, end: result.end });
     setPendingStart(null);
-  }
-
-  function isBeyondMax(date: Date) {
-    if (!pendingStart) return false;
-    const start = pendingStart < date ? pendingStart : date;
-    const end = pendingStart < date ? date : pendingStart;
-    return inclusiveDayCount(start, end) > maxInclusiveDays;
   }
 
   function selectMonth(month: number) {
@@ -164,11 +155,15 @@ export default function AdminCalendar({
               const todayFlag = isSameDay(date, today);
               const inRange = isInRange(date);
               const edgeFlag = isRangeEdge(date);
-              const beyondMax = isBeyondMax(date);
+              const beyondMax = isDashboardCalendarDateDisabled(
+                pendingStart,
+                date,
+                maxInclusiveDays,
+              );
 
               let bgClass = "";
               if (beyondMax) {
-                bgClass = "text-gray-300 cursor-not-allowed";
+                bgClass = "text-gray-300 cursor-not-allowed disabled:cursor-not-allowed";
               } else if (edgeFlag) {
                 bgClass = "bg-primary text-white font-bold";
               } else if (inRange) {
@@ -183,7 +178,13 @@ export default function AdminCalendar({
                 <button
                   key={di}
                   type="button"
-                  onClick={() => handleDateClick(day)}
+                  disabled={beyondMax}
+                  title={
+                    beyondMax
+                      ? `최대 ${maxInclusiveDays}일까지 선택할 수 있습니다`
+                      : undefined
+                  }
+                  onClick={beyondMax ? undefined : () => handleDateClick(day)}
                   className={`aspect-square rounded-full text-xs transition ${bgClass}`}
                 >
                   {day}
