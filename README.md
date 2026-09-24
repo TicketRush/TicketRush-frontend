@@ -49,31 +49,6 @@ TicketRush는 **5인 팀(프론트엔드 2 · 백엔드 3)** 으로 진행됩니
 
 <img src="docs/images/architecture.png" width="900" alt="TicketRush 시스템 아키텍처">
 
-**프론트엔드 관점의 통신 경로**
-
-```mermaid
-flowchart LR
-    USER["사용자 브라우저"]
-
-    subgraph FE["Frontend · Vercel"]
-        SPA["React SPA<br/>ticketrush.store"]
-    end
-
-    subgraph BE["Backend · AWS EC2"]
-        GATEWAY["Nginx → API Gateway<br/>api.ticketrush.store"]
-        SERVICES["user · auth · performance<br/>seat · booking · payment · ticket"]
-    end
-
-    TOSS["Toss Payments<br/>결제창"]
-    OAUTH["Kakao · Naver · Google"]
-
-    USER --> SPA
-    SPA -->|"REST API"| GATEWAY
-    SPA -->|"SSE 좌석 상태 스트림"| GATEWAY
-    GATEWAY --> SERVICES
-    SPA <-->|"결제창 리다이렉트"| TOSS
-    SPA <-->|"소셜 로그인 리다이렉트"| OAUTH
-```
 
 | 프론트엔드 관점에서 눈여겨볼 경계 | 설명 |
 |---|---|
@@ -201,6 +176,11 @@ flowchart LR
 
 ## 🧩 주요 구현
 
+아래 그림은 예매 흐름에서 상태가 어디에 저장되고 어떻게 복원되는지를 정리한 것입니다.
+1번부터 3번까지의 구현이 이 그림 위에 놓여 있습니다.
+
+<img src="docs/images/frontend-state-flow.png" width="900" alt="프론트엔드 상태 관리 흐름">
+
 ### 1️⃣ SSE 기반 실시간 좌석 동기화 + polling fallback
 
 **문제**
@@ -221,26 +201,6 @@ flowchart LR
 Toss Payments 간편결제는 결제창으로 **페이지 전체가 이동**했다가 `successUrl`로 돌아오는 방식이라, 돌아오는 순간 React 상태가 모두 초기화됩니다. 결제 승인 API에 필요한 `bookingId` · `seatId` 등을 잃게 되고, React StrictMode에서는 승인 요청이 두 번 나갈 위험도 있었습니다.
 
 **해결** — [`paymentStore.ts`](src/stores/reservation/paymentStore.ts) · [`PaymentSuccessPage.tsx`](src/pages/Payment/PaymentSuccessPage.tsx)
-
-```mermaid
-sequenceDiagram
-    participant B as 브라우저 (SPA)
-    participant S as sessionStorage
-    participant T as Toss Payments
-    participant A as API Gateway
- 
-    B->>A: POST /booking (예매 생성 · PENDING)
-    A-->>B: bookingNumber · bookingId · expires_at
-    B->>S: 예매 컨텍스트 저장
-    B->>T: SDK requestPayment (결제창으로 전체 페이지 이동)
-    Note over B,T: 이 시점에 React 상태는 모두 사라진다
-    T-->>B: successUrl로 리다이렉트 (paymentKey · orderId · amount)
-    B->>S: 예매 컨텍스트 복원
-    B->>B: orderId 와 bookingNumber 일치 검증
-    B->>A: POST /payment/confirm (승인 요청)
-    A-->>B: 승인 결과
-    B->>B: 예매 완료 화면으로 이동
-```
 
 - 예매 컨텍스트(`seatStore` · `paymentStore`)를 **Zustand persist + sessionStorage**에 저장해 리다이렉트 후 복원 (탭을 닫으면 자연스럽게 정리되도록 localStorage 대신 sessionStorage 사용)
 - 결제 상태를 **상태 머신**으로 관리해, 어떤 상태에서 어떤 동작이 허용되는지 명확히 분리
@@ -348,6 +308,12 @@ export const USE_MOCK =
 ---
 
 ## 📁 프로젝트 구조
+
+<img src="docs/images/frontend-layers.png" width="900" alt="프론트엔드 레이어 구조">
+
+의존 방향은 위에서 아래 한 방향입니다. 화면은 훅을 통해서만 상태에 접근하고,
+서버 호출은 API 레이어를 거칩니다. 백엔드 스펙이 바뀌어도 수정 범위가 `api/` 안에 머물도록
+매퍼와 목 API를 이 레이어에 모았습니다.
 
 ```text
 TicketRush-frontend/
