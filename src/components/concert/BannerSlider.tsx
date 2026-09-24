@@ -49,13 +49,13 @@ export default function BannerSlider() {
         }
       }}
     >
-      <BannerSlide key={current.id} banner={current} />
+      <BannerSlide key={current.performanceId} banner={current} posterUrl={current.imageUrl} />
 
       {banners.length > 1 && (
         <div className="flex justify-center gap-2 mt-4">
-          {banners.map((_, idx) => (
+          {banners.map((banner, idx) => (
             <button
-              key={idx}
+              key={banner.performanceId}
               type="button"
               onClick={() => setCurrentIndex(idx)}
               className={`h-2 rounded-full transition-all ${

@@ -8,6 +8,8 @@ import DatePartsInput from "@/components/admin/DatePartsInput";
 import BookingOpenAtInput from "@/components/admin/BookingOpenAtInput";
 import { createPerformancePatch, mapConcertForEdit } from "@/api/adminConcertEdit";
 import { createConcertFormData } from "@/api/adminConcertCreate";
+import { toast } from "react-toastify";
+import { ApiError } from "@/api/errors/errorMapper";
 import {
   createCharacterConfig,
   restoreCharacterDraft,
@@ -15,6 +17,7 @@ import {
 
 const hooks = vi.hoisted(() => ({
   query: vi.fn(),
+  banners: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
   control: vi.fn(),
@@ -43,6 +46,8 @@ vi.mock("react/jsx-dev-runtime", async (importOriginal) => {
     },
   };
 });
+vi.mock("@/hooks/queries/useBanners", () => ({ useBanners: hooks.banners }));
+vi.mock("react-toastify", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/hooks/admin/useAdmin", () => ({
   useConcertForEdit: hooks.query,
   useCreateConcert: () => ({ mutateAsync: hooks.create, isPending: false }),
@@ -86,6 +91,7 @@ const initial = mapConcertForEdit({
 beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.clearAllMocks();
+  hooks.banners.mockReturnValue({ data: [], isPending: false, isError: false });
   hooks.control.mockReset();
   hooks.formRender.mockReset();
   // An unrelated creation draft must never override the server's edit data.
@@ -103,6 +109,160 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+type FormElement = React.ReactElement<Record<string, unknown>>;
+function formNodes(node: React.ReactNode): FormElement[] {
+  if (Array.isArray(node)) return node.flatMap(formNodes);
+  if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+  if (typeof node.type === "function" && node.type.name === "CaptureControl") {
+    return formNodes((node.type as React.FunctionComponent<Record<string, unknown>>)(node.props));
+  }
+  return [node, ...formNodes(node.props.children as React.ReactNode)];
+}
+
+it.each([
+  ["create", 2, false, false], ["create", 3, false, true],
+  ["edit", 3, false, true], ["edit", 3, true, false],
+] as const)("applies banner capacity using the initial server state (%s, %i, %s)", (mode, count, enabled, disabled) => {
+  hooks.banners.mockReturnValue({ data: Array.from({ length: count }, (_, performanceId) => ({ performanceId })) });
+  hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, displayOnBanner: enabled, bannerSubtitle: enabled ? "재즈" : null } }, isFetchedAfterMount: true });
+  vi.stubGlobal("sessionStorage", { getItem: () => null });
+  const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
+  const checkbox = html.match(/<input[^>]*id="banner-enabled"[^>]*>/)![0];
+  expect(checkbox.includes('disabled=""')).toBe(disabled);
+  expect(checkbox.includes('checked=""')).toBe(enabled);
+  expect(html.includes('id="banner-subtitle"')).toBe(enabled);
+  if (enabled) expect(html).toContain('value="재즈"');
+  expect(html).toContain("최대 3개");
+  expect(hooks.update).not.toHaveBeenCalled();
+});
+
+it.each(["full", "error"])("allows an existing banner to uncheck and recheck without a PATCH (%s)", async (state) => {
+  hooks.banners.mockReturnValue(state === "full" ? { data: [{}, {}, {}] } : { isError: true });
+  hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, displayOnBanner: true, bannerSubtitle: "재즈" } }, isFetchedAfterMount: true });
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = formNodes(tree);
+    const checkbox = elements.find((node) => node.props.id === "banner-enabled")!;
+    expect(checkbox.props.disabled).toBe(false);
+    expect(checkbox.props.checked).toBe(step !== 1);
+    const subtitle = elements.find((node) => node.props.id === "banner-subtitle");
+    if (step !== 1) expect(subtitle?.props.value).toBe("재즈");
+    else expect(subtitle).toBeUndefined();
+    if (step === 2) {
+      save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes("변경사항 저장"))?.props.onClick as typeof save;
+      return;
+    }
+    (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: ++step === 2 } });
+  });
+  render();
+  await save!();
+  expect(step).toBe(2);
+  expect(hooks.update).toHaveBeenCalledOnce();
+  expect(JSON.stringify(createPerformancePatch(hooks.update.mock.calls[0][0]))).toBe("{}");
+});
+
+describe.each(["create", "edit"] as const)("new banner recovery (%s)", (mode) => {
+  it.each(["full", "error", "loading"])("allows unchecking after the query changes to %s", async (state) => {
+    type BannerQuery = { data?: object[]; isError?: boolean; isPending?: boolean };
+    let changeQuery!: React.Dispatch<React.SetStateAction<BannerQuery>>;
+    hooks.banners.mockImplementation(function useTestBanners() {
+      const [query, setQuery] = React.useState<BannerQuery>({ data: [{}, {}] });
+      changeQuery = setQuery;
+      return query;
+    });
+    let step = 0;
+    let save: (() => Promise<void>) | undefined;
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const elements = formNodes(tree);
+      const checkbox = elements.find((node) => node.props.id === "banner-enabled")!;
+      expect(checkbox.props.checked).toBe(step === 1 || step === 2);
+      expect(checkbox.props.disabled).toBe(step === 3);
+      const toggle = checkbox.props.onChange as (event: unknown) => void;
+      if (step === 0) { step++; toggle({ target: { checked: true } }); }
+      else if (step === 1) {
+        step++;
+        changeQuery(state === "full" ? { data: [{}, {}, {}] } : state === "error" ? { isError: true } : { isPending: true });
+      } else if (step === 2) { step++; toggle({ target: { checked: false } }); }
+      else {
+        save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+      }
+    });
+    vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+    const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
+    render(path, mode === "create" ? { concertDraft: { pathname: path, form: initial.form, totalSeats: 120, mainImage: new File(["poster"], "poster.png") } } : undefined);
+    expect(step).toBe(3);
+    await save!();
+    const mutation = mode === "create" ? hooks.create : hooks.update;
+    expect(mutation).toHaveBeenCalledOnce();
+    const input = mutation.mock.calls[0][0];
+    expect(input.form.displayOnBanner).toBe(false);
+    if (mode === "create") {
+      expect(JSON.parse(await (createConcertFormData(input).get("request") as Blob).text())).toMatchObject({ display_on_banner: false, banner_subtitle: null });
+    } else {
+      // The original was already false/null: recovery must not add a PATCH.
+      expect(JSON.stringify(createPerformancePatch(input))).toBe("{}");
+    }
+  });
+});
+
+describe.each(["create-session", "create-return", "edit-return"])("selected draft recovery (%s)", (source) => {
+  it.each(["full", "error", "loading"])("restores an enabled checkbox and allows unchecking with %s", (state) => {
+    hooks.banners.mockReturnValue(state === "full" ? { data: [{}, {}, {}] } : state === "error" ? { isError: true } : { isPending: true });
+    const path = source === "edit-return" ? "/admin/concerts/42/edit" : "/admin/concerts/new";
+    const draft = { pathname: path, form: { ...initial.form, displayOnBanner: true, bannerSubtitle: "Draft subtitle" }, totalSeats: 120 };
+    vi.stubGlobal("sessionStorage", { getItem: () => source === "create-session" ? JSON.stringify(draft) : null });
+    let unchecked = false;
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const elements = formNodes(tree);
+      const checkbox = elements.find((node) => node.props.id === "banner-enabled")!;
+      expect(checkbox.props.checked).toBe(!unchecked);
+      expect(checkbox.props.disabled).toBe(unchecked);
+      if (!unchecked) {
+        expect(elements.find((node) => node.props.id === "banner-subtitle")?.props.value).toBe("Draft subtitle");
+        unchecked = true;
+        (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: false } });
+      }
+    });
+    render(path, source === "create-session" ? undefined : { concertDraft: draft });
+    expect(unchecked).toBe(true);
+  });
+});
+
+it.each(["loading", "error"])("disables new banner selection while allowing ordinary creation (%s)", async (state) => {
+  hooks.banners.mockReturnValue({ isPending: state === "loading", isError: state === "error" });
+  vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = formNodes(tree);
+    expect(elements.find((node) => node.props.id === "banner-enabled")?.props.disabled).toBe(true);
+    const button = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes("공연 등록하기"))!;
+    expect(button.props.disabled).toBe(false);
+    save = button.props.onClick as typeof save;
+  });
+  render("/admin/concerts/new", { concertDraft: { pathname: "/admin/concerts/new", form: initial.form, totalSeats: 120, mainImage: new File(["poster"], "poster.png") } });
+  await save!();
+  expect(hooks.create).toHaveBeenCalledOnce();
+  const request = JSON.parse(await (createConcertFormData(hooks.create.mock.calls[0][0]).get("request") as Blob).text());
+  expect(request).toMatchObject({ display_on_banner: false, banner_subtitle: null });
+});
+
+it.each(["create", "edit"])("toasts a server conflict message without overriding it (%s)", async (mode) => {
+  // Synthetic fixture only: the backend's final conflict code/message is pending.
+  const message = "서버에서 전달한 충돌 안내";
+  const mutation = mode === "create" ? hooks.create : hooks.update;
+  mutation.mockRejectedValueOnce(new ApiError({ isSuccess: false, code: "TEST_CONFLICT", message, result: null }, 409));
+  vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    save = formNodes(tree).find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+  });
+  render(mode === "create" ? "/admin/concerts/new" : undefined, mode === "create" ? { concertDraft: { pathname: "/admin/concerts/new", form: initial.form, totalSeats: 120, mainImage: new File(["poster"], "poster.png") } } : undefined);
+  await save!();
+  expect(mutation).toHaveBeenCalledOnce();
+  expect(toast.error).toHaveBeenCalledWith(message);
+});
+
 function render(path = "/admin/concerts/42/edit", state?: unknown) {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[{ pathname: path, state }]}>
@@ -117,7 +277,7 @@ function render(path = "/admin/concerts/42/edit", state?: unknown) {
   );
 }
 
-it.each(["create", "edit"])("keeps banner settings local, restores toggled text, and preserves the submit payload (%s)", async (mode) => {
+it.each([["create", true], ["edit", true], ["create", false], ["edit", false]] as const)("persists banner settings and restores toggled text (%s, %s)", async (mode, enabled) => {
   type Element = React.ReactElement<Record<string, unknown>>;
   function nodes(node: React.ReactNode): Element[] {
     if (Array.isArray(node)) return node.flatMap(nodes);
@@ -143,7 +303,7 @@ it.each(["create", "edit"])("keeps banner settings local, restores toggled text,
     }
     expect(elements.find((element) => element.props.placeholder === "예: Neon Dreams Concert")?.props.value).toBe(initial.form.title);
     expect(elements.find((element) => element.type === "textarea")?.props.value).toBe(initial.form.description);
-    if (step === 4) {
+    if (step === (enabled ? 4 : 5)) {
       save = elements.find((element) => element.type === "button" &&
         React.Children.toArray(element.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
       return;
@@ -152,7 +312,7 @@ it.each(["create", "edit"])("keeps banner settings local, restores toggled text,
     if (next === 1) {
       (input!.props.onChange as React.ChangeEventHandler<HTMLInputElement>)({ target: { value: subtitle } } as React.ChangeEvent<HTMLInputElement>);
     } else {
-      (checkbox.props.onChange as React.ChangeEventHandler<HTMLInputElement>)({ target: { checked: next !== 2 } } as React.ChangeEvent<HTMLInputElement>);
+      (checkbox.props.onChange as React.ChangeEventHandler<HTMLInputElement>)({ target: { checked: next !== 2 && next !== 4 } } as React.ChangeEvent<HTMLInputElement>);
     }
   });
   vi.useFakeTimers();
@@ -163,23 +323,23 @@ it.each(["create", "edit"])("keeps banner settings local, restores toggled text,
     vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(initial.form.characterConfig) });
     const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
     render(path, mode === "create" ? { concertDraft: { pathname: path, form: initial.form, totalSeats: 120, mainImage } } : undefined);
-    expect(step).toBe(4);
+    expect(step).toBe(enabled ? 4 : 5);
     expect(save).toBeTypeOf("function");
     await save!();
     const mutation = mode === "create" ? hooks.create : hooks.update;
     expect(mutation).toHaveBeenCalledOnce();
     const input = mutation.mock.calls[0][0];
-    expect(input.form).toEqual(initial.form);
+    expect(input.form).toEqual({ ...initial.form, displayOnBanner: enabled, bannerSubtitle: subtitle });
     expect(Object.keys(input).sort()).toEqual((mode === "create"
       ? ["form", "totalSeats", "mainImage", "gallery"]
       : ["form", "original", "mainImage", "model3d", "gallery"]).sort());
-    expect(JSON.stringify(input)).not.toMatch(/banner/i);
+
     if (mode === "create") {
       const data = createConcertFormData(input);
       expect(Array.from(data.keys())).toEqual(["request", "mainImage"]);
-      expect(await (data.get("request") as Blob).text()).not.toMatch(/banner/i);
+      expect(JSON.parse(await (data.get("request") as Blob).text())).toMatchObject({ display_on_banner: enabled, banner_subtitle: enabled ? subtitle : null });
     } else {
-      expect(JSON.stringify(createPerformancePatch(input))).toBe("{}");
+      expect(JSON.parse(JSON.stringify(createPerformancePatch(input)))).toEqual(enabled ? { display_on_banner: true, banner_subtitle: subtitle } : {});
     }
   } finally {
     vi.useRealTimers();

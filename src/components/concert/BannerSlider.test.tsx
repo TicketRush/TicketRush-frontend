@@ -28,21 +28,21 @@ function DriveSlider() {
   mocks.drive(tree);
   return tree;
 }
-function DriveSlide({ posterUrl }: { posterUrl?: string }) {
+function DriveSlide({ posterUrl }: { posterUrl?: string | null }) {
   const tree = BannerSlide({ banner, posterUrl });
   mocks.drive(tree);
   return tree;
 }
 const banner: BannerItem = {
-  id: 3, title: "공연 제목", subtitle: "공연 소제목", description: "공연 소개",
-  date: "2027-01-01", tagLabel: "공연 안내", iconEmoji: "🎵", linkConcertId: 42, order: 1,
+  performanceId: 42, title: "공연 제목", subtitle: "공연 소제목", description: "공연 소개",
+  date: "2027-01-01", imageUrl: "/poster.png", order: 1,
 };
 function render(child: React.ReactNode = <BannerSlider />) {
   return renderToStaticMarkup(<MemoryRouter>{child}</MemoryRouter>);
 }
 beforeEach(() => {
   vi.stubGlobal("React", React);
-  mocks.query.mockReturnValue({ data: [banner, { ...banner, id: 4, title: "다음 공연", linkConcertId: 91 }] });
+  mocks.query.mockReturnValue({ data: [banner, { ...banner, performanceId: 91, title: "다음 공연", imageUrl: "/next.png" }] });
   mocks.drive.mockReset();
   mocks.effects = [];
 });
@@ -58,20 +58,20 @@ it("renders existing text and date with the linked concert ID, keeping dots outs
   expect(html).toContain('aria-current="true"');
 });
 
-it.each([undefined, 0, -1, 1.5, NaN])("does not use banner ID as a concert ID when linked ID is %s", (linkConcertId) => {
-  const html = render(<BannerSlide banner={{ ...banner, linkConcertId }} />);
+it.each([0, -1, 1.5, NaN])("does not use banner ID as a concert ID when linked ID is %s", (performanceId) => {
+  const html = render(<BannerSlide banner={{ ...banner, performanceId }} />);
   expect(html).not.toContain("<a ");
   expect(html).toContain(banner.title);
 });
 
-it("renders one named poster and a hidden decorative image using a presentation-only URL", () => {
+it("renders one named poster and a hidden decorative image using a API poster URL", () => {
   const html = render(<BannerSlide banner={banner} posterUrl="/poster.png" />);
   expect(html.match(/<img /g)).toHaveLength(2);
   expect(html).toContain('alt="공연 제목 대표 이미지"');
   expect(html).toContain('alt="" aria-hidden="true"');
 });
 
-it.each([undefined, "", "   "])("renders without broken or empty images when URL is %s", (posterUrl) => {
+it.each([undefined, null, "", "   "])("renders without broken or empty images when URL is %s", (posterUrl) => {
   const html = render(<BannerSlide banner={banner} posterUrl={posterUrl} />);
   expect(html).not.toContain("<img");
   expect(html).toContain(banner.title);
@@ -143,4 +143,28 @@ it("keeps the banner visible on Home even with an empty concert list", () => {
   expect(html).toContain("등록된 공연이 없습니다.");
   expect(html).toContain(banner.title);
   expect(html).toContain('href="/concerts/42"');
+});
+
+it("connects the API image to both layers through the slider", () => {
+  const html = render();
+  expect(html.match(/<img /g)).toHaveLength(2);
+  expect(html.match(/<img[^>]*src="\/poster.png"/g)).toHaveLength(2);
+  expect(html).toContain("object-contain");
+  expect(html).toContain("blur-2xl");
+});
+it.each([null, undefined, ""])("omits an absent subtitle without leaving an empty paragraph (%s)", (subtitle) => {
+  const html = render(<BannerSlide banner={{ ...banner, subtitle }} />);
+  expect(html).not.toContain("line-clamp-2");
+  expect(html).toContain(banner.title);
+});
+it("uses performance identity for slides and dots across reorder", () => {
+  for (const items of [[banner, { ...banner, performanceId: 91 }], [{ ...banner, performanceId: 91 }, banner]]) {
+    mocks.query.mockReturnValue({ data: items });
+    mocks.drive.mockImplementation((tree: React.ReactNode) => {
+      const elements = nodes(tree);
+      expect(elements.find((node) => node.type === BannerSlide)?.key).toBe(String(items[0].performanceId));
+      expect(elements.filter((node) => node.type === "button").map((node) => node.key)).toEqual(items.map((item) => String(item.performanceId)));
+    });
+    render(<DriveSlider />);
+  }
 });

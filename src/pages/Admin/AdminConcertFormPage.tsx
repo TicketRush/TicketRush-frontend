@@ -41,6 +41,7 @@ import {
   createCharacterConfig,
   validateCharacterConfig,
 } from "@/utils/character/characterConfig";
+import { useBanners } from "@/hooks/queries/useBanners";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 
@@ -140,10 +141,13 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
       ? { characterConfig: location.state.characterConfig } : {}),
   }));
   const [interacted, setInteracted] = useState<Partial<Record<"date" | "time" | "bookingOpenAt", boolean>>>({});
-  // UI draft only. Connect persistence/hydration after the banner contract is confirmed.
-  // Keep these values outside ConcertFormData and all submit/draft payloads.
-  const [bannerEnabled, setBannerEnabled] = useState(false);
-  const [bannerSubtitle, setBannerSubtitle] = useState("");
+  const bannerQuery = useBanners();
+  const bannerEnabled = form.displayOnBanner ?? false;
+  const bannerSubtitle = form.bannerSubtitle ?? "";
+  const originallyOnBanner = original?.displayOnBanner === true;
+  const bannerUnavailable = bannerQuery.isPending || bannerQuery.isError || !bannerQuery.data;
+  const bannerFull = (bannerQuery.data?.length ?? 0) >= 3;
+  const bannerDisabled = !bannerEnabled && !originallyOnBanner && (bannerUnavailable || bannerFull);
   const dateError = interacted.date ? validateConcertDate(form.date, original?.date) : null;
   const timeError = interacted.time ? validateConcertTime(form.time) : null;
   const bookingError = interacted.bookingOpenAt ? validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt) : null;
@@ -602,14 +606,18 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
 
         <Section title="배너 설정">
           <p id="banner-settings-note" className="text-sm text-admin-text-secondary">
-            배너 설정은 현재 저장되거나 메인 화면에 반영되지 않습니다. 기존 등록 상태도 표시되지 않습니다.
+            {bannerQuery.isError
+              ? "배너 수를 확인하지 못했습니다. 새 배너 등록은 잠시 사용할 수 없지만, 공연은 저장할 수 있습니다."
+              : bannerQuery.isPending ? "배너 등록 상태를 확인하는 중입니다."
+              : "메인 배너는 최대 3개까지 등록할 수 있습니다."}
           </p>
           <label className="flex items-center gap-2 text-sm">
             <input
               id="banner-enabled"
               type="checkbox"
               checked={bannerEnabled}
-              onChange={(e) => setBannerEnabled(e.target.checked)}
+              disabled={bannerDisabled}
+              onChange={(e) => update("displayOnBanner", e.target.checked)}
               aria-describedby="banner-settings-note"
               className="h-4 w-4 accent-primary"
             />
@@ -625,7 +633,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
                 type="text"
                 data-form-focus="true"
                 value={bannerSubtitle}
-                onChange={(e) => setBannerSubtitle(e.target.value)}
+                onChange={(e) => update("bannerSubtitle", e.target.value)}
                 onKeyDown={handleEnterMoveNext}
                 aria-describedby="banner-settings-note"
                 placeholder="공연을 소개하는 짧은 문구를 입력해주세요"

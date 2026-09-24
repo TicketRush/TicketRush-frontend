@@ -355,3 +355,32 @@ describe("admin edit contract", () => {
     expect(adapter.mock.calls[0][0].url).toBe("/api/v1/performance/admin/42/files");
   });
 });
+
+describe("banner edit persistence", () => {
+  it.each([true, false])("hydrates raw banner fields and skips unchanged PATCH (%s)", async (enabled) => {
+    adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(),
+      data: JSON.stringify({ is_success: true, result: { ...detail, display_on_banner: enabled, banner_subtitle: enabled ? "Jazz" : null } }) });
+    const value = await input();
+    expect(value.form).toMatchObject({ displayOnBanner: enabled, bannerSubtitle: enabled ? "Jazz" : "" });
+    await updateConcertApi(42, value);
+    expect(adapter).not.toHaveBeenCalled();
+  });
+  it.each([
+    [false, true, " new ", "new"], [true, true, "changed", "changed"],
+    [true, false, "old", null], [true, true, "   ", null],
+  ] as const)("PATCHes both banner fields for %s -> %s (%j)", async (before, after, subtitle, expected) => {
+    const value = await input();
+    value.original = { ...value.original, displayOnBanner: before, bannerSubtitle: "old" };
+    value.form = { ...value.original, displayOnBanner: after, bannerSubtitle: subtitle };
+    await updateConcertApi(42, value);
+    expect(adapter).toHaveBeenCalledOnce();
+    expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ display_on_banner: after, banner_subtitle: expected });
+  });
+  it.each([false, true])("ignores hidden drafts or normalized unchanged subtitles (%s)", async (enabled) => {
+    const value = await input();
+    value.original = { ...value.original, displayOnBanner: enabled, bannerSubtitle: "old" };
+    value.form = { ...value.original, bannerSubtitle: enabled ? " old " : "hidden changed draft" };
+    await updateConcertApi(42, value);
+    expect(adapter).not.toHaveBeenCalled();
+  });
+});

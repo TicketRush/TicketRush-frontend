@@ -5,6 +5,7 @@ import { validateCharacterConfig } from "@/utils/character/characterConfig";
 import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
 import {
   appendConcertFiles,
+  bannerSettingsRequest,
   MAX_CHARACTER_MESSAGE_LENGTH,
 } from "./adminConcertCreate";
 
@@ -25,6 +26,8 @@ export function mapConcertForEdit(detail: ConcertDetail): ConcertEditData {
   return {
     totalSeats: detail.totalSeats,
     form: {
+      displayOnBanner: detail.displayOnBanner ?? false,
+      bannerSubtitle: detail.bannerSubtitle ?? "",
       title: detail.title,
       performer: detail.performer ?? "",
       genre: detail.genre,
@@ -60,9 +63,14 @@ export function createPerformancePatch({ form, original }: UpdateConcertInput) {
   if (original.bookingOpenAt && !form.bookingOpenAt) {
     throw new Error("예매 오픈 시각 해제는 이 화면에서 지원하지 않습니다.");
   }
+  const banner = bannerSettingsRequest(form);
+  const originalBanner = bannerSettingsRequest(original);
+  const bannerChanged = banner.display_on_banner !== originalBanner.display_on_banner ||
+    banner.banner_subtitle !== originalBanner.banner_subtitle;
   const changed = <K extends keyof ConcertFormData>(key: K) =>
     form[key] !== original[key] ? form[key] : undefined;
   return {
+    ...(bannerChanged ? banner : {}),
     title: changed("title"),
     performer: changed("performer"),
     genre: changed("genre"),

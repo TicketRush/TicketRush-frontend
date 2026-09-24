@@ -60,6 +60,8 @@ interface PerformanceListResponse {
 interface PerformanceDetailResponse {
   characterConfig?: ConcertDetail["characterConfig"];
   characterMessage?: string | null;
+  displayOnBanner?: boolean;
+  bannerSubtitle?: string | null;
   performanceId: number;
   title: string;
   performer: string;
@@ -137,6 +139,8 @@ function mapDetail(item: PerformanceDetailResponse): ConcertDetail {
   return {
     characterConfig: item.characterConfig,
     characterMessage: item.characterMessage,
+    displayOnBanner: item.displayOnBanner,
+    bannerSubtitle: item.bannerSubtitle,
     id: item.performanceId,
     title: item.title,
     performer: item.performer,

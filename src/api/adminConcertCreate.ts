@@ -19,6 +19,8 @@ export interface CreateConcertInput {
  * venue, notices and facility icons have no corresponding fields in the create DTO.
  */
 export interface PerformanceCreateRequest {
+  display_on_banner: boolean;
+  banner_subtitle: string | null;
   title: string;
   performer: string;
   genre: ConcertFormData["genre"];
@@ -48,6 +50,7 @@ export function createPerformanceRequest({
     );
   }
   return {
+    ...bannerSettingsRequest(form),
     title: form.title,
     performer: form.performer,
     genre: form.genre,
@@ -84,4 +87,12 @@ export function appendConcertFiles(
   if (files.mainImage) data.append("mainImage", files.mainImage);
   if (files.model3d) data.append("model3d", files.model3d);
   files.gallery?.forEach((file) => data.append("gallery", file));
+}
+
+/** Normalize persistence independently of the hidden subtitle draft. */
+export function bannerSettingsRequest(form: ConcertFormData) {
+  return {
+    display_on_banner: form.displayOnBanner ?? false,
+    banner_subtitle: form.displayOnBanner ? form.bannerSubtitle?.trim() || null : null,
+  };
 }

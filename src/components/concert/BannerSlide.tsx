@@ -5,16 +5,14 @@ import type { BannerItem } from "@/types/domain/banner";
 
 interface Props {
   banner: BannerItem;
-  // Presentation input only, NOT a BannerResponse field. The current API has no
-  // image URL; supply this only once the backend image contract is confirmed.
-  posterUrl?: string;
+  posterUrl?: string | null;
 }
 
 export default function BannerSlide({ banner, posterUrl }: Props) {
   const [failedUrl, setFailedUrl] = useState<string>();
   const imageUrl = posterUrl?.trim();
   const showImage = !!imageUrl && imageUrl !== failedUrl;
-  const linkedId = banner.linkConcertId;
+  const linkedId = banner.performanceId;
   const isLinked = linkedId !== undefined && Number.isSafeInteger(linkedId) && linkedId > 0;
 
   const content = (
@@ -30,13 +28,7 @@ export default function BannerSlide({ banner, posterUrl }: Props) {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/10" />
       <div className="relative flex min-h-48 items-center gap-4 p-5 text-white sm:gap-6 sm:p-8">
         <div className="min-w-0 flex-1 break-words">
-          {banner.tagLabel && (
-            <span className="mb-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
-              {banner.tagLabel}
-            </span>
-          )}
           <h2 className="mb-1 text-xl font-bold sm:text-3xl">
-            {banner.iconEmoji && <span aria-hidden="true" className="mr-2">{banner.iconEmoji}</span>}
             {banner.title}
           </h2>
           {banner.subtitle && <p className="mb-2 line-clamp-2 text-base font-semibold sm:text-lg">{banner.subtitle}</p>}
@@ -55,10 +47,6 @@ export default function BannerSlide({ banner, posterUrl }: Props) {
             onError={() => setFailedUrl(imageUrl)}
             className="max-h-40 w-1/3 min-w-0 shrink-0 object-contain object-right sm:max-h-56"
           />
-        ) : banner.iconEmoji ? (
-          <span aria-hidden="true" className="hidden shrink-0 select-none text-7xl text-white/20 sm:block">
-            {banner.iconEmoji}
-          </span>
         ) : null}
       </div>
     </>
