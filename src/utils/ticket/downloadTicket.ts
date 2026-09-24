@@ -18,6 +18,40 @@ import html2canvas from "html2canvas";
 const CAPTURE_WIDTH = 640;
 
 /**
+ * lucide 아이콘은 `stroke="currentColor"` SVG다.
+ * html2canvas는 `<circle>`·currentColor 획을 비워 그린다.
+ * 체크 아이콘이 민트색 원만 남는 이유다. 계산된 색을 박은 뒤 비트맵으로 바꾼다.
+ */
+function replaceSvgIcons(root: HTMLElement): void {
+  for (const svg of root.querySelectorAll("svg")) {
+    const style = getComputedStyle(svg);
+    const color = style.color || "#111827";
+    const width = Math.ceil(svg.getBoundingClientRect().width) || Number(svg.getAttribute("width")) || 24;
+    const height = Math.ceil(svg.getBoundingClientRect().height) || Number(svg.getAttribute("height")) || 24;
+
+    const painted = svg.cloneNode(true) as SVGElement;
+    painted.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    painted.setAttribute("width", String(width));
+    painted.setAttribute("height", String(height));
+    for (const el of [painted, ...painted.querySelectorAll("*")]) {
+      for (const name of ["stroke", "fill"] as const) {
+        if (el.getAttribute(name) === "currentColor") el.setAttribute(name, color);
+      }
+    }
+
+    const img = document.createElement("img");
+    img.alt = "";
+    img.width = width;
+    img.height = height;
+    img.style.cssText = `width:${width}px;height:${height}px;display:block;`;
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+      new XMLSerializer().serializeToString(painted),
+    )}`;
+    svg.replaceWith(img);
+  }
+}
+
+/**
  * truncate(`overflow:hidden` + `text-overflow:ellipsis` + `white-space:nowrap`)는
  * html2canvas가 재현하지 못한다. 말줄임표 대신 원문을 그대로 그리면서 박스 밖으로
  * 삐져나온 글자를 잘라내기 때문에 공연명·좌석·예매번호가 깨져 보인다.
@@ -80,6 +114,7 @@ export async function renderTicketCanvas(
 
   try {
     releaseTextClipping(clone);
+    replaceSvgIcons(clone);
     await waitForAssets(stage);
 
     // 높이를 넘겨주지 않으면 html2canvas가 창 높이 기준으로 잘라낸 canvas를
