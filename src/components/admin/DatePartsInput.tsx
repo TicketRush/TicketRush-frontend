@@ -5,6 +5,7 @@ interface Props {
   id: string;
   value: DateParts;
   onChange: (value: DateParts) => void;
+  showRequiredIndicator?: boolean;
   onKeyDown?: KeyboardEventHandler<HTMLInputElement | HTMLSelectElement>;
   "data-form-focus"?: "true";
   "aria-invalid"?: boolean;
@@ -13,13 +14,13 @@ interface Props {
 
 const inputClass = "w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50 xl:px-4 xl:py-3 xl:text-base";
 
-export default function DatePartsInput({ id, value, onChange, ...navigationProps }: Props) {
+export default function DatePartsInput({ id, value, onChange, showRequiredIndicator = false, ...navigationProps }: Props) {
   const validYear = isValidYear(value.year);
   const days = validYear ? getDaysInMonth(Number(value.year), Number(value.month)) : 0;
   return (
     <div className="grid grid-cols-3 gap-3">
       <label htmlFor={`${id}-year`} className="space-y-1 text-sm">
-        <span>연도</span>
+        <span>연도{showRequiredIndicator && <span className="ml-1 text-red-400" aria-hidden="true">*</span>}</span>
         <input {...navigationProps} id={`${id}-year`} className={inputClass} type="text" inputMode="numeric" maxLength={4}
           placeholder="YYYY" value={value.year}
           onChange={(event) => {
@@ -27,7 +28,7 @@ export default function DatePartsInput({ id, value, onChange, ...navigationProps
           }} />
       </label>
       <label htmlFor={`${id}-month`} className="space-y-1 text-sm">
-        <span>월</span>
+        <span>월{showRequiredIndicator && <span className="ml-1 text-red-400" aria-hidden="true">*</span>}</span>
         <select {...navigationProps} id={`${id}-month`} className={inputClass} value={value.month} disabled={!validYear}
           onChange={(event) => onChange(changeDatePart(value, "month", event.target.value))}>
           <option value="">월 선택</option>
@@ -37,7 +38,7 @@ export default function DatePartsInput({ id, value, onChange, ...navigationProps
         </select>
       </label>
       <label htmlFor={`${id}-day`} className="space-y-1 text-sm">
-        <span>일</span>
+        <span>일{showRequiredIndicator && <span className="ml-1 text-red-400" aria-hidden="true">*</span>}</span>
         <select {...navigationProps} id={`${id}-day`} className={inputClass} value={value.day} disabled={!days}
           onChange={(event) => onChange(changeDatePart(value, "day", event.target.value))}>
           <option value="">일 선택</option>
