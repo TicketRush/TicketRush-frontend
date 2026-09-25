@@ -94,6 +94,27 @@ async function bakeCoverImages(root: HTMLElement): Promise<void> {
   );
 }
 
+/**
+ * 화면의 `<img>`는 CORS 없이 받아 디스크 캐시에 남긴다.
+ * 같은 주소로 다시 받으면 그 캐시가 재사용되고, 응답에
+ * `Access-Control-Allow-Origin`이 없어 캔버스가 포스터를 버린다.
+ * 저장용 요청만 쿼리를 붙여 캐시를 피한다. 서명된 URL은 쿼리를 바꾸면 깨지므로 그대로 둔다.
+ */
+function posterCorsSrc(src: string): string {
+  try {
+    const url = new URL(src, window.location.href);
+    const signed = [...url.searchParams.keys()].some((key) =>
+      key.toLowerCase().startsWith("x-amz-"),
+    );
+    if (signed) return src;
+    url.searchParams.set("ticket_cors", "1");
+    return url.toString();
+  } catch {
+    const join = src.includes("?") ? "&" : "?";
+    return `${src}${join}ticket_cors=1`;
+  }
+}
+
 function fittedImageDataUrl(
   src: string,
   width: number,
@@ -126,7 +147,7 @@ function fittedImageDataUrl(
       }
     };
     image.onerror = () => reject(new Error("poster load failed"));
-    image.src = src;
+    image.src = posterCorsSrc(src);
   });
 }
 
