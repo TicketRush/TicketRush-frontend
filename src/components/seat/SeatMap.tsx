@@ -2,7 +2,9 @@
 // layout이 있으면 헤더·캡션 크기는 totalRows × maxCols (#279)
 import SeatItem from "./SeatItem";
 import type { SeatLayoutSize, SeatWithStatus } from "@/types/domain/seat";
-import { useMemo } from "react";
+import { findAdjacentSeat, resolveSeatArrowKey } from "@/utils/seat/adjacentSeat";
+import { placeSeatsInColumns } from "@/utils/seat/seatColumns";
+import { useMemo, type KeyboardEvent } from "react";
 
 interface SeatMapProps {
   seats: SeatWithStatus[];
@@ -35,17 +37,32 @@ export default function SeatMap({
   }, [seats]);
 
   // layout 우선. 없으면 실제 최대 col (좌석 개수 아님 — 구멍 있는 행 대비)
-  const colCount =
-    layout?.maxCols ??
-    rows.reduce(
-      (max, row) =>
-        Math.max(max, ...row.seats.map((s) => s.col), 0),
-      0,
-    );
+  const dataMaxCol = rows.reduce(
+    (max, row) => Math.max(max, ...row.seats.map((seat) => seat.col), 0),
+    0,
+  );
+  const colCount = Math.max(layout?.maxCols ?? 0, dataMaxCol);
   const rowCount = layout?.totalRows ?? rows.length;
 
+  const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
+    const direction = resolveSeatArrowKey(event);
+    if (!direction) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const currentId = Number(target.dataset.seatId);
+    if (!Number.isFinite(currentId)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const next = findAdjacentSeat(seats, currentId, direction);
+    if (!next) return;
+    const button = event.currentTarget.querySelector<HTMLButtonElement>(
+      `[data-seat-id="${next.id}"]`,
+    );
+    button?.focus();
+  };
+
   return (
-    <div className="inline-block">
+    <div className="inline-block" onKeyDown={moveFocus}>
       {/* 열 번호 헤더 */}
       <div className="flex items-center gap-1.5 mb-2">
         {/* 좌측 행 라벨 칸 비우기 */}
@@ -69,14 +86,18 @@ export default function SeatMap({
               {row}
             </div>
             {/* 좌석들 */}
-            {seatsInRow.map((seat) => (
-              <SeatItem
-                key={seat.id}
-                seat={seat}
-                isSelected={selectedSeatId === seat.id}
-                onClick={onSeatClick}
-              />
-            ))}
+            {placeSeatsInColumns(seatsInRow, colCount).map((seat, index) =>
+              seat ? (
+                <SeatItem
+                  key={seat.id}
+                  seat={seat}
+                  isSelected={selectedSeatId === seat.id}
+                  onClick={onSeatClick}
+                />
+              ) : (
+                <div key={`${row}-empty-${index}`} className="w-8 h-8" aria-hidden />
+              ),
+            )}
           </div>
         ))}
       </div>

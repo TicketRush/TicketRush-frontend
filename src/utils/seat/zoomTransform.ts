@@ -64,6 +64,36 @@ export function resolveSeatMapZoomKey(event: {
   return null;
 }
 
+export type SeatMapPanDirection = "left" | "right" | "up" | "down";
+
+export const KEYBOARD_PAN_STEP_PX = 48;
+
+/** 맵 자체에 포커스가 있을 때의 방향키. 좌석 이동 키와 구분하려고 여기서는 키만 본다. */
+export function resolveSeatMapPanKey(event: {
+  key: string;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+}): SeatMapPanDirection | null {
+  if (event.ctrlKey || event.metaKey || event.altKey) return null;
+  if (event.key === "ArrowLeft") return "left";
+  if (event.key === "ArrowRight") return "right";
+  if (event.key === "ArrowUp") return "up";
+  if (event.key === "ArrowDown") return "down";
+  return null;
+}
+
+/** 화살표가 가리키는 쪽이 보이게 콘텐츠를 옮긴다. */
+export function panDeltaForArrow(
+  direction: SeatMapPanDirection,
+  step = KEYBOARD_PAN_STEP_PX,
+) {
+  if (direction === "left") return { x: step, y: 0 };
+  if (direction === "right") return { x: -step, y: 0 };
+  if (direction === "up") return { x: 0, y: step };
+  return { x: 0, y: -step };
+}
+
 /** 포커스된 좌석이 있으면 그 중심, 없으면 뷰포트 중심. */
 export function viewportPoint(
   container: { left: number; top: number; width: number; height: number },
