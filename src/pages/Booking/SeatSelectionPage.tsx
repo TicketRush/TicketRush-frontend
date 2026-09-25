@@ -274,7 +274,8 @@ export default function SeatSelectionPage() {
     setConcert,
   ]);
 
-  // 브라우저 뒤로가기·F5로 좌석에 남은 PENDING은 이탈로 보고 즉시 취소 (#167).
+  // 좌석 페이지로 돌아온 PENDING은 새 예매로 보고 즉시 취소 (#167).
+  // 홈·마이페이지 이탈은 HOLD를 유지하고 이어가기 배너를 쓴다 (#369).
   // 의존성 비움: 「좌석 확인」직후 bookingNumber가 생긴 뒤 이 effect가 다시 돌면
   // 방금 만든 PENDING을 취소하게 된다.
   useEffect(() => {
