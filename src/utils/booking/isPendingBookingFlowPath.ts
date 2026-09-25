@@ -1,5 +1,5 @@
 /**
- * 예매 확인/결제/결제실패 화면 — 이탈 시 PENDING을 취소해야 하는 경로 (#167).
+ * 예매 확인/결제/결제실패 화면 — 타이머와 결제를 이 페이지들이 직접 다룬다.
  * 결제 성공 확인·만료 페이지는 제외한다.
  */
 export function isPendingBookingFlowPath(pathname: string): boolean {
@@ -11,8 +11,8 @@ export function isPendingBookingFlowPath(pathname: string): boolean {
 }
 
 /**
- * 이 경로에서는 sessionStorage의 PENDING을 유지한다.
- * 좌석은 「좌석 확인」직후 bookingNumber가 생긴 채 잠시 머물 수 있어 제외한다.
+ * 이 경로에서는 레이아웃이 만료 취소·이어가기 배너를 띄우지 않는다.
+ * 확인/결제는 페이지가 타이머를 복원하고, 좌석은 재진입 시 PENDING을 정리한다.
  * 로그인·가입·OAuth는 레이아웃 밖이지만, 세션이 끊겨도 결제를 이어갈 수 있게 유지한다.
  */
 export function shouldKeepPendingOnPath(pathname: string): boolean {
