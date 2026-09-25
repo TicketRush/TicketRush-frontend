@@ -5,6 +5,7 @@ import {
   dashboardCalendarView,
   isDashboardCalendarDateDisabled,
   MAX_DASHBOARD_PERIOD_DAYS,
+  resolveDashboardCalendarCancel,
   resolveDashboardCalendarClick,
 } from "@/utils/admin/dashboardPeriod";
 
@@ -102,6 +103,27 @@ export default function AdminCalendar({
     setPendingStart(null);
   }
 
+  function cancelPendingSelection() {
+    if (resolveDashboardCalendarCancel(pendingStart).action !== "clear-pending") {
+      return;
+    }
+    setPendingStart(null);
+  }
+
+  function handleCalendarKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape") return;
+    if (pickerMode) {
+      event.stopPropagation();
+      setPickerMode(null);
+      return;
+    }
+    if (resolveDashboardCalendarCancel(pendingStart).action !== "clear-pending") {
+      return;
+    }
+    event.stopPropagation();
+    setPendingStart(null);
+  }
+
   function selectMonth(month: number) {
     setViewMonth(month);
     setPickerMode(null);
@@ -117,7 +139,10 @@ export default function AdminCalendar({
   const canGoYearNext = yearPageStart + YEAR_RANGE_SIZE < 2200;
 
   return (
-    <div className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-4 relative">
+    <div
+      className="bg-admin-card-bg border-2 border-admin-card-border rounded-xl p-4 relative"
+      onKeyDown={handleCalendarKeyDown}
+    >
       <p className="text-sm font-bold mb-3 text-gray-900">기간 설정</p>
 
       {/* 월/연도 헤더 */}
@@ -194,6 +219,20 @@ export default function AdminCalendar({
           </div>
         ))}
       </div>
+
+      {/* 피커 오버레이는 투명해서 포인터만 막는다. 열린 동안 버튼을 두면 클릭은 피커만 닫고, 키보드는 선택을 취소한다. */}
+      {pendingStart && !pickerMode && (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <p className="text-xs text-gray-500">종료일을 선택하세요</p>
+          <button
+            type="button"
+            onClick={cancelPendingSelection}
+            className="text-xs text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+          >
+            선택 취소
+          </button>
+        </div>
+      )}
 
       {/* 모달 — 절대 위치로 띄움 */}
       {pickerMode === "month" && (

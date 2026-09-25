@@ -7,6 +7,7 @@ import {
   isDashboardCalendarDateDisabled,
   isDashboardPeriodWithinLimit,
   parseLocalDateKey,
+  resolveDashboardCalendarCancel,
   resolveDashboardCalendarClick,
   toLocalDateKey,
 } from "./dashboardPeriod";
@@ -113,6 +114,18 @@ describe("resolveDashboardCalendarClick", () => {
       start: day,
       end: day,
     });
+  });
+});
+
+describe("resolveDashboardCalendarCancel", () => {
+  it("시작일이 있으면 pending만 비운다", () => {
+    expect(
+      resolveDashboardCalendarCancel(parseLocalDateKey("2026-01-01")),
+    ).toEqual({ action: "clear-pending" });
+  });
+
+  it("시작일이 없으면 아무것도 하지 않는다", () => {
+    expect(resolveDashboardCalendarCancel(null)).toEqual({ action: "noop" });
   });
 });
 

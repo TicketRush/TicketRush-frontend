@@ -73,7 +73,10 @@ function orderedDays(a: Date, b: Date): { start: Date; end: Date } {
     : { start: b, end: a };
 }
 
-/** 시작일을 고른 뒤, 포함 일수가 상한을 넘는 끝점인지. */
+/**
+ * 시작일을 고른 뒤, 포함 일수가 상한을 넘는 끝점인지.
+ * pendingStart가 없으면 92일 비활성만 없다. 오늘 이후를 켜는 판정은 아니다.
+ */
 export function isDashboardCalendarDateDisabled(
   pendingStart: Date | null,
   date: Date,
@@ -108,6 +111,21 @@ export function resolveDashboardCalendarClick(
   }
   const { start, end } = orderedDays(pendingStart, clicked);
   return { action: "confirm", start, end };
+}
+
+export type DashboardCalendarCancel =
+  | { action: "clear-pending" }
+  | { action: "noop" };
+
+/**
+ * 기간 선택 취소. 날짜 클릭이 아니므로 ignore·confirm과 섞지 않는다.
+ * pendingStart만 비운다. 조회 기간과 보고 있는 달은 바꾸지 않는다.
+ */
+export function resolveDashboardCalendarCancel(
+  pendingStart: Date | null,
+): DashboardCalendarCancel {
+  if (!pendingStart) return { action: "noop" };
+  return { action: "clear-pending" };
 }
 
 export function fillDailyRevenueGaps(
