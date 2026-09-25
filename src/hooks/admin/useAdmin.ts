@@ -242,6 +242,7 @@ export function useCreateConcert() {
     mutationFn: (data: CreateConcertInput) => api.createConcertApi(data),
     meta: { skipGlobalErrorToast: true },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.banners.list() });
       qc.invalidateQueries({ queryKey: adminKeys.all });
     },
   });
@@ -254,6 +255,8 @@ export function useUpdateConcert(id: number) {
     meta: { skipGlobalErrorToast: true },
     onSettled: () => {
       // A file failure can follow a successful JSON PATCH.
+      // Refresh banners without delaying the save result on this optional GET.
+      void qc.invalidateQueries({ queryKey: queryKeys.banners.list() });
       return Promise.all([
         qc.invalidateQueries({ queryKey: adminKeys.all }),
         qc.invalidateQueries({ queryKey: queryKeys.concerts.all }),

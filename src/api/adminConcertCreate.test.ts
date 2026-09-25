@@ -100,6 +100,8 @@ describe("performance multipart request", () => {
     expect(blob.type).toBe("application/json");
     const request = JSON.parse(await blob.text());
     expect(request).toEqual({
+      display_on_banner: false,
+      banner_subtitle: null,
       title: "테스트",
       performer: "출연진",
       genre: "CONCERT",
@@ -293,4 +295,16 @@ describe("createConcertApi with the real axios interceptors", () => {
       "잘못된 캐릭터 설정",
     );
   });
+});
+
+it.each([
+  [false, "draft", null], [true, " subtitle ", "subtitle"],
+  [true, "", null], [true, "   ", null], [false, "", null],
+] as const)("serializes banner settings in multipart (%s, %j)", async (enabled, subtitle, expected) => {
+  const value = input();
+  value.form.displayOnBanner = enabled;
+  value.form.bannerSubtitle = subtitle;
+  const request = JSON.parse(await (createConcertFormData(value).get("request") as Blob).text());
+  expect(request).toMatchObject({ display_on_banner: enabled, banner_subtitle: expected });
+  expect(Object.keys(request).filter((key) => key.includes("banner"))).toEqual(["display_on_banner", "banner_subtitle"]);
 });

@@ -94,6 +94,8 @@ export interface ConcertFacility {
 export interface ConcertDetail extends Omit<ConcertSummary, "remainingSeats"> {
   characterConfig?: import("./character").CharacterConfig | null;
   characterMessage?: string | null;
+  displayOnBanner?: boolean;
+  bannerSubtitle?: string | null;
   description: string;
   /** 공연 시간 (분) */
   durationMinutes: number;

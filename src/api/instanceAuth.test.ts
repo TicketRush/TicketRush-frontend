@@ -49,7 +49,7 @@ function success(config: InternalAxiosRequestConfig) {
     data: {
       is_success: true,
       code: "COMMON_200",
-      result: config.url === "/api/v1/performance" ? [] : {},
+      result: ["/api/v1/performance", "/api/v1/banner"].includes(config.url ?? "") ? [] : {},
     },
   };
 }
@@ -100,6 +100,19 @@ it("preserves the #673 booking rejection for the existing UI error handler", asy
 function authorizationOf(callIndex = 0): unknown {
   return adapter.mock.calls[callIndex][0].headers.Authorization;
 }
+
+it("preserves an unrecognized 409 code and server message through the real interceptor", async () => {
+  // Synthetic fixture; no production banner error code has been agreed yet.
+  const message = "서버에서 전달한 충돌 안내";
+  adapter.mockImplementationOnce(async (config) => failure(config, 409, {
+    is_success: false, code: "TEST_CONFLICT", message, result: null,
+  }));
+  await expect(apiClient.patch("/api/v1/performance/admin/42", {
+    display_on_banner: true, banner_subtitle: null,
+  })).rejects.toMatchObject({ name: "ApiError", httpStatus: 409, code: "TEST_CONFLICT", message });
+  expect(adapter).toHaveBeenCalledOnce();
+  expect(auth.logout).not.toHaveBeenCalled();
+});
 
 beforeEach(() => {
   mode.mock = false;
