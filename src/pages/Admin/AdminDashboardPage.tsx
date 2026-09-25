@@ -297,6 +297,7 @@ export default function AdminDashboardPage() {
                 pageIndex={concertPage}
                 totalPages={concertPagination.totalPages}
                 onChange={setConcertPage}
+                surface="light"
               />
             ) : null}
           </div>

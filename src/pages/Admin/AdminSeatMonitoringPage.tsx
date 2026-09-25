@@ -253,6 +253,7 @@ function AdminSeatMonitoringList() {
                 pageIndex={listPage}
                 totalPages={concerts.pagination.totalPages}
                 onChange={setListPage}
+                surface="light"
               />
             ) : null}
           </>
