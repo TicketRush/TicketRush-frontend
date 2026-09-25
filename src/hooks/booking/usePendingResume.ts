@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
+import { queryKeys } from "@/constants/queryKeys";
+import { loadResumablePending } from "@/hooks/booking/loadResumablePending";
 import { useCancelPendingReservation } from "@/hooks/booking/useCancelPendingReservation";
+import useAuthStore from "@/stores/global/authStore";
+import { safeParseSeatNumber } from "@/utils/seat/parseSeatNumber";
 import { useRestorePendingTimer } from "@/hooks/booking/useRestorePendingTimer";
 import { useReservationLifecycle } from "@/hooks/useReservationLifecycle";
 import { useReleaseSeat } from "@/hooks/mutations/useReleaseSeat";
@@ -21,7 +26,7 @@ import {
 } from "@/utils/booking/pendingResume";
 
 /**
- * 결제 전 이탈 후에도 HOLD·타이머가 남아 있으면 이어가기를 유지한다 (#369).
+ * 같은 탭은 sessionStorage, 다른 탭은 서버 PENDING 조회로 같은 배너를 쓴다 (#369/#444).
  * 확인/결제 화면은 자체 만료 처리를 하고, 플로우 밖에서는 여기서 만료·복원을 맡는다.
  */
 export function usePendingResume() {
@@ -29,6 +34,16 @@ export function usePendingResume() {
   const navigate = useNavigate();
   const bookingNumber = usePaymentStore((s) => s.bookingNumber);
   const paymentStatus = usePaymentStore((s) => s.status);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
+  const offFlow = shouldExpirePendingOffFlow(pathname);
+  const serverResume = useQuery({
+    queryKey: queryKeys.bookings.pendingResume(),
+    queryFn: () => loadResumablePending(),
+    enabled: !!accessToken && offFlow && !bookingNumber,
+    retry: false,
+    staleTime: 15_000,
+  });
   const performanceId = useConcertStore((s) => s.currentConcert?.id) ?? 0;
   const concertTitle = useConcertStore((s) => s.currentConcert?.title) ?? "";
   const hasSelectedSeat = useSeatStore((s) => s.selectedSeat != null);
@@ -39,11 +54,10 @@ export function usePendingResume() {
   const releaseMutation = useReleaseSeat(performanceId);
   const [cancelPending, setCancelPending] = useState(false);
 
-  const offFlow =
-    shouldExpirePendingOffFlow(pathname) &&
-    isResumablePaymentStatus(paymentStatus);
+  const offFlowExpiry =
+    offFlow && isResumablePaymentStatus(paymentStatus);
   const { status: restoreStatus } = useRestorePendingTimer(
-    offFlow ? bookingNumber : null,
+    offFlowExpiry ? bookingNumber : null,
   );
 
   const expireRef = useRef({
@@ -85,6 +99,41 @@ export function usePendingResume() {
     if (restoreStatus === "missing") expireOffFlow();
   }, [restoreStatus, expireOffFlow]);
 
+  const serverBooking = serverResume.data;
+
+  useEffect(() => {
+    if (!bookingNumber) return;
+    queryClient.removeQueries({ queryKey: queryKeys.bookings.pendingResume() });
+  }, [bookingNumber, queryClient]);
+
+  useEffect(() => {
+    if (!serverBooking) return;
+    if (usePaymentStore.getState().bookingNumber) return;
+    const parsed = safeParseSeatNumber(serverBooking.seatNumber);
+    useSeatStore.getState().selectSeat({
+      id: serverBooking.seatId,
+      seatLayoutId: 0,
+      seatNumber: serverBooking.seatNumber,
+      row: parsed.row,
+      col: parsed.col,
+    });
+    useConcertStore.getState().setConcert({
+      id: serverBooking.performanceId,
+      title: serverBooking.performanceTitle,
+      price: serverBooking.price,
+      showDate: serverBooking.performanceDate,
+      showTime: serverBooking.performanceTime,
+      venue: serverBooking.performanceVenue,
+    });
+    usePaymentStore.getState().startBooking(
+      serverBooking.bookingNumber,
+      serverBooking.bookingId,
+      serverBooking.seatId,
+      serverBooking.price,
+    );
+    useTimerStore.getState().startTimerFromExpiresAt(serverBooking.expiresAt);
+  }, [serverBooking]);
+
   const visible = shouldShowPendingResumeBanner({
     bookingNumber,
     paymentStatus,
@@ -103,11 +152,16 @@ export function usePendingResume() {
   const onCancel = useCallback(async () => {
     setCancelPending(true);
     try {
-      await cancelPendingReservation();
+      const cancelled = await cancelPendingReservation();
+      if (cancelled) {
+        queryClient.removeQueries({
+          queryKey: queryKeys.bookings.pendingResume(),
+        });
+      }
     } finally {
       setCancelPending(false);
     }
-  }, [cancelPendingReservation]);
+  }, [cancelPendingReservation, queryClient]);
 
   return {
     visible,

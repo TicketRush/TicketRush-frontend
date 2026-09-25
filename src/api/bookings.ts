@@ -39,6 +39,7 @@ import {
   mockGetBookingDetail,
   mockGetMyBookings,
   mockGetMyBookingCount,
+  mockListPendingForResume,
   mockCancelBooking,
   mockGetAdminRefunds,
   mockGetAdminRefundStats,
@@ -265,6 +266,31 @@ export async function countMyBookingsApi(
     { params: { status } },
   );
   return { count: res.data.count };
+}
+
+/**
+ * 내 예매 목록과 분리된 PENDING 조회 (#444).
+ * 목록 매핑은 performanceId·seatId·expiresAt을 버리므로 여기서만 유지한다.
+ */
+export async function fetchMyPendingForResume(): Promise<
+  ReturnType<typeof mockListPendingForResume>
+> {
+  if (USE_MOCK) return mockListPendingForResume();
+
+  const batch = await fetchMyBookingSummariesPage("PENDING", 0, BOOKING_ME_MAX_PAGE_SIZE);
+  return batch.items.map((item) => ({
+    bookingId: item.bookingId,
+    bookingNumber: item.bookingNumber,
+    performanceId: item.performanceId,
+    performanceTitle: item.performanceTitle ?? "",
+    performanceVenue: item.performanceAddress ?? "",
+    performanceDate: item.performanceDate ?? "",
+    performanceTime: "",
+    seatId: item.seatId,
+    seatNumber: item.seatNumber ?? "",
+    price: item.paymentAmount,
+    expiresAt: item.expiresAt ?? null,
+  }));
 }
 
 export async function fetchPendingBookingExpiresAt(
