@@ -119,8 +119,11 @@ function formNodes(node: React.ReactNode): FormElement[] {
   return [node, ...formNodes(node.props.children as React.ReactNode)];
 }
 
+const bannerFullMessage = "배너 3개가 모두 등록되어 새로운 배너를 등록할 수 없습니다.";
+
 it.each([
-  ["create", 2, false, false], ["create", 3, false, true],
+  ["create", 0, false, false], ["create", 1, false, false],
+  ["create", 2, false, false], ["create", 3, false, true], ["create", 4, false, true],
   ["edit", 3, false, true], ["edit", 3, true, false],
 ] as const)("applies banner capacity using the initial server state (%s, %i, %s)", (mode, count, enabled, disabled) => {
   hooks.banners.mockReturnValue({ data: Array.from({ length: count }, (_, performanceId) => ({ performanceId })) });
@@ -132,8 +135,19 @@ it.each([
   expect(checkbox.includes('checked=""')).toBe(enabled);
   expect(html.includes('id="banner-subtitle"')).toBe(enabled);
   if (enabled) expect(html).toContain('value="재즈"');
-  expect(html).toContain("최대 3개");
+  expect(html.includes(bannerFullMessage)).toBe(disabled);
+  expect(checkbox).toContain('aria-describedby="banner-settings-note"');
+  expect(html).toContain('id="banner-settings-note"');
   expect(hooks.update).not.toHaveBeenCalled();
+});
+
+it.each(["loading", "error"])("does not describe cached full data as current capacity while %s", (state) => {
+  hooks.banners.mockReturnValue({ data: [{}, {}, {}], isPending: state === "loading", isError: state === "error" });
+  vi.stubGlobal("sessionStorage", { getItem: () => null });
+  const html = render("/admin/concerts/new");
+  expect(html).not.toContain(bannerFullMessage);
+  expect(html).toContain(state === "loading" ? "배너 등록 상태를 확인하는 중입니다." : "배너 수를 확인하지 못했습니다.");
+  expect(html.match(/<input[^>]*id="banner-enabled"[^>]*>/)?.[0]).toContain('disabled=""');
 });
 
 it.each(["full", "error"])("allows an existing banner to uncheck and recheck without a PATCH (%s)", async (state) => {
@@ -146,6 +160,7 @@ it.each(["full", "error"])("allows an existing banner to uncheck and recheck wit
     const checkbox = elements.find((node) => node.props.id === "banner-enabled")!;
     expect(checkbox.props.disabled).toBe(false);
     expect(checkbox.props.checked).toBe(step !== 1);
+    expect(elements.find((node) => node.props.id === "banner-settings-note")?.props.children).not.toBe(bannerFullMessage);
     const subtitle = elements.find((node) => node.props.id === "banner-subtitle");
     if (step !== 1) expect(subtitle?.props.value).toBe("재즈");
     else expect(subtitle).toBeUndefined();
@@ -178,6 +193,7 @@ describe.each(["create", "edit"] as const)("new banner recovery (%s)", (mode) =>
       const checkbox = elements.find((node) => node.props.id === "banner-enabled")!;
       expect(checkbox.props.checked).toBe(step === 1 || step === 2);
       expect(checkbox.props.disabled).toBe(step === 3);
+      expect(elements.find((node) => node.props.id === "banner-settings-note")?.props.children === bannerFullMessage).toBe(state === "full" && step === 3);
       const toggle = checkbox.props.onChange as (event: unknown) => void;
       if (step === 0) { step++; toggle({ target: { checked: true } }); }
       else if (step === 1) {
@@ -247,11 +263,10 @@ it.each(["loading", "error"])("disables new banner selection while allowing ordi
   expect(request).toMatchObject({ display_on_banner: false, banner_subtitle: null });
 });
 
-it.each(["create", "edit"])("toasts a server conflict message without overriding it (%s)", async (mode) => {
-  // Synthetic fixture only: the backend's final conflict code/message is pending.
-  const message = "서버에서 전달한 충돌 안내";
+it.each(["create", "edit"])("toasts the banner capacity conflict message without overriding it (%s)", async (mode) => {
+  const message = "등록 가능한 배너 3개가 모두 사용 중입니다.";
   const mutation = mode === "create" ? hooks.create : hooks.update;
-  mutation.mockRejectedValueOnce(new ApiError({ isSuccess: false, code: "TEST_CONFLICT", message, result: null }, 409));
+  mutation.mockRejectedValueOnce(new ApiError({ isSuccess: false, code: "BANNER_409_001", message, result: null }, 409));
   vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
   let save: (() => Promise<void>) | undefined;
   hooks.formRender.mockImplementation((tree: React.ReactNode) => {
