@@ -73,18 +73,91 @@ function orderedDays(a: Date, b: Date): { start: Date; end: Date } {
     : { start: b, end: a };
 }
 
+export type DashboardCalendarDisabledReason = "future" | "over-max";
+
+/** 오늘(로컬 자정)보다 늦은 날짜. 당일은 미래가 아니다. */
+export function isAfterLocalToday(date: Date, today = new Date()): boolean {
+  return startOfDay(date).getTime() > startOfDay(today).getTime();
+}
+
 /**
- * 시작일을 고른 뒤, 포함 일수가 상한을 넘는 끝점인지.
- * pendingStart가 없으면 92일 비활성만 없다. 오늘 이후를 켜는 판정은 아니다.
+ * 달력에서 고를 수 없는 이유.
+ * 오늘 이후는 시작일을 고르기 전에도 막는다. 92일을 넘으면서 미래인 날짜는 미래 이유를 우선한다.
  */
+export function dashboardCalendarDisabledReason(
+  pendingStart: Date | null,
+  date: Date,
+  today = new Date(),
+  maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+): DashboardCalendarDisabledReason | null {
+  if (isAfterLocalToday(date, today)) return "future";
+  if (!pendingStart) return null;
+  const { start, end } = orderedDays(pendingStart, date);
+  if (inclusiveDayCount(start, end) > maxInclusiveDays) return "over-max";
+  return null;
+}
+
+export function dashboardCalendarDisabledTitle(
+  reason: DashboardCalendarDisabledReason,
+  maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+): string {
+  if (reason === "future") return "오늘 이후 날짜는 선택할 수 없습니다";
+  return `최대 ${maxInclusiveDays}일까지 선택할 수 있습니다`;
+}
+
 export function isDashboardCalendarDateDisabled(
   pendingStart: Date | null,
   date: Date,
   maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+  today = new Date(),
 ): boolean {
-  if (!pendingStart) return false;
-  const { start, end } = orderedDays(pendingStart, date);
-  return inclusiveDayCount(start, end) > maxInclusiveDays;
+  return (
+    dashboardCalendarDisabledReason(
+      pendingStart,
+      date,
+      today,
+      maxInclusiveDays,
+    ) != null
+  );
+}
+
+/**
+ * 대시보드 조회가 가능한 기간. 92일 이내이고, 시작·종료가 모두 오늘 이전(당일 포함)이다.
+ * BE는 미래 기간을 400으로 거절하지 않으므로, 화면이 요청 자체를 보내지 않는다.
+ */
+export function isDashboardPeriodQueryable(
+  start: Date,
+  end: Date,
+  today = new Date(),
+): boolean {
+  if (!isDashboardPeriodWithinLimit(start, end)) return false;
+  const limit = startOfDay(today).getTime();
+  return (
+    startOfDay(start).getTime() <= limit && startOfDay(end).getTime() <= limit
+  );
+}
+
+export type DashboardRangeCommit =
+  | { action: "commit" }
+  | { action: "ignore" }
+  | { action: "reject-too-long" };
+
+/**
+ * 달력 밖에서 기간이 들어와도 조회 상태와 어긋나지 않게 한다.
+ * 오늘 이후가 포함되면 92일 토스트 없이 무시한다. 과거 구간만 상한 초과로 거절한다.
+ */
+export function resolveDashboardRangeChange(
+  start: Date,
+  end: Date,
+  today = new Date(),
+): DashboardRangeCommit {
+  if (isAfterLocalToday(start, today) || isAfterLocalToday(end, today)) {
+    return { action: "ignore" };
+  }
+  if (!isDashboardPeriodWithinLimit(start, end)) {
+    return { action: "reject-too-long" };
+  }
+  return { action: "commit" };
 }
 
 export type DashboardCalendarClick =
@@ -94,15 +167,21 @@ export type DashboardCalendarClick =
 
 /**
  * 달력 날짜 클릭 결과.
- * 상한을 넘는 날짜는 시작일(pendingStart)과 조회 기간을 그대로 둔다.
+ * 오늘 이후이거나 상한을 넘는 날짜는 시작일과 조회 기간을 그대로 둔다.
  */
 export function resolveDashboardCalendarClick(
   pendingStart: Date | null,
   clicked: Date,
   maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+  today = new Date(),
 ): DashboardCalendarClick {
   if (
-    isDashboardCalendarDateDisabled(pendingStart, clicked, maxInclusiveDays)
+    isDashboardCalendarDateDisabled(
+      pendingStart,
+      clicked,
+      maxInclusiveDays,
+      today,
+    )
   ) {
     return { action: "ignore" };
   }

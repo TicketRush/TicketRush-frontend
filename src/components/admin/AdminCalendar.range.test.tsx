@@ -48,6 +48,7 @@ function textOf(node: React.ReactNode): string {
 
 function renderCalendar(
   onRangeChange: (range: { start: Date; end: Date }) => void,
+  today?: Date,
 ) {
   harness.cursor = 0;
   return all(
@@ -57,6 +58,7 @@ function renderCalendar(
         end: parseLocalDateKey("2026-01-30"),
       },
       onRangeChange,
+      today: today ?? parseLocalDateKey("2026-09-25"),
     }),
   );
 }
@@ -94,6 +96,56 @@ function pressEscape(node: Element | undefined) {
 beforeEach(() => {
   harness.values = [];
   harness.cursor = 0;
+});
+
+describe("AdminCalendar 오늘 이후", () => {
+  const today = parseLocalDateKey("2026-01-15");
+
+  it("시작일을 고르기 전에도 내일은 비활성이고, 92일 문구를 쓰지 않는다", () => {
+    const onRangeChange = vi.fn();
+    const nodes = renderCalendar(onRangeChange, today);
+    const tomorrow = dayButton(nodes, 16);
+    const todayButton = dayButton(nodes, 15);
+
+    expect(todayButton?.props.disabled).toBeFalsy();
+    expect(todayButton?.props.title).toBeUndefined();
+    expect(tomorrow?.props.disabled).toBe(true);
+    expect(tomorrow?.props.onClick).toBeUndefined();
+    expect(tomorrow?.props.title).toBe("오늘 이후 날짜는 선택할 수 없습니다");
+    expect(
+      nodes.some(
+        (node) =>
+          node.type === "span" &&
+          node.props.title === "오늘 이후 날짜는 선택할 수 없습니다",
+      ),
+    ).toBe(true);
+    expect(onRangeChange).not.toHaveBeenCalled();
+  });
+
+  it("미래이면서 92일을 넘는 날짜도 미래 안내만 보여 준다", () => {
+    const onRangeChange = vi.fn();
+    let nodes = renderCalendar(onRangeChange, today);
+    click(dayButton(nodes, 1));
+
+    nodes = renderCalendar(onRangeChange, today);
+    click(
+      nodes.find(
+        (node) =>
+          node.type === "button" &&
+          Array.isArray(node.props.children) &&
+          textOf(node.props.children).startsWith("1월"),
+      ),
+    );
+    nodes = renderCalendar(onRangeChange, today);
+    click(buttonByText(nodes, "6월"));
+
+    nodes = renderCalendar(onRangeChange, today);
+    const farFuture = dayButton(nodes, 1);
+    expect(farFuture?.props.disabled).toBe(true);
+    expect(farFuture?.props.title).toBe("오늘 이후 날짜는 선택할 수 없습니다");
+    expect(farFuture?.props.onClick).toBeUndefined();
+    expect(onRangeChange).not.toHaveBeenCalled();
+  });
 });
 
 describe("AdminCalendar 92일 상한", () => {

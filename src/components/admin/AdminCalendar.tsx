@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
+  dashboardCalendarDisabledReason,
+  dashboardCalendarDisabledTitle,
   dashboardCalendarView,
-  isDashboardCalendarDateDisabled,
   MAX_DASHBOARD_PERIOD_DAYS,
   resolveDashboardCalendarCancel,
   resolveDashboardCalendarClick,
@@ -14,6 +15,8 @@ interface AdminCalendarProps {
   selectedRange: { start: Date; end: Date };
   onRangeChange: (range: { start: Date; end: Date }) => void;
   maxInclusiveDays?: number;
+  /** 테스트에서 로컬 오늘을 고정할 때 쓴다. 기본값은 렌더 시점의 오늘. */
+  today?: Date;
 }
 
 const YEAR_RANGE_SIZE = 24;
@@ -23,6 +26,7 @@ export default function AdminCalendar({
   selectedRange,
   onRangeChange,
   maxInclusiveDays = MAX_DASHBOARD_PERIOD_DAYS,
+  today = new Date(),
 }: AdminCalendarProps) {
   const initialView = dashboardCalendarView(selectedRange);
   const [viewYear, setViewYear] = useState(initialView.year);
@@ -33,7 +37,6 @@ export default function AdminCalendar({
   // 범위 선택 중간 상태 (시작일만 클릭한 상태)
   const [pendingStart, setPendingStart] = useState<Date | null>(null);
 
-  const today = new Date();
   function isSameDay(d1: Date, d2: Date) {
     return (
       d1.getFullYear() === d2.getFullYear() &&
@@ -92,6 +95,7 @@ export default function AdminCalendar({
       pendingStart,
       clicked,
       maxInclusiveDays,
+      today,
     );
     if (result.action === "ignore") return;
     if (result.action === "set-start") {
@@ -180,14 +184,15 @@ export default function AdminCalendar({
               const todayFlag = isSameDay(date, today);
               const inRange = isInRange(date);
               const edgeFlag = isRangeEdge(date);
-              const beyondMax = isDashboardCalendarDateDisabled(
+              const disabledReason = dashboardCalendarDisabledReason(
                 pendingStart,
                 date,
+                today,
                 maxInclusiveDays,
               );
 
               let bgClass = "";
-              if (beyondMax) {
+              if (disabledReason) {
                 bgClass = "text-gray-300 cursor-not-allowed disabled:cursor-not-allowed";
               } else if (edgeFlag) {
                 bgClass = "bg-primary text-white font-bold";
@@ -199,21 +204,35 @@ export default function AdminCalendar({
                 bgClass = "hover:bg-gray-100 text-gray-900";
               }
 
+              const disabledTitle = disabledReason
+                ? dashboardCalendarDisabledTitle(
+                    disabledReason,
+                    maxInclusiveDays,
+                  )
+                : undefined;
+
               return (
-                <button
+                <span
                   key={di}
-                  type="button"
-                  disabled={beyondMax}
-                  title={
-                    beyondMax
-                      ? `최대 ${maxInclusiveDays}일까지 선택할 수 있습니다`
-                      : undefined
-                  }
-                  onClick={beyondMax ? undefined : () => handleDateClick(day)}
-                  className={`aspect-square rounded-full text-xs transition ${bgClass}`}
+                  title={disabledTitle}
+                  className={`block aspect-square ${
+                    disabledReason ? "cursor-not-allowed" : ""
+                  }`}
                 >
-                  {day}
-                </button>
+                  <button
+                    type="button"
+                    disabled={disabledReason != null}
+                    title={disabledTitle}
+                    onClick={
+                      disabledReason ? undefined : () => handleDateClick(day)
+                    }
+                    className={`h-full w-full rounded-full text-xs transition ${bgClass} ${
+                      disabledReason ? "pointer-events-none" : ""
+                    }`}
+                  >
+                    {day}
+                  </button>
+                </span>
               );
             })}
           </div>
