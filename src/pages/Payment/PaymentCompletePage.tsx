@@ -97,7 +97,7 @@ export default function PaymentCompletePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
-      <div ref={ticketRef} className="bg-white">
+      <div ref={ticketRef} className="bg-white pt-10">
         <div className="text-center mb-8">
           {isConfirmed ? (
             <div className="inline-flex items-center justify-center size-24 rounded-full bg-green-100 mb-4">
