@@ -101,15 +101,14 @@ function authorizationOf(callIndex = 0): unknown {
   return adapter.mock.calls[callIndex][0].headers.Authorization;
 }
 
-it("preserves an unrecognized 409 code and server message through the real interceptor", async () => {
-  // Synthetic fixture; no production banner error code has been agreed yet.
-  const message = "서버에서 전달한 충돌 안내";
+it("preserves the banner capacity 409 code and server message through the real interceptor", async () => {
+  const message = "등록 가능한 배너 3개가 모두 사용 중입니다.";
   adapter.mockImplementationOnce(async (config) => failure(config, 409, {
-    is_success: false, code: "TEST_CONFLICT", message, result: null,
+    is_success: false, code: "BANNER_409_001", message, result: null,
   }));
   await expect(apiClient.patch("/api/v1/performance/admin/42", {
     display_on_banner: true, banner_subtitle: null,
-  })).rejects.toMatchObject({ name: "ApiError", httpStatus: 409, code: "TEST_CONFLICT", message });
+  })).rejects.toMatchObject({ name: "ApiError", httpStatus: 409, code: "BANNER_409_001", message });
   expect(adapter).toHaveBeenCalledOnce();
   expect(auth.logout).not.toHaveBeenCalled();
 });

@@ -611,6 +611,8 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             {bannerQuery.isError
               ? "배너 수를 확인하지 못했습니다. 새 배너 등록은 잠시 사용할 수 없지만, 공연은 저장할 수 있습니다."
               : bannerQuery.isPending ? "배너 등록 상태를 확인하는 중입니다."
+              : !bannerUnavailable && bannerFull && bannerDisabled
+                ? "배너 3개가 모두 등록되어 새로운 배너를 등록할 수 없습니다."
               : "메인 배너는 최대 3개까지 등록할 수 있습니다."}
           </p>
           <label className="flex items-center gap-2 text-sm">
