@@ -5,6 +5,7 @@ import {
   Ticket,
   Activity,
   PlusSquare,
+  Image,
   RotateCcw,
   ArrowLeft,
 } from "lucide-react";
@@ -15,6 +16,7 @@ const navItems = [
   { to: "/admin/bookings", label: "예매 내역", icon: Ticket },
   { to: "/admin/seat-monitoring", label: "좌석 모니터링", icon: Activity },
   { to: "/admin/concerts/new", label: "공연 등록", icon: PlusSquare },
+  { to: "/admin/banners", label: "배너 관리", icon: Image },
   { to: "/admin/refunds", label: "환불 관리", icon: RotateCcw },
 ];
 
@@ -47,6 +49,7 @@ export default function AdminLayout() {
             <Link
               key={to}
               to={to}
+              aria-current={isActive(to, exact) ? "page" : undefined}
               className={[
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg",
                 "font-pretendard text-sm transition-colors",
