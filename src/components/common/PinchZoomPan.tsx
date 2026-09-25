@@ -30,8 +30,10 @@ import {
   isPannable,
   isZoomKeyTypingTarget,
   isZoomWheelEvent,
+  panDeltaForArrow,
   panDeltaToReveal,
   pointerDistance,
+  resolveSeatMapPanKey,
   resolveSeatMapZoomKey,
   viewportPoint,
   scaleByWheel,
@@ -408,19 +410,33 @@ export default function PinchZoomPan({
       return;
     }
     const action = resolveSeatMapZoomKey(event);
-    if (!action) return;
+    if (action) {
+      event.preventDefault();
+      const before = transformRef.current.scale;
+      if (action === "in") zoomByButton(ZOOM_BUTTON_FACTOR);
+      else if (action === "out") zoomByButton(1 / ZOOM_BUTTON_FACTOR);
+      else reset();
+      const after = transformRef.current.scale;
+      if (action === "fit") setZoomNotice("전체 보기");
+      else if (action === "in" && after <= before + 0.001) {
+        setZoomNotice("더 확대할 수 없습니다");
+      } else if (action === "out" && after >= before - 0.001) {
+        setZoomNotice("더 축소할 수 없습니다");
+      } else setZoomNotice("");
+      return;
+    }
+
+    if (event.target !== event.currentTarget) return;
+    const direction = resolveSeatMapPanKey(event);
+    if (!direction) return;
+    if (!isPannable(transformRef.current, minInteractiveScale())) return;
     event.preventDefault();
-    const before = transformRef.current.scale;
-    if (action === "in") zoomByButton(ZOOM_BUTTON_FACTOR);
-    else if (action === "out") zoomByButton(1 / ZOOM_BUTTON_FACTOR);
-    else reset();
-    const after = transformRef.current.scale;
-    if (action === "fit") setZoomNotice("전체 보기");
-    else if (action === "in" && after <= before + 0.001) {
-      setZoomNotice("더 확대할 수 없습니다");
-    } else if (action === "out" && after >= before - 0.001) {
-      setZoomNotice("더 축소할 수 없습니다");
-    } else setZoomNotice("");
+    const delta = panDeltaForArrow(direction);
+    const prev = transformRef.current;
+    commitTransform(
+      { scale: prev.scale, x: prev.x + delta.x, y: prev.y + delta.y },
+      true,
+    );
   };
 
   const revealFocusedContent = (event: FocusEvent<HTMLDivElement>) => {
@@ -483,7 +499,7 @@ export default function PinchZoomPan({
         {children}
       </div>
       <span id={hintId} className="sr-only">
-        더하기나 등호로 확대, 빼기로 축소, 0으로 전체 보기
+        더하기나 등호로 확대, 빼기로 축소, 0으로 전체 보기. 좌석에서는 방향키로 인접 좌석으로 이동합니다. 이 영역에 포커스가 있고 확대된 상태에서는 방향키로 맵을 둘러봅니다.
       </span>
       <span className="sr-only" aria-live="polite">
         {zoomNotice}

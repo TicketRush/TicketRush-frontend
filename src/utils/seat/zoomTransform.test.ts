@@ -7,7 +7,9 @@ import {
   isPannable,
   isZoomKeyTypingTarget,
   isZoomWheelEvent,
+  panDeltaForArrow,
   panDeltaToReveal,
+  resolveSeatMapPanKey,
   viewportPoint,
   pointerDistance,
   resolveSeatMapZoomKey,
@@ -259,6 +261,22 @@ describe("resolveSeatMapZoomKey", () => {
   it("좌석 선택에 쓰는 Enter·Space는 줌이 아니다", () => {
     expect(resolveSeatMapZoomKey({ key: "Enter" })).toBeNull();
     expect(resolveSeatMapZoomKey({ key: " " })).toBeNull();
+  });
+});
+
+describe("resolveSeatMapPanKey", () => {
+  it("방향키만 맵 팬으로 본다", () => {
+    expect(resolveSeatMapPanKey({ key: "ArrowLeft" })).toBe("left");
+    expect(resolveSeatMapPanKey({ key: "ArrowDown" })).toBe("down");
+    expect(resolveSeatMapPanKey({ key: "+" })).toBeNull();
+    expect(resolveSeatMapPanKey({ key: "ArrowUp", ctrlKey: true })).toBeNull();
+  });
+});
+
+describe("panDeltaForArrow", () => {
+  it("보는 방향의 반대쪽으로 콘텐츠를 옮긴다", () => {
+    expect(panDeltaForArrow("right", 40)).toEqual({ x: -40, y: 0 });
+    expect(panDeltaForArrow("up", 40)).toEqual({ x: 0, y: 40 });
   });
 });
 
