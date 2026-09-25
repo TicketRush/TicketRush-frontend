@@ -22,36 +22,78 @@ const CAPTURE_SCALE = 2;
 
 /**
  * lucide 아이콘은 `stroke="currentColor"` SVG다.
- * html2canvas는 `<circle>`·currentColor 획을 비워 그린다.
- * 체크 아이콘이 민트색 원만 남는 이유다. 계산된 색을 박은 뒤 비트맵으로 바꾼다.
+ * SVG를 `data:image/svg+xml`로만 바꾸면 html2canvas가 `<circle>` 획을 다시 비운다.
+ * 브라우저가 PNG로 그린 뒤에 그 이미지만 캡처에 넘긴다.
  */
-function replaceSvgIcons(root: HTMLElement): void {
-  for (const svg of root.querySelectorAll("svg")) {
-    const style = getComputedStyle(svg);
-    const color = style.color || "#111827";
-    const width = Math.ceil(svg.getBoundingClientRect().width) || Number(svg.getAttribute("width")) || 24;
-    const height = Math.ceil(svg.getBoundingClientRect().height) || Number(svg.getAttribute("height")) || 24;
+async function replaceSvgIcons(root: HTMLElement): Promise<void> {
+  await Promise.all([...root.querySelectorAll("svg")].map(replaceSvgIcon));
+}
 
-    const painted = svg.cloneNode(true) as SVGElement;
-    painted.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    painted.setAttribute("width", String(width));
-    painted.setAttribute("height", String(height));
-    for (const el of [painted, ...painted.querySelectorAll("*")]) {
-      for (const name of ["stroke", "fill"] as const) {
-        if (el.getAttribute(name) === "currentColor") el.setAttribute(name, color);
-      }
+async function replaceSvgIcon(svg: SVGElement): Promise<void> {
+  const style = getComputedStyle(svg);
+  const color = style.color || "#111827";
+  const width =
+    Math.ceil(svg.getBoundingClientRect().width) ||
+    Number(svg.getAttribute("width")) ||
+    24;
+  const height =
+    Math.ceil(svg.getBoundingClientRect().height) ||
+    Number(svg.getAttribute("height")) ||
+    24;
+
+  const painted = svg.cloneNode(true) as SVGElement;
+  painted.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  painted.setAttribute("width", String(width));
+  painted.setAttribute("height", String(height));
+  for (const el of [painted, ...painted.querySelectorAll("*")]) {
+    for (const name of ["stroke", "fill"] as const) {
+      if (el.getAttribute(name) === "currentColor") el.setAttribute(name, color);
     }
-
-    const img = document.createElement("img");
-    img.alt = "";
-    img.width = width;
-    img.height = height;
-    img.style.cssText = `width:${width}px;height:${height}px;display:block;`;
-    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-      new XMLSerializer().serializeToString(painted),
-    )}`;
-    svg.replaceWith(img);
   }
+
+  const xml = new XMLSerializer().serializeToString(painted);
+  let src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+  try {
+    src = await rasterizeSvgPng(xml, width, height);
+  } catch {
+    // PNG로 못 그리면 기존 SVG 이미지를 남긴다.
+  }
+
+  const img = document.createElement("img");
+  img.alt = "";
+  img.width = width;
+  img.height = height;
+  img.style.cssText = `width:${width}px;height:${height}px;display:block;`;
+  img.src = src;
+  svg.replaceWith(img);
+}
+
+function rasterizeSvgPng(
+  xml: string,
+  width: number,
+  height: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, width * CAPTURE_SCALE);
+      canvas.height = Math.max(1, height * CAPTURE_SCALE);
+      const ctx = canvas.getContext("2d");
+      if (!ctx || !image.naturalWidth || !image.naturalHeight) {
+        reject(new Error("svg raster failed"));
+        return;
+      }
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = () => reject(new Error("svg load failed"));
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+  });
 }
 
 /**
@@ -214,7 +256,7 @@ export async function renderTicketCanvas(
 
   try {
     releaseTextClipping(clone);
-    replaceSvgIcons(clone);
+    await replaceSvgIcons(clone);
     await waitForAssets(stage);
     await bakeCoverImages(clone);
     await waitForAssets(stage);
