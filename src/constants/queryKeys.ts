@@ -47,6 +47,7 @@ export const queryKeys = {
     count: () => ["bookings", "count"] as const,
     detail: (bookingNumber: string) =>
       ["bookings", "detail", bookingNumber] as const,
+    pendingResume: () => ["bookings", "pending-resume"] as const,
   },
   payments: {
     all: ["payments"] as const,
