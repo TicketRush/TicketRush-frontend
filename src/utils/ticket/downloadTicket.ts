@@ -17,6 +17,9 @@ import html2canvas from "html2canvas";
  */
 const CAPTURE_WIDTH = 640;
 
+/** html2canvas `scale`과 맞춘다. 포스터만 1배로 자르면 PNG에서 흐리다. */
+const CAPTURE_SCALE = 2;
+
 /**
  * lucide 아이콘은 `stroke="currentColor"` SVG다.
  * html2canvas는 `<circle>`·currentColor 획을 비워 그린다.
@@ -49,6 +52,82 @@ function replaceSvgIcons(root: HTMLElement): void {
     )}`;
     svg.replaceWith(img);
   }
+}
+
+/**
+ * html2canvas는 `object-fit`과 퍼센트 높이를 무시한다.
+ * 포스터는 `h-full` + `object-cover` + `overflow-hidden`이라 캡처본에서 빈 칸이 된다.
+ * 레이아웃이 잡힌 뒤 박스 크기로 cover 크롭한 이미지를 넣는다.
+ * CORS로 읽지 못하면 노드는 그대로 둔다. overflow를 풀어도 그 이미지는 그려지지 않는다.
+ */
+async function bakeCoverImages(root: HTMLElement): Promise<void> {
+  const imgs = [...root.querySelectorAll("img")].filter(
+    (img) => !img.src.startsWith("data:"),
+  );
+
+  await Promise.all(
+    imgs.map(async (img) => {
+      const fit = getComputedStyle(img).objectFit;
+      if (fit !== "cover" && fit !== "contain") return;
+
+      const box = img.getBoundingClientRect();
+      const parent = img.parentElement?.getBoundingClientRect();
+      const width = Math.round(box.width || parent?.width || 0);
+      const height = Math.round(box.height || parent?.height || 0);
+      if (width < 2 || height < 2) return;
+
+      const src = img.currentSrc || img.src;
+      try {
+        img.src = await fittedImageDataUrl(
+          src,
+          width * CAPTURE_SCALE,
+          height * CAPTURE_SCALE,
+          fit,
+        );
+      } catch {
+        return;
+      }
+      img.style.width = `${width}px`;
+      img.style.height = `${height}px`;
+      img.style.objectFit = "fill";
+    }),
+  );
+}
+
+function fittedImageDataUrl(
+  src: string,
+  width: number,
+  height: number,
+  fit: string,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx || !image.naturalWidth || !image.naturalHeight) {
+        reject(new Error("poster draw failed"));
+        return;
+      }
+      const scale =
+        fit === "contain"
+          ? Math.min(width / image.naturalWidth, height / image.naturalHeight)
+          : Math.max(width / image.naturalWidth, height / image.naturalHeight);
+      const dw = image.naturalWidth * scale;
+      const dh = image.naturalHeight * scale;
+      ctx.drawImage(image, (width - dw) / 2, (height - dh) / 2, dw, dh);
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        reject(new Error("poster tainted"));
+      }
+    };
+    image.onerror = () => reject(new Error("poster load failed"));
+    image.src = src;
+  });
 }
 
 /**
@@ -116,6 +195,8 @@ export async function renderTicketCanvas(
     releaseTextClipping(clone);
     replaceSvgIcons(clone);
     await waitForAssets(stage);
+    await bakeCoverImages(clone);
+    await waitForAssets(stage);
 
     // 높이를 넘겨주지 않으면 html2canvas가 창 높이 기준으로 잘라낸 canvas를
     // 만든다(세로로 잘린 이미지의 원인). windowWidth도 고정해 캡처 시점의
@@ -124,7 +205,7 @@ export async function renderTicketCanvas(
 
     return await html2canvas(stage, {
       backgroundColor: "#ffffff",
-      scale: 2, // 고해상도 (Retina 대응)
+      scale: CAPTURE_SCALE, // 고해상도 (Retina 대응)
       useCORS: true, // cross-origin 이미지(포스터 등) 대응
       width: CAPTURE_WIDTH,
       height,
