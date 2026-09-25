@@ -30,8 +30,6 @@ async function replaceSvgIcons(root: HTMLElement): Promise<void> {
 }
 
 async function replaceSvgIcon(svg: SVGElement): Promise<void> {
-  const style = getComputedStyle(svg);
-  const color = style.color || "#111827";
   const width =
     Math.ceil(svg.getBoundingClientRect().width) ||
     Number(svg.getAttribute("width")) ||
@@ -45,18 +43,19 @@ async function replaceSvgIcon(svg: SVGElement): Promise<void> {
   painted.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   painted.setAttribute("width", String(width));
   painted.setAttribute("height", String(height));
-  for (const el of [painted, ...painted.querySelectorAll("*")]) {
-    for (const name of ["stroke", "fill"] as const) {
-      if (el.getAttribute(name) === "currentColor") el.setAttribute(name, color);
-    }
-  }
+  // 단독 SVG 이미지는 부모의 currentColor를 상속하지 못한다.
+  // 화면에서 계산된 획을 원·체크 각각에 속성으로 박는다.
+  copyPaintAttributes(svg, painted);
 
-  const xml = new XMLSerializer().serializeToString(painted);
-  let src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+  let src: string;
   try {
-    src = await rasterizeSvgPng(xml, width, height);
+    src = await rasterizeSvgPng(
+      new XMLSerializer().serializeToString(painted),
+      width,
+      height,
+    );
   } catch {
-    // PNG로 못 그리면 기존 SVG 이미지를 남긴다.
+    return;
   }
 
   const img = document.createElement("img");
@@ -68,31 +67,73 @@ async function replaceSvgIcon(svg: SVGElement): Promise<void> {
   svg.replaceWith(img);
 }
 
+function copyPaintAttributes(source: SVGElement, painted: SVGElement): void {
+  const sources = [source, ...source.querySelectorAll("*")];
+  const targets = [painted, ...painted.querySelectorAll("*")];
+  sources.forEach((original, index) => {
+    const target = targets[index];
+    if (!target) return;
+    const style = getComputedStyle(original);
+    if (style.stroke && style.stroke !== "none") {
+      target.setAttribute("stroke", style.stroke);
+    }
+    if (style.fill) target.setAttribute("fill", style.fill);
+    const strokeWidth = style.strokeWidth.replace("px", "");
+    if (strokeWidth) target.setAttribute("stroke-width", strokeWidth);
+    if (style.strokeLinecap) {
+      target.setAttribute("stroke-linecap", style.strokeLinecap);
+    }
+    if (style.strokeLinejoin) {
+      target.setAttribute("stroke-linejoin", style.strokeLinejoin);
+    }
+  });
+}
+
 function rasterizeSvgPng(
   xml: string,
   width: number,
   height: number,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const image = new Image();
+    const finish = () => URL.revokeObjectURL(url);
     image.onload = () => {
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, width * CAPTURE_SCALE);
       canvas.height = Math.max(1, height * CAPTURE_SCALE);
       const ctx = canvas.getContext("2d");
-      if (!ctx || !image.naturalWidth || !image.naturalHeight) {
+      if (!ctx) {
+        finish();
         reject(new Error("svg raster failed"));
         return;
       }
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let visible = false;
+      for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] !== 0) {
+          visible = true;
+          break;
+        }
+      }
+      finish();
+      if (!visible) {
+        reject(new Error("blank svg"));
+        return;
+      }
       try {
         resolve(canvas.toDataURL("image/png"));
       } catch (error) {
         reject(error);
       }
     };
-    image.onerror = () => reject(new Error("svg load failed"));
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+    image.onerror = () => {
+      finish();
+      reject(new Error("svg load failed"));
+    };
+    image.src = url;
   });
 }
 
