@@ -5,8 +5,12 @@ import {
   clampPan,
   computeFitTransform,
   isPannable,
+  isZoomKeyTypingTarget,
   isZoomWheelEvent,
+  panDeltaToReveal,
+  viewportPoint,
   pointerDistance,
+  resolveSeatMapZoomKey,
   scaleByWheel,
   zoomAroundPoint,
   transformsEqual,
@@ -155,6 +159,43 @@ describe("scaleByWheel", () => {
   });
 });
 
+describe("viewportPoint", () => {
+  it("대상이 없으면 뷰포트 중심이다", () => {
+    expect(
+      viewportPoint({ left: 10, top: 20, width: 200, height: 100 }, null),
+    ).toEqual({ x: 100, y: 50 });
+  });
+
+  it("대상의 화면 중심을 뷰포트 좌표로 바꾼다", () => {
+    expect(
+      viewportPoint(
+        { left: 10, top: 20, width: 200, height: 100 },
+        { left: 50, top: 40, width: 20, height: 20 },
+      ),
+    ).toEqual({ x: 50, y: 30 });
+  });
+});
+
+describe("panDeltaToReveal", () => {
+  const container = { left: 0, top: 0, right: 200, bottom: 100 };
+
+  it("이미 안에 있으면 움직이지 않는다", () => {
+    expect(
+      panDeltaToReveal(container, { left: 20, top: 20, right: 40, bottom: 40 }, 8),
+    ).toEqual({ x: 0, y: 0 });
+  });
+
+  it("밖으로 나간 쪽만 패딩 안쪽으로 당긴다", () => {
+    expect(
+      panDeltaToReveal(
+        container,
+        { left: -30, top: 20, right: 10, bottom: 40 },
+        8,
+      ),
+    ).toEqual({ x: 38, y: 0 });
+  });
+});
+
 describe("isZoomWheelEvent", () => {
   it("Ctrl 또는 Meta가 있을 때만 줌으로 본다", () => {
     expect(isZoomWheelEvent({ ctrlKey: true, metaKey: false })).toBe(true);
@@ -192,6 +233,47 @@ describe("isPannable", () => {
 
   it("맞춤보다 확대되면 팬한다", () => {
     expect(isPannable({ scale: 0.8, x: 0, y: 0 }, 0.5)).toBe(true);
+  });
+});
+
+describe("resolveSeatMapZoomKey", () => {
+  it.each([
+    ["+", "in"],
+    ["=", "in"],
+    ["Add", "in"],
+    ["-", "out"],
+    ["_", "out"],
+    ["Subtract", "out"],
+    ["0", "fit"],
+  ] as const)("%s 는 %s", (key, action) => {
+    expect(resolveSeatMapZoomKey({ key })).toBe(action);
+  });
+
+  it("Ctrl·Meta·Alt와 조합 중 입력은 브라우저에 맡긴다", () => {
+    expect(resolveSeatMapZoomKey({ key: "+", ctrlKey: true })).toBeNull();
+    expect(resolveSeatMapZoomKey({ key: "-", metaKey: true })).toBeNull();
+    expect(resolveSeatMapZoomKey({ key: "0", altKey: true })).toBeNull();
+    expect(resolveSeatMapZoomKey({ key: "+", isComposing: true })).toBeNull();
+  });
+
+  it("좌석 선택에 쓰는 Enter·Space는 줌이 아니다", () => {
+    expect(resolveSeatMapZoomKey({ key: "Enter" })).toBeNull();
+    expect(resolveSeatMapZoomKey({ key: " " })).toBeNull();
+  });
+});
+
+describe("isZoomKeyTypingTarget", () => {
+  it("입력 칸에서는 줌 키를 가로채지 않는다", () => {
+    expect(
+      isZoomKeyTypingTarget({
+        closest: (selector) => (selector.includes("input") ? {} : null),
+      }),
+    ).toBe(true);
+  });
+
+  it("좌석 버튼은 입력 칸이 아니다", () => {
+    expect(isZoomKeyTypingTarget({ closest: () => null })).toBe(false);
+    expect(isZoomKeyTypingTarget(null)).toBe(false);
   });
 });
 
