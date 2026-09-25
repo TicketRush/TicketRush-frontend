@@ -466,7 +466,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
           </Field>
         </Section>
 
-        <Section title="일정 정보">
+        <Section title="공연 일정">
           {dateError && <p id="show-date-error" className="text-sm text-red-400">{dateError}</p>}
           {timeError && <p id="show-time-error" className="text-sm text-red-400">{timeError}</p>}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">

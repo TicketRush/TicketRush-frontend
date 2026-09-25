@@ -109,6 +109,25 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it.each(["create", "edit"])("shows required date labels only in the performance schedule (%s)", (mode) => {
+  vi.stubGlobal("sessionStorage", { getItem: () => null });
+  const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
+  expect(html).toContain("공연 일정");
+  expect(html).not.toContain("일정 정보");
+  expect(html).toContain("예매 일정");
+  for (const [part, text] of [["year", "연도"], ["month", "월"], ["day", "일"]]) {
+    const showLabel = html.match(new RegExp(`<label[^>]*for="show-date-${part}"[^>]*>([\\s\\S]*?)</label>`))?.[1];
+    const bookingLabel = html.match(new RegExp(`<label[^>]*for="booking-open-${part}"[^>]*>([\\s\\S]*?)</label>`))?.[1];
+    expect(showLabel).toContain(text);
+    expect(showLabel).toMatch(/<span[^>]*aria-hidden="true"[^>]*>\*<\/span>/);
+    expect(bookingLabel).toContain(text);
+    expect(bookingLabel).not.toContain("*");
+    for (const label of [showLabel!, bookingLabel!]) {
+      expect(label).not.toMatch(/\s(?:required|aria-required)=/);
+    }
+  }
+});
+
 type FormElement = React.ReactElement<Record<string, unknown>>;
 function formNodes(node: React.ReactNode): FormElement[] {
   if (Array.isArray(node)) return node.flatMap(formNodes);
