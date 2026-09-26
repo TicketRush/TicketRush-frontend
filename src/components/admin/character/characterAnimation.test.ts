@@ -15,6 +15,35 @@ async function load(path: string) {
 }
 
 describe("shared character animation with real GLBs", () => {
+  it.each(CHARACTER_ANIMATIONS)("keeps the authored static classic dress visible during $id and replacement", async ({ id }) => {
+    const base = await load("chibi-base");
+    const classic = await load("outfits/classic_outfit");
+    const scene = clone(classic.scene);
+    const dress = scene.getObjectByName("classic_dress")!;
+    scene.updateMatrixWorld(true);
+    const initial = dress.matrixWorld.clone();
+    const timeline = new CharacterAnimation(base.animations);
+    timeline.register(clone(base.scene), true);
+    timeline.play(id);
+    timeline.update(0.6);
+    const remove = timeline.register(scene);
+    timeline.update(0.4);
+    scene.updateMatrixWorld(true);
+    expect(dress).not.toBeInstanceOf(SkinnedMesh);
+    expect(dress.visible).toBe(true);
+    expect(dress.matrixWorld.equals(initial)).toBe(true);
+    const uncache = vi.spyOn(AnimationMixer.prototype, "uncacheRoot");
+    remove();
+    expect(uncache).toHaveBeenCalledWith(scene);
+    const replacement = clone(classic.scene);
+    const removeReplacement = timeline.register(replacement);
+    timeline.update(0.2);
+    expect(replacement.getObjectByName("classic_dress")!.visible).toBe(true);
+    removeReplacement();
+    timeline.dispose();
+    uncache.mockRestore();
+  });
+
   it("replaces a playing animation with a fresh clip and restores rest", async () => {
     const base = await load("chibi-base");
     const body = clone(base.scene);
