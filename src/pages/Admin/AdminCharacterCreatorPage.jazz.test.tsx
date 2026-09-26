@@ -127,6 +127,48 @@ function loadRgb() {
   });
 }
 
+function chooseOutfit(label: string) {
+  const section = render().find(node => node.props.title === "의상 선택")!;
+  const cards = all(section.props.children as React.ReactNode).filter(node => typeof node.type === "function" && node.props.onClick && all(node.props.children as React.ReactNode).some(child => child.props.children === label));
+  expect(cards).toHaveLength(1);
+  const card = cards[0];
+  const button = all((card.type as React.FunctionComponent<Record<string, unknown>>)(card.props)).find(node => node.type === "button")!;
+  (button.props.onClick as () => void)();
+}
+
+it("selects classic, changes its color, applies and restores the same legacy ID without persisting playback", () => {
+  chooseOutfit("클래식");
+  const colorControl = render().find(node => node.props.idPrefix === "outfit")!;
+  const input = all((colorControl.type as React.FunctionComponent<Record<string, unknown>>)(colorControl.props))
+    .find(node => node.type === "input" && node.props.type === "color")!;
+  (input.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "#123ABC" } });
+  for (const [label, id] of [["인사", "wave"], ["큐트", "cute"], ["입 가리기", "cover_mouth"]]) {
+    const button = render().find(node => node.type === "button" && node.props["aria-label"] === label)!;
+    (button.props.onClick as () => void)();
+    renderViewer();
+    expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ outfitModelId: "classic", outfitColor: "#123ABC", animationRequest: expect.objectContaining({ id }) }), undefined);
+  }
+  const apply = render().find(node => node.type === "button" && String(node.props.children).includes("제작값 적용"))!;
+  (apply.props.onClick as () => void)();
+  const saved = JSON.parse(harness.save.mock.calls[0][1]);
+  expect(saved).toMatchObject({ outfitModelId: "classic", outfitColor: "#123ABC" });
+  expect(saved).not.toHaveProperty("animationRequest");
+  expect(JSON.stringify(saved)).not.toContain(".glb");
+  harness.values = [];
+  vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(saved), setItem: harness.save });
+  renderViewer();
+  expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ outfitModelId: "classic", outfitColor: "#123ABC", animationRequest: undefined }), undefined);
+  const restored = render().find(node => node.props.selected === true && all(node.props.children as React.ReactNode).some(child => child.props.children === "클래식"));
+  expect(restored).toBeDefined();
+  chooseOutfit("재즈");
+  renderViewer();
+  expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ outfitModelId: "rainbow-blouse" }), undefined);
+  chooseOutfit("클래식");
+  chooseOutfit("클래식");
+  renderViewer();
+  expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ outfitModelId: "classic", outfitColor: "#123ABC" }), undefined);
+});
+
 it("passes all three distinct jazz colors to the actual viewer mock", () => {
   loadRgb();
   renderViewer();
