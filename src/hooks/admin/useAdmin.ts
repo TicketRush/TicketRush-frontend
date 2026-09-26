@@ -13,9 +13,15 @@ import { queryKeys } from "@/constants/queryKeys";
 import type {
   AdminBookingListParams,
   AdminConcertListParams,
+  AdminConcertListResponse,
   AdminDashboardParams,
 } from "@/types/domain/admin";
 import type { AdminBookingListTab } from "@/utils/admin/adminBookingTabs";
+import {
+  freshAdminConcertPages,
+  isAbortError,
+  resolveAdminConcertTitle,
+} from "@/utils/admin/adminConcertTitle";
 import {
   isDashboardPeriodQueryable,
   parseLocalDateKey,
@@ -37,6 +43,7 @@ export const adminKeys = {
     ["admin", "dashboard", params] as const,
   concerts: (params?: AdminConcertListParams) =>
     ["admin", "concerts", params] as const,
+  concertTitle: (id: number) => ["admin", "concert-title", id] as const,
   bookings: (
     params?: AdminBookingListParams & { tab?: AdminBookingListTab },
   ) => ["admin", "bookings", params] as const,
@@ -76,6 +83,56 @@ export function useAdminDashboard(params: AdminDashboardParams) {
     enabled,
     placeholderData: (prev) => prev,
     retry: retryUnlessClientError,
+  });
+}
+
+const ADMIN_CONCERT_TITLE_PAGE_SIZE = 50;
+const ADMIN_CONCERT_LIST_FRESH_MS = 30_000;
+
+export function useAdminConcertTitle(
+  performanceId: number | undefined,
+  options?: { enabled?: boolean },
+) {
+  const qc = useQueryClient();
+  const id =
+    performanceId != null &&
+    Number.isSafeInteger(performanceId) &&
+    performanceId > 0
+      ? performanceId
+      : undefined;
+  const enabled = (options?.enabled ?? true) && id != null;
+
+  return useQuery({
+    queryKey: id != null
+      ? adminKeys.concertTitle(id)
+      : ["admin", "concert-title", "invalid"],
+    queryFn: ({ signal }) =>
+      resolveAdminConcertTitle(id!, {
+        pageSize: ADMIN_CONCERT_TITLE_PAGE_SIZE,
+        signal,
+        cached: freshAdminConcertPages(
+          qc
+            .getQueryCache()
+            .findAll({ queryKey: ["admin", "concerts"] })
+            .map((query) => ({
+              data: query.state.data as AdminConcertListResponse | undefined,
+              updatedAt: query.state.dataUpdatedAt,
+              invalidated: query.state.isInvalidated,
+            })),
+          Date.now(),
+          ADMIN_CONCERT_LIST_FRESH_MS,
+        ),
+        fetchPage: async (page) => {
+          const params = { page, size: ADMIN_CONCERT_TITLE_PAGE_SIZE };
+          const list = await api.fetchAdminConcerts(params, signal);
+          qc.setQueryData(adminKeys.concerts(params), list);
+          return list;
+        },
+      }),
+    enabled,
+    staleTime: ADMIN_CONCERT_LIST_FRESH_MS,
+    retry: (failureCount, error) =>
+      !isAbortError(error) && retryUnlessClientError(failureCount, error),
   });
 }
 
