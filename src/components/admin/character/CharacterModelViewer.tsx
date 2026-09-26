@@ -1,3 +1,7 @@
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { CharacterAnimationProvider, CharacterFace } from "./CharacterAnimationProvider";
+import { useCharacterAnimationPart } from "./useCharacterAnimationPart";
+import type { CharacterAnimationRequest } from "./characterAnimation";
 import { applyJazzPartColor } from "./jazzOutfitColor";
 import { findConcertPartColor, cloneConcertMaterialWithColor } from "./concertOutfitColor";
 import {
@@ -39,6 +43,7 @@ export type { EyeStyle } from "@/components/admin/character/characterEye";
 export type { OutfitModelId } from "@/components/admin/character/characterOutfit";
 
 interface CharacterModelViewerProps {
+  animationRequest?: CharacterAnimationRequest;
   modelUrl?: string;
   /** Used when centered is false. */
   modelPosition?: [number, number, number];
@@ -183,7 +188,7 @@ function CharacterBody({
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
-    const clonedScene = gltf.scene.clone(true);
+    const clonedScene = cloneSkeleton(gltf.scene);
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
@@ -204,6 +209,8 @@ function CharacterBody({
     return clonedScene;
   }, [gltf.scene, skinColor]);
 
+  useCharacterAnimationPart(scene, gltf.scene, true);
+
   return <primitive object={scene} />;
 }
 
@@ -215,7 +222,7 @@ function HairModel({
   const gltf = useGLTF(hairModelUrl);
 
   const scene = useMemo(() => {
-    const clonedScene = gltf.scene.clone(true);
+    const clonedScene = cloneSkeleton(gltf.scene);
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
@@ -231,6 +238,8 @@ function HairModel({
     return clonedScene;
   }, [gltf.scene, hairColor]);
 
+  useCharacterAnimationPart(scene, gltf.scene);
+
   return <primitive object={scene} />;
 }
 
@@ -241,7 +250,7 @@ function EyeModel({
   const gltf = useGLTF(eyeModelUrl);
 
   const scene = useMemo(() => {
-    return gltf.scene.clone(true);
+    return cloneSkeleton(gltf.scene);
   }, [gltf.scene]);
 
   return <primitive object={scene} />;
@@ -252,7 +261,7 @@ function MouthAsset({ mouthStyle }: { mouthStyle: MouthStyle }) {
   const gltf = useGLTF(mouthModelUrl);
 
   const scene = useMemo(() => {
-    return gltf.scene.clone(true);
+    return cloneSkeleton(gltf.scene);
   }, [gltf.scene]);
 
   return <primitive object={scene} />;
@@ -527,9 +536,10 @@ function OutfitModel({
   const gltf = useGLTF(modelUrl);
 
   const scene = useMemo(() => {
-    const clonedScene = gltf.scene.clone(true);
+    const clonedScene = cloneSkeleton(gltf.scene);
 
     if (
+      outfitModelId !== "classic" &&
       outfitModelId !== "festival" &&
       outfitModelId !== "musical" &&
       outfitModelId !== "concert" &&
@@ -542,6 +552,11 @@ function OutfitModel({
 
     clonedScene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      if (outfitModelId === "classic") {
+        applyMeshColorWithoutBaseTexture(object, outfitColor);
         return;
       }
 
@@ -683,10 +698,13 @@ function OutfitModel({
     fanmeetSkirtColor,
   ]);
 
+  useCharacterAnimationPart(scene, gltf.scene);
+
   return <primitive object={scene} />;
 }
 
 function CharacterModel({
+  animationRequest,
   modelPosition = [0, -0.4, 0],
   modelScale = 0.8,
   centered = false,
@@ -717,6 +735,7 @@ function CharacterModel({
   fanmeetSkirtColor = DEFAULT_FANMEET_SKIRT_COLOR,
 }: Pick<
   CharacterModelViewerProps,
+  | "animationRequest"
   | "modelPosition"
   | "modelScale"
   | "centered"
@@ -774,52 +793,57 @@ function CharacterModel({
   ) : null;
 
   return (
-    <Center
-      cacheKey={
-        centered
-          ? [
-              modelUrl,
-              hairStyle,
-              eyeStyle,
-              mouthStyle,
-              outfitModelId,
-              modelScale,
-            ].join(":")
-          : 0
-      }
-    >
-      <group
-        scale={modelScale}
-        position={centered ? [0, 0, 0] : modelPosition}
-        rotation={[0, 0, 0]}
+    <CharacterAnimationProvider modelUrl={modelUrl} request={animationRequest}>
+      <Center
+        cacheKey={
+          centered
+            ? [
+                modelUrl,
+                hairStyle,
+                eyeStyle,
+                mouthStyle,
+                outfitModelId,
+                modelScale,
+              ].join(":")
+            : 0
+        }
       >
-        <CharacterBody
-          modelUrl={modelUrl}
-          skinColor={skinColor}
-        />
+        <group
+          scale={modelScale}
+          position={centered ? [0, 0, 0] : modelPosition}
+          rotation={[0, 0, 0]}
+        >
+          <CharacterBody
+            modelUrl={modelUrl}
+            skinColor={skinColor}
+          />
 
-        <HairModel
-          hairStyle={hairStyle}
-          hairColor={hairColor}
-        />
+          <HairModel
+            hairStyle={hairStyle}
+            hairColor={hairColor}
+          />
 
-        <EyeModel eyeStyle={eyeStyle} />
+          <CharacterFace>
+            <EyeModel eyeStyle={eyeStyle} />
 
-        <MouthModel mouthStyle={mouthStyle} />
+            <MouthModel mouthStyle={mouthStyle} />
+          </CharacterFace>
 
-        {centered ? (
-          outfit
-        ) : (
-          <Suspense fallback={null}>
-            {outfit}
-          </Suspense>
-        )}
-      </group>
-    </Center>
+          {centered ? (
+            outfit
+          ) : (
+            <Suspense fallback={null}>
+              {outfit}
+            </Suspense>
+          )}
+        </group>
+      </Center>
+    </CharacterAnimationProvider>
   );
 }
 
 export default function CharacterModelViewer({
+  animationRequest,
   modelPosition = [0, -0.4, 0],
   modelScale = 0.8,
   centered = false,
@@ -869,6 +893,7 @@ export default function CharacterModelViewer({
 
         <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
+            animationRequest={animationRequest}
             modelPosition={modelPosition}
             modelScale={modelScale}
             centered={centered}

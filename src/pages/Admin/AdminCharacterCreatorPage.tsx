@@ -1,3 +1,4 @@
+import { CHARACTER_ANIMATIONS, type CharacterAnimationRequest } from "@/components/admin/character/characterAnimation";
 import { toast } from "react-toastify";
 import type {
   CharacterDraft,
@@ -298,6 +299,7 @@ export default function AdminCharacterCreatorPage() {
     loadSavedCharacter() ?? DEFAULT_CHARACTER,
   );
 
+  const [animationRequest, setAnimationRequest] = useState<CharacterAnimationRequest>();
   const [skinHexInput, setSkinHexInput] = useState(
     () => character.skinColor,
   );
@@ -3017,6 +3019,7 @@ export default function AdminCharacterCreatorPage() {
               }}
             >
               <CharacterModelViewer
+                animationRequest={animationRequest}
                 modelUrl="/models/chibi-base.glb"
                 skinColor={character.skinColor}
                 hairColor={character.hairColor}
@@ -3048,6 +3051,19 @@ export default function AdminCharacterCreatorPage() {
                 eyeStyle={character.eyeStyle}
                 mouthStyle={character.mouthStyle}
               />
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="애니메이션">
+              {CHARACTER_ANIMATIONS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-100"
+                  onClick={() => setAnimationRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
