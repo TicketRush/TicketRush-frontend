@@ -11,6 +11,18 @@ vi.mock("@/components/admin/character/CharacterModelViewer", () => ({
 vi.mock("@/hooks/common/useDocumentTitle", () => ({ useDocumentTitle: vi.fn() }));
 afterEach(() => vi.unstubAllGlobals());
 
+it.each(["standing", "wave", "heart", "dance", "sing"])("shows exactly three animation actions with legacy pose %s", pose => {
+  vi.stubGlobal("React", React);
+  vi.stubGlobal("localStorage", { getItem: () => JSON.stringify({ outfitModelId: "classic", pose }) });
+  const html = renderToStaticMarkup(<MemoryRouter><AdminCharacterCreatorPage /></MemoryRouter>);
+  for (const label of ["인사", "큐트", "입 가리기"]) {
+    expect(html.match(new RegExp(`aria-label="${label}"`, "g"))).toHaveLength(1);
+  }
+  for (const icon of ["👋", "🫰", "🤭"]) expect(html).toContain(icon);
+  for (const label of ["손 흔들기", "손가락 하트", "춤추기", "노래하기", "포즈:"]) expect(html).not.toContain(label);
+  expect(html.match(/role="group" aria-label="애니메이션"/g)).toHaveLength(1);
+});
+
 describe("character creator without accessory controls", () => {
   it.each(["rainbow-blouse", "concert", "theater", "classic", "ballet", "musical", "festival"])("shows jazz controls only for jazz (%s)", (outfitModelId) => {
     vi.stubGlobal("React", React);
@@ -38,7 +50,7 @@ describe("character creator without accessory controls", () => {
       for (const label of ["액세서리", "제거", "선글라스", "모자", "헤드셋", "마이크", "기타", "응원봉"]) {
         expect(html).not.toContain(label);
       }
-      for (const label of ["피부", "헤어", "눈", "입", "의상", "포즈", "배경", "3D preview"]) {
+      for (const label of ["피부", "헤어", "눈", "입", "의상", "애니메이션", "배경", "3D preview"]) {
         expect(html).toContain(label);
       }
       const draft = accessory === undefined

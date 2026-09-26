@@ -75,7 +75,7 @@ it.each([["인사", "wave"], ["큐트", "cute"], ["입 가리기", "cover_mouth"
   "restarts %s on every click without changing saved customization",
   (label, id) => {
     const click = () => {
-      const button = render().find(node => node.type === "button" && node.props.children === label)!;
+      const button = render().find(node => node.type === "button" && node.props["aria-label"] === label)!;
       (button.props.onClick as () => void)();
     };
     click();
@@ -93,6 +93,33 @@ it.each([["인사", "wave"], ["큐트", "cute"], ["입 가리기", "cover_mouth"
 );
 
 const rgb = { jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" };
+
+it.each(["standing", "wave", "heart", "dance", "sing"])(
+  "loads legacy pose %s without autoplay and keeps playback out of applied settings",
+  pose => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify({ outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF", pose }),
+      setItem: harness.save,
+    });
+    renderViewer();
+    expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ animationRequest: undefined }), undefined);
+    for (const [index, label] of ["인사", "큐트", "입 가리기"].entries()) {
+      const button = render().find(node => node.type === "button" && node.props["aria-label"] === label)!;
+      (button.props.onClick as () => void)();
+      renderViewer();
+      expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({
+        animationRequest: { id: ["wave", "cute", "cover_mouth"][index], sequence: index + 1 },
+      }), undefined);
+    }
+    const apply = render().find(node => node.type === "button" && String(node.props.children).includes("제작값 적용"))!;
+    (apply.props.onClick as () => void)();
+    const saved = JSON.parse(harness.save.mock.calls[0][1]);
+    expect(saved).toMatchObject({ pose, outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF" });
+    expect(saved).not.toHaveProperty("animationRequest");
+    expect(saved).not.toHaveProperty("sequence");
+    expect(harness.navigate).toHaveBeenCalledWith("/admin/concerts/42/edit", { state: { characterConfig: saved } });
+  },
+);
 function loadRgb() {
   vi.stubGlobal("localStorage", {
     getItem: () => JSON.stringify({ outfitModelId: "rainbow-blouse", ...rgb }),
