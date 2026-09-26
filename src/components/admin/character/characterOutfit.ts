@@ -87,7 +87,7 @@ export const OUTFIT_OPTIONS: readonly OutfitOption[] = [
     name: "클래식",
     description: "클래식 공연 의상",
     icon: "🎻",
-    modelUrl: null,
+    modelUrl: "/models/outfits/classic_outfit.glb",
   },
   {
     id: "rainbow-blouse",

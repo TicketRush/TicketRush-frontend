@@ -71,6 +71,27 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it.each([["인사", "wave"], ["큐트", "cute"], ["입 가리기", "cover_mouth"]])(
+  "restarts %s on every click without changing saved customization",
+  (label, id) => {
+    const click = () => {
+      const button = render().find(node => node.type === "button" && node.props.children === label)!;
+      (button.props.onClick as () => void)();
+    };
+    click();
+    renderViewer();
+    expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({
+      animationRequest: { id, sequence: 1 }, outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF",
+    }), undefined);
+    click();
+    renderViewer();
+    expect(harness.viewer).toHaveBeenLastCalledWith(expect.objectContaining({
+      animationRequest: { id, sequence: 2 }, outfitModelId: "rainbow-blouse", outfitColor: "#ABCDEF",
+    }), undefined);
+    expect(harness.save).not.toHaveBeenCalled();
+  },
+);
+
 const rgb = { jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" };
 function loadRgb() {
   vi.stubGlobal("localStorage", {
