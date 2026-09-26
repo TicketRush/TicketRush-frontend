@@ -444,6 +444,11 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
           </p>
         </header>
 
+        <p className="text-sm text-admin-text-secondary">
+          <span className="text-red-400" aria-hidden="true">*</span>
+          <span className="sr-only">별표</span> 표시는 필수 입력 항목입니다.
+        </p>
+
         <Section title="기본 정보">
           <Field label="공연명" required>
             <FormInput
