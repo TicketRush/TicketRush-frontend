@@ -112,6 +112,9 @@ describe("AdminCalendar 오늘 이후", () => {
     expect(tomorrow?.props.disabled).toBe(true);
     expect(tomorrow?.props.onClick).toBeUndefined();
     expect(tomorrow?.props.title).toBe("오늘 이후 날짜는 선택할 수 없습니다");
+    expect(tomorrow?.props["aria-label"]).toBe(
+      "2026년 1월 16일 금요일, 선택 불가, 오늘 이후 날짜는 선택할 수 없습니다",
+    );
     expect(
       nodes.some(
         (node) =>
@@ -184,6 +187,9 @@ describe("AdminCalendar 92일 상한", () => {
     expect(beyondLimit?.props.title).toBe(
       "최대 92일까지 선택할 수 있습니다",
     );
+    expect(beyondLimit?.props["aria-label"]).toBe(
+      "2026년 4월 3일 금요일, 선택 불가, 최대 92일까지 선택할 수 있습니다",
+    );
     expect(onRangeChange).not.toHaveBeenCalled();
 
     click(withinLimit);
@@ -204,6 +210,10 @@ describe("AdminCalendar 기간 선택 취소", () => {
     click(dayButton(nodes, 15));
 
     nodes = renderCalendar(onRangeChange);
+    expect(dayButton(nodes, 15)?.props["aria-label"]).toBe(
+      "2026년 1월 15일 목요일, 시작일",
+    );
+    expect(dayButton(nodes, 15)?.props["aria-pressed"]).toBeUndefined();
     expect(textOf(nodes[0])).toContain("종료일을 선택하세요");
     click(buttonByText(nodes, "선택 취소"));
 

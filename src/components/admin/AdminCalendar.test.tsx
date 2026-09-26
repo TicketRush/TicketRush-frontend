@@ -34,4 +34,32 @@ describe("AdminCalendar", () => {
     expect(html).toContain(`>${today.getMonth() + 1}월`);
     expect(html).toContain(`>${today.getDate()}<`);
   });
+
+  it("날짜 숫자는 그대로 두고 이름과 헤더에 연·월을 붙인다", () => {
+    const html = renderToStaticMarkup(
+      <AdminCalendar
+        today={parseLocalDateKey("2026-09-22")}
+        selectedRange={{
+          start: parseLocalDateKey("2026-09-01"),
+          end: parseLocalDateKey("2026-09-22"),
+        }}
+        onRangeChange={() => {}}
+      />,
+    );
+
+    expect(html).toContain(">22<");
+    expect(html).toContain('aria-label="2026년 9월 1일 화요일, 시작일"');
+    expect(html).toContain(
+      'aria-label="2026년 9월 10일 목요일, 선택한 기간"',
+    );
+    expect(html).toContain(
+      'aria-label="2026년 9월 22일 화요일, 오늘, 종료일"',
+    );
+    expect(html).toContain('aria-current="date"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-label="2026년 9월"');
+    expect(html).toContain('aria-label="2026년"');
+    expect(html).toContain(">9월");
+    expect(html).toContain(">2026 ");
+  });
 });

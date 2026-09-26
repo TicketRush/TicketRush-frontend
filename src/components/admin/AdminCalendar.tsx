@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { formatAdminCalendarDayName } from "@/utils/admin/adminCalendarDayName";
 import {
   dashboardCalendarDisabledReason,
   dashboardCalendarDisabledTitle,
@@ -153,6 +154,7 @@ export default function AdminCalendar({
       <div className="flex items-center gap-2 mb-3">
         <button
           type="button"
+          aria-label={`${viewYear}년 ${viewMonth + 1}월`}
           onClick={() => setPickerMode(pickerMode === "month" ? null : "month")}
           className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 text-sm text-gray-900"
         >
@@ -160,6 +162,7 @@ export default function AdminCalendar({
         </button>
         <button
           type="button"
+          aria-label={`${viewYear}년`}
           onClick={() => setPickerMode(pickerMode === "year" ? null : "year")}
           className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 text-sm text-gray-900"
         >
@@ -167,8 +170,11 @@ export default function AdminCalendar({
         </button>
       </div>
 
-      {/* 요일 헤더 */}
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-500 mb-1">
+      {/* 요일 헤더는 칸과 연결하지 않는다. 요일은 각 날짜 버튼 이름에 있다. */}
+      <div
+        className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-500 mb-1"
+        aria-hidden="true"
+      >
         {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
           <div key={d}>{d}</div>
         ))}
@@ -184,6 +190,12 @@ export default function AdminCalendar({
               const todayFlag = isSameDay(date, today);
               const inRange = isInRange(date);
               const edgeFlag = isRangeEdge(date);
+              const pendingEdge =
+                pendingStart != null && isSameDay(date, pendingStart);
+              const confirmedStart =
+                pendingStart == null && isSameDay(date, selectedRange.start);
+              const confirmedEnd =
+                pendingStart == null && isSameDay(date, selectedRange.end);
               const disabledReason = dashboardCalendarDisabledReason(
                 pendingStart,
                 date,
@@ -223,6 +235,25 @@ export default function AdminCalendar({
                     type="button"
                     disabled={disabledReason != null}
                     title={disabledTitle}
+                    aria-label={formatAdminCalendarDayName(date, {
+                      isToday: todayFlag,
+                      isPendingStart: disabledReason ? false : pendingEdge,
+                      isRangeStart: disabledReason ? false : confirmedStart,
+                      isRangeEnd: disabledReason ? false : confirmedEnd,
+                      isInRange:
+                        disabledReason == null &&
+                        pendingStart == null &&
+                        inRange &&
+                        !confirmedStart &&
+                        !confirmedEnd,
+                      disabledTitle,
+                    })}
+                    aria-current={todayFlag ? "date" : undefined}
+                    aria-pressed={
+                      disabledReason == null && (confirmedStart || confirmedEnd)
+                        ? true
+                        : undefined
+                    }
                     onClick={
                       disabledReason ? undefined : () => handleDateClick(day)
                     }
