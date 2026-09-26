@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -33,6 +34,8 @@ import {
 } from "@/components/ticket/TicketUi";
 import { copyBookingNumber } from "@/utils/ticket/copyBookingNumber";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
+import { fetchSeats } from "@/api/seats";
+import { queryKeys } from "@/constants/queryKeys";
 
 const LONG_PRESS_MS = 500;
 const TOOLTIP_AUTO_HIDE_MS = 3000;
@@ -55,6 +58,15 @@ export default function TicketDetailPage() {
 
   const ticketRef = useRef<HTMLDivElement>(null);
   const [showSeatMap, setShowSeatMap] = useState(false);
+  const seatLayout = useQuery({
+    queryKey: data?.performanceId
+      ? queryKeys.seats.layout(data.performanceId)
+      : ["seats", "layout", "invalid"],
+    queryFn: () => fetchSeats(data!.performanceId),
+    enabled: showSeatMap && !!data?.performanceId,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
   const longPressTimer = useRef<number | null>(null);
 
   const [showTooltip, setShowTooltip] = useState(true);
@@ -261,6 +273,16 @@ export default function TicketDetailPage() {
       {showSeatMap && (
         <SeatMapPopover
           seatLabel={data.seatNumber}
+          layoutPending={!!data.performanceId && seatLayout.isPending}
+          venue={
+            seatLayout.isSuccess
+              ? {
+                  seats: seatLayout.data.seats,
+                  maxCols: seatLayout.data.layout?.maxCols,
+                  totalRows: seatLayout.data.layout?.totalRows,
+                }
+              : null
+          }
           onClose={() => setShowSeatMap(false)}
         />
       )}

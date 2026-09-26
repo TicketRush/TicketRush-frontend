@@ -38,6 +38,9 @@ export const queryKeys = {
     /** 좌석 잔여 수 */
     counts: (performanceId: number) =>
       ["seats", "counts", performanceId] as const,
+    /** 티켓 위치 확인용 배치. 예매 중 실시간 맵과 캐시를 공유하지 않는다. */
+    layout: (performanceId: number) =>
+      ["seats", "layout", performanceId] as const,
   },
   bookings: {
     all: ["bookings"] as const,
