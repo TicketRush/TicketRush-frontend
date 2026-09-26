@@ -17,7 +17,7 @@ import type {
 } from "@/types/domain/admin";
 import type { AdminBookingListTab } from "@/utils/admin/adminBookingTabs";
 import {
-  isDashboardPeriodWithinLimit,
+  isDashboardPeriodQueryable,
   parseLocalDateKey,
 } from "@/utils/admin/dashboardPeriod";
 import {
@@ -64,7 +64,7 @@ function retryUnlessClientError(failureCount: number, error: Error) {
 
 // ── 대시보드 ──────────────────────────────────────────
 export function useAdminDashboard(params: AdminDashboardParams) {
-  const enabled = isDashboardPeriodWithinLimit(
+  const enabled = isDashboardPeriodQueryable(
     parseLocalDateKey(params.from),
     parseLocalDateKey(params.to),
   );

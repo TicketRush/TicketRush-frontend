@@ -209,6 +209,28 @@ describe("AdminSeatMonitoringPage live updates (#336 / #361)", () => {
     );
   });
 
+  it("목록 ?page= 는 화면에 보이는 번호이고 첫 페이지는 0으로 연다", () => {
+    renderAt("/admin/seat-monitoring?page=2");
+    expect(mocks.concerts).toHaveBeenCalledWith(
+      { page: 1, size: 50 },
+      { refetchOnMount: "always" },
+    );
+
+    mocks.concerts.mockClear();
+    renderAt("/admin/seat-monitoring?page=1");
+    expect(mocks.concerts).toHaveBeenCalledWith(
+      { page: 0, size: 50 },
+      { refetchOnMount: "always" },
+    );
+
+    mocks.concerts.mockClear();
+    renderAt("/admin/seat-monitoring?page=abc");
+    expect(mocks.concerts).toHaveBeenCalledWith(
+      { page: 0, size: 50 },
+      { refetchOnMount: "always" },
+    );
+  });
+
   it("잘못된 공연 ID면 맵 SSE를 열지 않는다", () => {
     const html = renderAt("/admin/seat-monitoring/abc");
     expect(html).not.toContain("새로고침");

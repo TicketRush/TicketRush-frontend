@@ -4,9 +4,12 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
+  type FocusEvent,
+  type KeyboardEvent,
   type PointerEvent,
   type PropsWithChildren,
 } from "react";
@@ -25,8 +28,14 @@ import {
   FIT_PADDING_PX,
   IDENTITY_TRANSFORM,
   isPannable,
+  isZoomKeyTypingTarget,
   isZoomWheelEvent,
+  panDeltaForArrow,
+  panDeltaToReveal,
   pointerDistance,
+  resolveSeatMapPanKey,
+  resolveSeatMapZoomKey,
+  viewportPoint,
   scaleByWheel,
   transformsEqual,
   zoomAroundPoint,
@@ -63,6 +72,8 @@ export default function PinchZoomPan({
   const [fitted, setFitted] = useState<ZoomTransform>(IDENTITY_TRANSFORM);
   const [isDragging, setIsDragging] = useState(false);
   const [hasFitted, setHasFitted] = useState(false);
+  const [zoomNotice, setZoomNotice] = useState("");
+  const hintId = useId();
 
   const transformRef = useRef(transform);
   transformRef.current = transform;
@@ -366,8 +377,14 @@ export default function PinchZoomPan({
 
   const zoomByButton = (factor: number) => {
     const container = containerRef.current;
+    const content = contentRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
+    const active = document.activeElement;
+    const target =
+      content && active instanceof Element && content.contains(active)
+        ? active.getBoundingClientRect()
+        : null;
     const prev = transformRef.current;
     const nextScale = clamp(
       prev.scale * factor,
@@ -375,10 +392,7 @@ export default function PinchZoomPan({
       maxScale,
     );
     commitTransform(
-      zoomAroundPoint(prev, nextScale, {
-        x: rect.width / 2,
-        y: rect.height / 2,
-      }),
+      zoomAroundPoint(prev, nextScale, viewportPoint(rect, target)),
       true,
     );
   };
@@ -390,6 +404,64 @@ export default function PinchZoomPan({
     setTransform(fittedRef.current);
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (isZoomKeyTypingTarget(event.target instanceof Element ? event.target : null)) {
+      return;
+    }
+    const action = resolveSeatMapZoomKey(event);
+    if (action) {
+      event.preventDefault();
+      const before = transformRef.current.scale;
+      if (action === "in") zoomByButton(ZOOM_BUTTON_FACTOR);
+      else if (action === "out") zoomByButton(1 / ZOOM_BUTTON_FACTOR);
+      else reset();
+      const after = transformRef.current.scale;
+      if (action === "fit") setZoomNotice("전체 보기");
+      else if (action === "in" && after <= before + 0.001) {
+        setZoomNotice("더 확대할 수 없습니다");
+      } else if (action === "out" && after >= before - 0.001) {
+        setZoomNotice("더 축소할 수 없습니다");
+      } else setZoomNotice("");
+      return;
+    }
+
+    if (event.target !== event.currentTarget) return;
+    const direction = resolveSeatMapPanKey(event);
+    if (!direction) return;
+    if (!isPannable(transformRef.current, minInteractiveScale())) return;
+    event.preventDefault();
+    const delta = panDeltaForArrow(direction);
+    const prev = transformRef.current;
+    commitTransform(
+      { scale: prev.scale, x: prev.x + delta.x, y: prev.y + delta.y },
+      true,
+    );
+  };
+
+  const revealFocusedContent = (event: FocusEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    const target = event.target;
+    if (!container || !content || !(target instanceof Element)) return;
+    if (!content.contains(target) || !target.matches(":focus-visible")) return;
+    if (!isPannable(transformRef.current, minInteractiveScale())) return;
+    const delta = panDeltaToReveal(
+      container.getBoundingClientRect(),
+      target.getBoundingClientRect(),
+      12,
+    );
+    if (delta.x === 0 && delta.y === 0) return;
+    commitTransform(
+      {
+        scale: transformRef.current.scale,
+        x: transformRef.current.x + delta.x,
+        y: transformRef.current.y + delta.y,
+      },
+      true,
+    );
+  };
+
   const fitScale = fitted.scale || minScale;
   const atMin = transform.scale <= fitScale + 0.001;
   const atMax = transform.scale >= maxScale - 0.001;
@@ -399,8 +471,13 @@ export default function PinchZoomPan({
     <div
       ref={containerRef}
       role="group"
+      tabIndex={0}
       aria-label="좌석맵 확대 축소"
-      className={`relative overflow-hidden select-none ${
+      aria-describedby={hintId}
+      aria-keyshortcuts="Plus - 0"
+      onKeyDown={handleKeyDown}
+      onFocus={revealFocusedContent}
+      className={`relative overflow-hidden select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-400 ${
         lockTouch ? "touch-none overscroll-none" : "touch-pan-y"
       } ${className}`}
       onPointerDown={handlePointerDown}
@@ -421,6 +498,12 @@ export default function PinchZoomPan({
       >
         {children}
       </div>
+      <span id={hintId} className="sr-only">
+        더하기나 등호로 확대, 빼기로 축소, 0으로 전체 보기. 좌석에서는 방향키로 인접 좌석으로 이동합니다. 이 영역에 포커스가 있고 확대된 상태에서는 방향키로 맵을 둘러봅니다.
+      </span>
+      <span className="sr-only" aria-live="polite">
+        {zoomNotice}
+      </span>
 
       {showControls && (
         <div

@@ -34,7 +34,8 @@ import type {
 import {
   defaultDashboardRange,
   fillDailyRevenueGaps,
-  isDashboardPeriodWithinLimit,
+  resolveDashboardRangeChange,
+  startOfDay,
   toLocalDateKey,
 } from "@/utils/admin/dashboardPeriod";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
@@ -69,6 +70,7 @@ export default function AdminDashboardPage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [concertPage, setConcertPage] = useState(0);
   const [selectedRange, setSelectedRange] = useState(defaultDashboardRange);
+  const today = startOfDay(new Date());
 
   const from = toLocalDateKey(selectedRange.start);
   const to = toLocalDateKey(selectedRange.end);
@@ -90,7 +92,9 @@ export default function AdminDashboardPage() {
   }, [data?.dailyRevenue, from, to]);
 
   function handleRangeChange(range: { start: Date; end: Date }) {
-    if (!isDashboardPeriodWithinLimit(range.start, range.end)) {
+    const decision = resolveDashboardRangeChange(range.start, range.end, today);
+    if (decision.action === "ignore") return;
+    if (decision.action === "reject-too-long") {
       toast.error(
         mapErrorToMessage(ERROR_CODES.PERFORMANCE_DASHBOARD_PERIOD_TOO_LONG),
       );
@@ -254,6 +258,7 @@ export default function AdminDashboardPage() {
         <AdminCalendar
           selectedRange={selectedRange}
           onRangeChange={handleRangeChange}
+          today={today}
         />
         <RevenueChart
           data={chartRevenue}
@@ -297,6 +302,7 @@ export default function AdminDashboardPage() {
                 pageIndex={concertPage}
                 totalPages={concertPagination.totalPages}
                 onChange={setConcertPage}
+                surface="light"
               />
             ) : null}
           </div>

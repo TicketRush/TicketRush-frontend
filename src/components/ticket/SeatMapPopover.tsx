@@ -1,14 +1,18 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FocusTrap } from "focus-trap-react";
 import { X } from "lucide-react";
 import { useBodyScrollLock } from "@/hooks/common/useBodyScrollLock";
-
-const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
-const COLS_CNT = 12;
+import { buildSeatLocationGrid } from "@/utils/ticket/seatLocationGrid";
 
 // 팝오버 열린 직후 이 시간 동안은 배경 클릭 무시 (즉시 닫힘 방지)
 const POPOVER_CLICK_GUARD_MS = 200;
+
+function seatCellPx(colCount: number): number {
+  if (colCount <= 12) return 16;
+  if (colCount <= 24) return 12;
+  return 10;
+}
 
 export default function SeatMapPopover({
   seatLabel,
@@ -18,9 +22,11 @@ export default function SeatMapPopover({
   onClose: () => void;
 }) {
   const titleId = useId();
-  const [rowChar, colStr] = seatLabel.split("-");
-  const targetCol = Number(colStr);
+  const { rows, colCount, targetRow, targetCol } =
+    buildSeatLocationGrid(seatLabel);
   const [canClose, setCanClose] = useState(false);
+  const markRef = useRef<HTMLDivElement>(null);
+  const seatPx = seatCellPx(colCount);
 
   // 열린 동안만 마운트된다. 스크롤바 폭 보정과 위치 복원은 공통 잠금을 쓴다 (#376, #341).
   useBodyScrollLock(true);
@@ -32,6 +38,10 @@ export default function SeatMapPopover({
     );
     return () => window.clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    markRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [seatLabel]);
 
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -89,22 +99,24 @@ export default function SeatMapPopover({
               </div>
             </div>
 
-            <div className="mb-4 space-y-1">
-              {ROWS.map((row) => (
+            <div className="mb-4 max-h-64 space-y-1 overflow-auto">
+              {rows.map((row) => (
                 <div key={row} className="flex items-center gap-0.5">
-                  <div className="w-4 text-center text-[10px] font-bold text-text-secondary">
+                  <div className="w-4 shrink-0 text-center text-[10px] font-bold text-text-secondary">
                     {row}
                   </div>
-                  {Array.from({ length: COLS_CNT }).map((_, idx) => {
+                  {Array.from({ length: colCount }).map((_, idx) => {
                     const col = idx + 1;
-                    const isTarget = row === rowChar && col === targetCol;
+                    const isTarget = row === targetRow && col === targetCol;
                     return (
                       <div
                         key={col}
-                        className={`h-4 w-4 rounded ${
-                          isTarget
-                            ? "bg-primary ring-2 ring-primary/40 ring-offset-1"
-                            : "bg-gray-200"
+                        ref={isTarget ? markRef : undefined}
+                        data-my-seat={isTarget ? seatLabel : undefined}
+                        aria-label={isTarget ? `내 좌석 ${seatLabel}` : undefined}
+                        style={{ width: seatPx, height: seatPx }}
+                        className={`shrink-0 rounded ${
+                          isTarget ? "z-10 bg-primary ring-2 ring-primary" : "bg-gray-200"
                         }`}
                       />
                     );

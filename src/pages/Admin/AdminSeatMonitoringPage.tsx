@@ -4,12 +4,14 @@
 // 상세 bookingNumber로 예매 단건을 조합.
 // #336: 공개 SSE(seat-status/stream)로 맵·KPI 캐시를 패치. 재조회 중에도 기존 화면 유지.
 // #361: 연결 상태, /admin/seat-monitoring/:id URL, 목록 숫자 재조회, HOLD 만료 시 맵 유지.
+// #386: 목록 페이지는 ?page= 에 둔다. 번호는 화면에 보이는 쪽(1부터)이고 첫 페이지는 쿼리를 생략한다.
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Navigate,
   useLocation,
   useNavigate,
   useParams,
+  useSearchParams,
 } from "react-router-dom";
 import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { toast } from "react-toastify";
@@ -35,6 +37,12 @@ import type { ConcertStatus, Genre } from "@/types/domain/concert";
 import Pagination from "@/components/admin/Pagination";
 import { resolveSelectedSeatLiveUpdate } from "@/utils/admin/adminSeatLiveUpdate";
 import { parseAdminPerformanceId } from "@/utils/admin/parseAdminPerformanceId";
+import {
+  clampedMonitoringListPage,
+  monitoringListPath,
+  parseMonitoringListPage,
+  readMonitoringListPage,
+} from "@/utils/admin/monitoringListPage";
 import {
   SEAT_STREAM_CONNECTION_LABEL,
   type SeatStreamConnectionStatus,
@@ -70,18 +78,25 @@ const GENRE_LABELS: Record<Genre, string> = {
 
 interface MonitoringLocationState {
   concert?: AdminConcertItem;
+  listPage?: number;
 }
 
 export default function AdminSeatMonitoringPage() {
   useDocumentTitle("좌석 모니터링");
 
+  const location = useLocation();
   const { performanceId: rawPerformanceId } = useParams<{
     performanceId?: string;
   }>();
   const performanceId = parseAdminPerformanceId(rawPerformanceId);
 
   if (rawPerformanceId && performanceId == null) {
-    return <Navigate to="/admin/seat-monitoring" replace />;
+    return (
+      <Navigate
+        to={monitoringListPath(readMonitoringListPage(location.state))}
+        replace
+      />
+    );
   }
   if (performanceId == null) {
     return <AdminSeatMonitoringList />;
@@ -91,7 +106,9 @@ export default function AdminSeatMonitoringPage() {
 
 function AdminSeatMonitoringList() {
   const navigate = useNavigate();
-  const [listPage, setListPage] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawPage = searchParams.get("page");
+  const listPage = parseMonitoringListPage(rawPage);
 
   const {
     data: concerts,
@@ -106,6 +123,52 @@ function AdminSeatMonitoringList() {
     { refetchOnMount: "always" },
   );
   const concertList = concerts?.items ?? [];
+  const beyondLastPage =
+    !concertsPlaceholder &&
+    clampedMonitoringListPage(listPage, concerts?.pagination?.totalPages) !=
+      null;
+
+  const commitListPage = useCallback(
+    (page: number, replace: boolean) => {
+      const shown = page <= 0 ? null : String(page + 1);
+      if ((searchParams.get("page") ?? null) === shown) return;
+      const next = new URLSearchParams(searchParams);
+      if (shown == null) next.delete("page");
+      else next.set("page", shown);
+      setSearchParams(next, replace ? { replace: true } : undefined);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  useEffect(() => {
+    const canonical = listPage <= 0 ? null : String(listPage + 1);
+    if ((rawPage ?? null) !== canonical) {
+      commitListPage(listPage, true);
+      return;
+    }
+    if (concertsPlaceholder) return;
+    const clamped = clampedMonitoringListPage(
+      listPage,
+      concerts?.pagination?.totalPages,
+    );
+    if (clamped == null) return;
+    commitListPage(clamped, true);
+  }, [
+    concerts?.pagination?.totalPages,
+    concertsPlaceholder,
+    commitListPage,
+    listPage,
+    rawPage,
+  ]);
+
+  function openConcert(concert: AdminConcertItem) {
+    navigate(`/admin/seat-monitoring/${concert.id}`, {
+      state: {
+        concert,
+        listPage,
+      } satisfies MonitoringLocationState,
+    });
+  }
 
   // ── 1단계: 공연 목록 화면 ────────────────────────
   return (
@@ -144,7 +207,8 @@ function AdminSeatMonitoringList() {
             공연 목록을 불러올 수 없습니다.
           </div>
         ) : (concertsLoading && concertList.length === 0) ||
-          concertsPlaceholder ? (
+          concertsPlaceholder ||
+          beyondLastPage ? (
           <div className="text-center py-12 text-admin-text-secondary">
             공연 정보를 불러오는 중...
           </div>
@@ -202,13 +266,7 @@ function AdminSeatMonitoringList() {
                   return (
                     <tr
                       key={c.id}
-                      onClick={() => {
-                        navigate(`/admin/seat-monitoring/${c.id}`, {
-                          state: {
-                            concert: c,
-                          } satisfies MonitoringLocationState,
-                        });
-                      }}
+                      onClick={() => openConcert(c)}
                       className="border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
                     >
                       <td className="py-3 px-3 text-center font-mono text-xs whitespace-nowrap">
@@ -252,7 +310,11 @@ function AdminSeatMonitoringList() {
               <Pagination
                 pageIndex={listPage}
                 totalPages={concerts.pagination.totalPages}
-                onChange={setListPage}
+                onChange={(page) => {
+                  if (page === listPage) return;
+                  commitListPage(page, false);
+                }}
+                surface="light"
               />
             ) : null}
           </>
@@ -286,7 +348,9 @@ function AdminSeatMonitoringMapRoute({
       key={performanceId}
       performanceId={performanceId}
       concertTitle={concertTitle}
-      onChangeConcert={() => navigate("/admin/seat-monitoring")}
+      onChangeConcert={() =>
+        navigate(monitoringListPath(readMonitoringListPage(location.state)))
+      }
     />
   );
 }

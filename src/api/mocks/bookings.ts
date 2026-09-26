@@ -259,6 +259,41 @@ export async function mockFetchPendingBookingExpiresAt(
   return toBackendDateTime(new Date(created + 5 * 60 * 1000));
 }
 
+/** 내 예매 목록과 따로, PENDING만 이어가기 후보로 돌려준다 (#444). */
+export function mockListPendingForResume(): Array<{
+  bookingId: number;
+  bookingNumber: string;
+  performanceId: number;
+  performanceTitle: string;
+  performanceVenue: string;
+  performanceDate: string;
+  performanceTime: string;
+  seatId: number;
+  seatNumber: string;
+  price?: number;
+  expiresAt: string | null;
+}> {
+  return bookingsOfStatus("PENDING").map((booking) => {
+    const created = parseBackendDateTime(booking.createdAt);
+    return {
+      bookingId: booking.bookingId,
+      bookingNumber: booking.bookingNumber,
+      performanceId: booking.performanceId,
+      performanceTitle: booking.performanceTitle,
+      performanceVenue: booking.performanceVenue,
+      performanceDate: booking.performanceDate,
+      performanceTime: booking.performanceTime,
+      seatId: booking.seatId,
+      seatNumber: booking.seatNumber,
+      price: booking.price,
+      expiresAt:
+        created == null
+          ? null
+          : toBackendDateTime(new Date(created + 5 * 60 * 1000)),
+    };
+  });
+}
+
 function toMyBookingListItem(b: BookingDetail): BookingListItem {
   return {
     bookingId: b.bookingId,

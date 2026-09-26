@@ -14,6 +14,9 @@ describe("PinchZoomPan", () => {
       </PinchZoomPan>,
     );
     expect(html).toContain("좌석맵 확대 축소");
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('aria-keyshortcuts="Plus - 0"');
+    expect(html).toContain("인접 좌석으로 이동합니다");
     expect(html).toContain('aria-label="확대"');
     expect(html).toContain('aria-label="축소"');
     expect(html).toContain('aria-label="전체 보기"');

@@ -93,6 +93,8 @@ it("locks background scroll with scrollbar compensation while the seat map is op
   expect(ui.html).toContain('aria-modal="true"');
   expect(ui.html).toContain("좌석 위치");
   expect(ui.html).toContain("B-4");
+  expect(ui.html).toContain('data-my-seat="B-4"');
+  expect(ui.html).toContain('aria-label="내 좌석 B-4"');
   expect(ui.html).toContain("overscroll-contain");
   expect(document.body.style.overflow).toBe("hidden");
   expect(document.body.style.position).toBe("fixed");
@@ -111,6 +113,17 @@ it("restores the previous scroll position when the popover closes", () => {
   expect(document.body.style).toEqual(original);
   expect(document.documentElement.style.overflow).toBe("scroll");
   expect(window.scrollTo).toHaveBeenCalledWith(0, 240);
+});
+
+it("marks a seat past column 12 on the location map", () => {
+  captured.length = 0;
+  const html = renderToStaticMarkup(
+    <SeatMapPopover seatLabel="E-20" onClose={vi.fn()} />,
+  );
+
+  expect(html).toContain('data-my-seat="E-20"');
+  expect(html).toContain("E-20");
+  expect(html.match(/data-my-seat="E-20"/g)).toHaveLength(1);
 });
 
 it("closes on Escape and ignores the backdrop until the open-click guard passes", () => {

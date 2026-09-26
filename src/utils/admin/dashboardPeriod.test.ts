@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  dashboardCalendarDisabledReason,
+  dashboardCalendarDisabledTitle,
   dashboardCalendarView,
   defaultDashboardRange,
   fillDailyRevenueGaps,
   inclusiveDayCount,
   isDashboardCalendarDateDisabled,
+  isDashboardPeriodQueryable,
   isDashboardPeriodWithinLimit,
   parseLocalDateKey,
+  resolveDashboardRangeChange,
+  resolveDashboardCalendarCancel,
   resolveDashboardCalendarClick,
   toLocalDateKey,
 } from "./dashboardPeriod";
@@ -42,30 +47,178 @@ describe("inclusiveDayCount", () => {
 });
 
 describe("isDashboardCalendarDateDisabled", () => {
-  it("시작일을 고르기 전에는 비활성 날짜가 없다", () => {
+  const today = parseLocalDateKey("2026-09-25");
+
+  it("시작일을 고르기 전에는 오늘과 과거만 고를 수 있다", () => {
     expect(
-      isDashboardCalendarDateDisabled(null, parseLocalDateKey("2026-04-03")),
+      isDashboardCalendarDateDisabled(
+        null,
+        parseLocalDateKey("2026-04-03"),
+        92,
+        today,
+      ),
     ).toBe(false);
+    expect(
+      isDashboardCalendarDateDisabled(
+        null,
+        parseLocalDateKey("2026-09-25"),
+        92,
+        today,
+      ),
+    ).toBe(false);
+    expect(
+      isDashboardCalendarDateDisabled(
+        null,
+        parseLocalDateKey("2026-09-26"),
+        92,
+        today,
+      ),
+    ).toBe(true);
+  });
+
+  it("미래이면서 92일을 넘는 날짜는 미래 이유를 우선한다", () => {
+    const start = parseLocalDateKey("2026-09-01");
+    const farFuture = parseLocalDateKey("2026-12-31");
+    expect(
+      dashboardCalendarDisabledReason(start, farFuture, today),
+    ).toBe("future");
+    expect(dashboardCalendarDisabledTitle("future")).toBe(
+      "오늘 이후 날짜는 선택할 수 없습니다",
+    );
+    expect(dashboardCalendarDisabledTitle("over-max")).toBe(
+      "최대 92일까지 선택할 수 있습니다",
+    );
   });
 
   it("시작일 기준 92일은 선택 가능하고 93일은 비활성이다", () => {
     const start = parseLocalDateKey("2026-01-01");
     expect(
-      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-04-02")),
+      isDashboardCalendarDateDisabled(
+        start,
+        parseLocalDateKey("2026-04-02"),
+        92,
+        today,
+      ),
     ).toBe(false);
     expect(
-      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-04-03")),
-    ).toBe(true);
+      dashboardCalendarDisabledReason(
+        start,
+        parseLocalDateKey("2026-04-03"),
+        today,
+      ),
+    ).toBe("over-max");
   });
 
   it("시작일보다 이전으로도 상한을 넘으면 비활성이다", () => {
     const start = parseLocalDateKey("2026-04-03");
     expect(
-      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-01-02")),
+      isDashboardCalendarDateDisabled(
+        start,
+        parseLocalDateKey("2026-01-02"),
+        92,
+        today,
+      ),
     ).toBe(false);
     expect(
-      isDashboardCalendarDateDisabled(start, parseLocalDateKey("2026-01-01")),
+      isDashboardCalendarDateDisabled(
+        start,
+        parseLocalDateKey("2026-01-01"),
+        92,
+        today,
+      ),
     ).toBe(true);
+  });
+});
+
+describe("isDashboardPeriodQueryable", () => {
+  const today = parseLocalDateKey("2026-09-25");
+
+  it("오늘을 포함한 과거 92일 이내는 조회한다", () => {
+    expect(
+      isDashboardPeriodQueryable(
+        parseLocalDateKey("2026-06-26"),
+        parseLocalDateKey("2026-09-25"),
+        today,
+      ),
+    ).toBe(true);
+  });
+
+  it("과거라도 92일을 넘거나 순서가 뒤집히면 조회하지 않는다", () => {
+    expect(
+      isDashboardPeriodQueryable(
+        parseLocalDateKey("2026-01-01"),
+        parseLocalDateKey("2026-04-03"),
+        today,
+      ),
+    ).toBe(false);
+    expect(
+      isDashboardPeriodQueryable(
+        parseLocalDateKey("2026-04-03"),
+        parseLocalDateKey("2026-01-01"),
+        today,
+      ),
+    ).toBe(false);
+  });
+
+  it("92일을 넘는 과거 기간은 조회하지 않는다", () => {
+    expect(
+      isDashboardPeriodQueryable(
+        parseLocalDateKey("2026-01-01"),
+        parseLocalDateKey("2026-04-03"),
+        today,
+      ),
+    ).toBe(false);
+  });
+
+  it("종료일이나 시작일이 오늘 이후면 조회하지 않는다", () => {
+    expect(
+      isDashboardPeriodQueryable(
+        parseLocalDateKey("2026-09-01"),
+        parseLocalDateKey("2026-09-26"),
+        today,
+      ),
+    ).toBe(false);
+    expect(
+      isDashboardPeriodQueryable(
+        parseLocalDateKey("2026-09-26"),
+        parseLocalDateKey("2026-09-30"),
+        today,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("resolveDashboardRangeChange", () => {
+  const today = parseLocalDateKey("2026-09-25");
+
+  it("오늘까지의 기간은 반영한다", () => {
+    expect(
+      resolveDashboardRangeChange(
+        parseLocalDateKey("2026-09-01"),
+        parseLocalDateKey("2026-09-25"),
+        today,
+      ),
+    ).toEqual({ action: "commit" });
+  });
+
+  it("미래가 섞인 기간은 92일을 넘어도 토스트 없이 무시한다", () => {
+    expect(
+      resolveDashboardRangeChange(
+        parseLocalDateKey("2026-09-01"),
+        parseLocalDateKey("2026-12-31"),
+        today,
+      ),
+    ).toEqual({ action: "ignore" });
+  });
+
+  it("과거 구간이 92일을 넘으면 상한 초과로 거절한다", () => {
+    expect(
+      resolveDashboardRangeChange(
+        parseLocalDateKey("2026-01-01"),
+        parseLocalDateKey("2026-04-03"),
+        today,
+      ),
+    ).toEqual({ action: "reject-too-long" });
   });
 });
 
@@ -99,11 +252,28 @@ describe("resolveDashboardCalendarClick", () => {
   });
 
   it("상한 초과는 시작일을 유지하고 기간을 확정하지 않는다", () => {
+    const today = parseLocalDateKey("2026-09-25");
     const start = parseLocalDateKey("2026-01-01");
     const beyond = parseLocalDateKey("2026-04-03");
-    expect(resolveDashboardCalendarClick(start, beyond)).toEqual({
+    expect(resolveDashboardCalendarClick(start, beyond, 92, today)).toEqual({
       action: "ignore",
     });
+  });
+
+  it("오늘 이후 클릭은 시작일 선택 전에도 무시한다", () => {
+    const today = parseLocalDateKey("2026-09-25");
+    const tomorrow = parseLocalDateKey("2026-09-26");
+    expect(resolveDashboardCalendarClick(null, tomorrow, 92, today)).toEqual({
+      action: "ignore",
+    });
+    expect(
+      resolveDashboardCalendarClick(
+        parseLocalDateKey("2026-09-01"),
+        tomorrow,
+        92,
+        today,
+      ),
+    ).toEqual({ action: "ignore" });
   });
 
   it("같은 날을 다시 고르면 하루 기간으로 확정한다", () => {
@@ -113,6 +283,18 @@ describe("resolveDashboardCalendarClick", () => {
       start: day,
       end: day,
     });
+  });
+});
+
+describe("resolveDashboardCalendarCancel", () => {
+  it("시작일이 있으면 pending만 비운다", () => {
+    expect(
+      resolveDashboardCalendarCancel(parseLocalDateKey("2026-01-01")),
+    ).toEqual({ action: "clear-pending" });
+  });
+
+  it("시작일이 없으면 아무것도 하지 않는다", () => {
+    expect(resolveDashboardCalendarCancel(null)).toEqual({ action: "noop" });
   });
 });
 

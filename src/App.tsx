@@ -31,6 +31,7 @@ import NotFoundPage from "@/pages/Error/NotFoundPage";
 import AdminDashboardPage from "@/pages/Admin/AdminDashboardPage";
 import AdminBookingsPage from "@/pages/Admin/AdminBookingsPage";
 import AdminRefundsPage from "@/pages/Admin/AdminRefundsPage";
+import AdminBannersPage from "@/pages/Admin/AdminBannersPage";
 import AdminSeatMonitoringPage from "@/pages/Admin/AdminSeatMonitoringPage";
 import AdminConcertFormPage from "@/pages/Admin/AdminConcertFormPage";
 import AdminCharacterCreatorPage from "@/pages/Admin/AdminCharacterCreatorPage";
@@ -97,6 +98,7 @@ const router = createBrowserRouter([
           { path: "/admin", element: <AdminDashboardPage /> },
           { path: "/admin/bookings", element: <AdminBookingsPage /> },
           { path: "/admin/refunds", element: <AdminRefundsPage /> },
+          { path: "/admin/banners", element: <AdminBannersPage /> },
           {
             path: "/admin/seat-monitoring",
             element: <AdminSeatMonitoringPage />,

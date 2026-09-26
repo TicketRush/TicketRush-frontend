@@ -35,6 +35,7 @@ function SeatItemImpl({ seat, isSelected, onClick }: SeatItemProps) {
       {/* 좌석 버튼 */}
       <button
         type="button"
+        data-seat-id={seat.id}
         disabled={!isClickable}
         onClick={() => onClick(seat)}
         aria-label={`좌석 ${seat.seatNumber} ${SEAT_STATUS_LABEL[visualStatus]}`}

@@ -17,6 +17,223 @@ import html2canvas from "html2canvas";
  */
 const CAPTURE_WIDTH = 640;
 
+/** html2canvas `scale`과 맞춘다. 포스터만 1배로 자르면 PNG에서 흐리다. */
+const CAPTURE_SCALE = 2;
+
+/**
+ * lucide 아이콘은 `stroke="currentColor"` SVG다.
+ * SVG를 `data:image/svg+xml`로만 바꾸면 html2canvas가 `<circle>` 획을 다시 비운다.
+ * 브라우저가 PNG로 그린 뒤에 그 이미지만 캡처에 넘긴다.
+ */
+async function replaceSvgIcons(root: HTMLElement): Promise<void> {
+  await Promise.all([...root.querySelectorAll("svg")].map(replaceSvgIcon));
+}
+
+async function replaceSvgIcon(svg: SVGElement): Promise<void> {
+  const width =
+    Math.ceil(svg.getBoundingClientRect().width) ||
+    Number(svg.getAttribute("width")) ||
+    24;
+  const height =
+    Math.ceil(svg.getBoundingClientRect().height) ||
+    Number(svg.getAttribute("height")) ||
+    24;
+
+  const painted = svg.cloneNode(true) as SVGElement;
+  painted.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  painted.setAttribute("width", String(width));
+  painted.setAttribute("height", String(height));
+  // 단독 SVG 이미지는 부모의 currentColor를 상속하지 못한다.
+  // 화면에서 계산된 획을 원·체크 각각에 속성으로 박는다.
+  copyPaintAttributes(svg, painted);
+
+  let src: string;
+  try {
+    src = await rasterizeSvgPng(
+      new XMLSerializer().serializeToString(painted),
+      width,
+      height,
+    );
+  } catch {
+    return;
+  }
+
+  const img = document.createElement("img");
+  img.alt = "";
+  img.width = width;
+  img.height = height;
+  img.style.cssText = `width:${width}px;height:${height}px;display:block;`;
+  img.src = src;
+  svg.replaceWith(img);
+}
+
+function copyPaintAttributes(source: SVGElement, painted: SVGElement): void {
+  const sources = [source, ...source.querySelectorAll("*")];
+  const targets = [painted, ...painted.querySelectorAll("*")];
+  sources.forEach((original, index) => {
+    const target = targets[index];
+    if (!target) return;
+    const style = getComputedStyle(original);
+    if (style.stroke && style.stroke !== "none") {
+      target.setAttribute("stroke", style.stroke);
+    }
+    if (style.fill) target.setAttribute("fill", style.fill);
+    const strokeWidth = style.strokeWidth.replace("px", "");
+    if (strokeWidth) target.setAttribute("stroke-width", strokeWidth);
+    if (style.strokeLinecap) {
+      target.setAttribute("stroke-linecap", style.strokeLinecap);
+    }
+    if (style.strokeLinejoin) {
+      target.setAttribute("stroke-linejoin", style.strokeLinejoin);
+    }
+  });
+}
+
+function rasterizeSvgPng(
+  xml: string,
+  width: number,
+  height: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    const finish = () => URL.revokeObjectURL(url);
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, width * CAPTURE_SCALE);
+      canvas.height = Math.max(1, height * CAPTURE_SCALE);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        finish();
+        reject(new Error("svg raster failed"));
+        return;
+      }
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let visible = false;
+      for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] !== 0) {
+          visible = true;
+          break;
+        }
+      }
+      finish();
+      if (!visible) {
+        reject(new Error("blank svg"));
+        return;
+      }
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = () => {
+      finish();
+      reject(new Error("svg load failed"));
+    };
+    image.src = url;
+  });
+}
+
+/**
+ * html2canvas는 `object-fit`과 퍼센트 높이를 무시한다.
+ * 포스터는 `h-full` + `object-cover` + `overflow-hidden`이라 캡처본에서 빈 칸이 된다.
+ * 레이아웃이 잡힌 뒤 박스 크기로 cover 크롭한 이미지를 넣는다.
+ * CORS로 읽지 못하면 노드는 그대로 둔다. overflow를 풀어도 그 이미지는 그려지지 않는다.
+ */
+async function bakeCoverImages(root: HTMLElement): Promise<void> {
+  const imgs = [...root.querySelectorAll("img")].filter(
+    (img) => !img.src.startsWith("data:"),
+  );
+
+  await Promise.all(
+    imgs.map(async (img) => {
+      const fit = getComputedStyle(img).objectFit;
+      if (fit !== "cover" && fit !== "contain") return;
+
+      const box = img.getBoundingClientRect();
+      const parent = img.parentElement?.getBoundingClientRect();
+      const width = Math.round(box.width || parent?.width || 0);
+      const height = Math.round(box.height || parent?.height || 0);
+      if (width < 2 || height < 2) return;
+
+      const src = img.currentSrc || img.src;
+      try {
+        img.src = await fittedImageDataUrl(
+          src,
+          width * CAPTURE_SCALE,
+          height * CAPTURE_SCALE,
+          fit,
+        );
+      } catch {
+        return;
+      }
+      img.style.width = `${width}px`;
+      img.style.height = `${height}px`;
+      img.style.objectFit = "fill";
+    }),
+  );
+}
+
+/**
+ * 화면의 `<img>`는 CORS 없이 받아 디스크 캐시에 남긴다.
+ * 같은 주소로 다시 받으면 그 캐시가 재사용되고, 응답에
+ * `Access-Control-Allow-Origin`이 없어 캔버스가 포스터를 버린다.
+ * 저장용 요청만 쿼리를 붙여 캐시를 피한다. 서명된 URL은 쿼리를 바꾸면 깨지므로 그대로 둔다.
+ */
+function posterCorsSrc(src: string): string {
+  try {
+    const url = new URL(src, window.location.href);
+    const signed = [...url.searchParams.keys()].some((key) =>
+      key.toLowerCase().startsWith("x-amz-"),
+    );
+    if (signed) return src;
+    url.searchParams.set("ticket_cors", "1");
+    return url.toString();
+  } catch {
+    const join = src.includes("?") ? "&" : "?";
+    return `${src}${join}ticket_cors=1`;
+  }
+}
+
+function fittedImageDataUrl(
+  src: string,
+  width: number,
+  height: number,
+  fit: string,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx || !image.naturalWidth || !image.naturalHeight) {
+        reject(new Error("poster draw failed"));
+        return;
+      }
+      const scale =
+        fit === "contain"
+          ? Math.min(width / image.naturalWidth, height / image.naturalHeight)
+          : Math.max(width / image.naturalWidth, height / image.naturalHeight);
+      const dw = image.naturalWidth * scale;
+      const dh = image.naturalHeight * scale;
+      ctx.drawImage(image, (width - dw) / 2, (height - dh) / 2, dw, dh);
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        reject(new Error("poster tainted"));
+      }
+    };
+    image.onerror = () => reject(new Error("poster load failed"));
+    image.src = posterCorsSrc(src);
+  });
+}
+
 /**
  * truncate(`overflow:hidden` + `text-overflow:ellipsis` + `white-space:nowrap`)는
  * html2canvas가 재현하지 못한다. 말줄임표 대신 원문을 그대로 그리면서 박스 밖으로
@@ -80,6 +297,9 @@ export async function renderTicketCanvas(
 
   try {
     releaseTextClipping(clone);
+    await replaceSvgIcons(clone);
+    await waitForAssets(stage);
+    await bakeCoverImages(clone);
     await waitForAssets(stage);
 
     // 높이를 넘겨주지 않으면 html2canvas가 창 높이 기준으로 잘라낸 canvas를
@@ -89,7 +309,7 @@ export async function renderTicketCanvas(
 
     return await html2canvas(stage, {
       backgroundColor: "#ffffff",
-      scale: 2, // 고해상도 (Retina 대응)
+      scale: CAPTURE_SCALE, // 고해상도 (Retina 대응)
       useCORS: true, // cross-origin 이미지(포스터 등) 대응
       width: CAPTURE_WIDTH,
       height,
