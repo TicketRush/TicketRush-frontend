@@ -51,6 +51,15 @@ function input(): CreateConcertInput {
 }
 
 describe("performance multipart request", () => {
+  it("allows a main image plus three gallery files and rejects a fourth gallery file", () => {
+    const value = input();
+    value.gallery = Array.from({ length: 3 }, (_, i) => new File(["image"], `${i}.png`));
+    const body = createConcertFormData(value);
+    expect(body.get("mainImage")).toBe(value.mainImage);
+    expect(body.getAll("gallery")).toEqual(value.gallery);
+    value.gallery.push(new File(["fourth"], "fourth.png"));
+    expect(() => createConcertFormData(value)).toThrow("최대 3개");
+  });
   it.each(["", "202--T25:00"])("builds immediate booking at request time, ignoring disabled draft %s", async (bookingOpenAt) => {
     vi.useFakeTimers();
     try {

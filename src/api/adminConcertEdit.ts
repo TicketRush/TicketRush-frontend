@@ -111,6 +111,9 @@ export function createPerformancePatch({ form, original, status, immediateBookin
 }
 
 export function createConcertReplacementFiles(input: UpdateConcertInput) {
+  const keptUrls = input.form.imageGalleryUrls ?? [];
+  const galleryChanged = JSON.stringify(keptUrls) !== JSON.stringify(input.original.imageGalleryUrls ?? []);
+  const includeGalleryRequest = galleryChanged || (input.gallery?.length ?? 0) > 0;
   const files = [
     input.mainImage,
     input.model3d,
@@ -119,10 +122,15 @@ export function createConcertReplacementFiles(input: UpdateConcertInput) {
   if (files.some((file) => !(file instanceof File) || file.size === 0)) {
     throw new Error("교체할 파일은 비어 있지 않은 파일이어야 합니다.");
   }
-  if ((input.gallery?.length ?? 0) > 3)
+  if (includeGalleryRequest && keptUrls.length + (input.gallery?.length ?? 0) > 3)
     throw new Error("갤러리는 최대 3개까지 선택해주세요.");
-  if (!files.length) return null;
+  if (!files.length && !galleryChanged) return null;
   const data = new FormData();
+  if (includeGalleryRequest) {
+    data.append("request", new Blob([
+      JSON.stringify({ keep_gallery_urls: keptUrls }),
+    ], { type: "application/json" }));
+  }
   appendConcertFiles(data, input);
   return data;
 }
