@@ -1,6 +1,8 @@
 import type { ConcertFormData } from "@/types/domain/admin";
 import { bookingOpenAtForInput } from "@/utils/concert/parseBookingOpenAt";
-import type { ConcertDetail } from "@/types/domain/concert";
+import type { ConcertDetail, ConcertStatus } from "@/types/domain/concert";
+import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
+import { isBookingScheduleLocked } from "@/utils/admin/bookingSchedule";
 import { validateCharacterConfig } from "@/utils/character/characterConfig";
 import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
 import {
@@ -10,11 +12,15 @@ import {
 } from "./adminConcertCreate";
 
 export interface ConcertEditData {
+  status: ConcertStatus;
   form: ConcertFormData;
   totalSeats: number;
 }
 
 export interface UpdateConcertInput {
+  /** Frontend metadata only; not part of PerformancePatchRequest. */
+  status?: ConcertStatus;
+  immediateBooking?: boolean;
   form: ConcertFormData;
   original: ConcertFormData;
   mainImage?: File | null;
@@ -24,6 +30,7 @@ export interface UpdateConcertInput {
 
 export function mapConcertForEdit(detail: ConcertDetail): ConcertEditData {
   return {
+    status: detail.status,
     totalSeats: detail.totalSeats,
     form: {
       displayOnBanner: detail.displayOnBanner ?? false,
@@ -51,7 +58,8 @@ export function mapConcertForEdit(detail: ConcertDetail): ConcertEditData {
 }
 
 // PerformancePatchRequest: total_seats, facilities, venue and notices are not editable.
-export function createPerformancePatch({ form, original }: UpdateConcertInput) {
+export function createPerformancePatch({ form, original, status, immediateBooking = false }: UpdateConcertInput) {
+  const bookingLocked = isBookingScheduleLocked(status);
   const error = validateCharacterConfig(form.characterConfig, false);
   if (error) throw new Error(error);
   const message = form.characterMessage?.trim();
@@ -60,7 +68,7 @@ export function createPerformancePatch({ form, original }: UpdateConcertInput) {
       `캐릭터 한마디는 ${MAX_CHARACTER_MESSAGE_LENGTH}자 이하여야 합니다.`,
     );
   }
-  if (original.bookingOpenAt && !form.bookingOpenAt) {
+  if (!bookingLocked && !immediateBooking && original.bookingOpenAt && !form.bookingOpenAt) {
     throw new Error("예매 오픈 시각 해제는 이 화면에서 지원하지 않습니다.");
   }
   const banner = bannerSettingsRequest(form);
@@ -86,7 +94,9 @@ export function createPerformancePatch({ form, original }: UpdateConcertInput) {
     price: changed("price"),
     address: changed("address"),
     booking_open_at:
-      changed("bookingOpenAt") && form.bookingOpenAt
+      bookingLocked ? undefined : immediateBooking
+        ? formatSeoulDateTime(Date.now(), "", true)
+        : changed("bookingOpenAt") && form.bookingOpenAt
         ? formatBookingOpenAt(form.bookingOpenAt)
         : undefined,
     character_config:

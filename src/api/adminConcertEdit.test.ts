@@ -90,6 +90,34 @@ async function input() {
 }
 
 describe("admin edit contract", () => {
+  it("sends an immediate PATCH even when the original equals the submission second", async () => {
+    const value = await input();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-09-25T15:04:07Z"));
+      value.original.bookingOpenAt = "2026-09-26 00:04:07";
+      value.form.bookingOpenAt = value.original.bookingOpenAt;
+      await updateConcertApi(42, { ...value, status: "UPCOMING", immediateBooking: true });
+      expect(adapter).toHaveBeenCalledOnce();
+      expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ booking_open_at: "2026-09-26 00:04:07" });
+      adapter.mockClear();
+      await updateConcertApi(42, { ...value, status: "UPCOMING", immediateBooking: false });
+      expect(adapter).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(["ON_SALE", "CLOSED", "CANCELED"] as const)("omits locked booking schedule changes from PATCH (%s)", async (status) => {
+    const value = await input();
+    value.form.bookingOpenAt = "";
+    value.form.title = "다른 정보 수정";
+    await updateConcertApi(42, { ...value, status, immediateBooking: true });
+    expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ title: "다른 정보 수정" });
+  });
+
+  it.each(["UPCOMING", "ON_SALE", "CLOSED", "CANCELED"] as const)("retains status as edit metadata (%s)", async (status) => {
+    adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, performance_status: status } }) });
+    expect((await fetchConcertForEdit(42)).status).toBe(status);
+  });
   it.each(["UPCOMING", "ON_SALE", "CLOSED", "CANCELED"])("maps raw performance_status %s and preserves booking_open_at", async (status) => {
     adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: JSON.stringify({ is_success: true, result: { ...detail, performance_status: status, booking_open_at: "2026-09-22 19:00:00" } }) });
     const result = await fetchConcertDetail(42);

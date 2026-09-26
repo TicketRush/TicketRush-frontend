@@ -1,4 +1,5 @@
 import type { ConcertFormData } from "@/types/domain/admin";
+import { formatSeoulDateTime } from "@/utils/datetime/formatSeoulInstant";
 import type { CharacterConfig } from "@/types/domain/character";
 import { validateCharacterConfig } from "@/utils/character/characterConfig";
 import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
@@ -6,6 +7,8 @@ import { formatBookingOpenAt } from "@/utils/admin/concertFormValidation";
 export const MAX_CHARACTER_MESSAGE_LENGTH = 50;
 
 export interface CreateConcertInput {
+  /** Transient UI action; never serialized as a backend field. */
+  immediateBooking?: boolean;
   form: ConcertFormData;
   totalSeats: number;
   mainImage: File;
@@ -40,6 +43,7 @@ export interface PerformanceCreateRequest {
 export function createPerformanceRequest({
   form,
   totalSeats,
+  immediateBooking = false,
 }: CreateConcertInput): PerformanceCreateRequest {
   const error = validateCharacterConfig(form.characterConfig, true);
   if (error) throw new Error(error);
@@ -57,7 +61,9 @@ export function createPerformanceRequest({
     description: form.description,
     show_date: form.date,
     show_time: form.time.length === 5 ? `${form.time}:00` : form.time,
-    booking_open_at: formatBookingOpenAt(form.bookingOpenAt),
+    booking_open_at: immediateBooking
+      ? formatSeoulDateTime(Date.now(), "", true)
+      : formatBookingOpenAt(form.bookingOpenAt),
     duration_minutes: form.durationMinutes,
     price: form.price,
     total_seats: totalSeats,

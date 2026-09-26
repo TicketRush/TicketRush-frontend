@@ -51,6 +51,18 @@ function input(): CreateConcertInput {
 }
 
 describe("performance multipart request", () => {
+  it.each(["", "202--T25:00"])("builds immediate booking at request time, ignoring disabled draft %s", async (bookingOpenAt) => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-09-25T14:59:00Z"));
+      const value = { ...input(), immediateBooking: true };
+      value.form.bookingOpenAt = bookingOpenAt;
+      vi.setSystemTime(new Date("2026-09-25T15:04:07Z"));
+      const request = JSON.parse(await (createConcertFormData(value).get("request") as Blob).text());
+      expect(request.booking_open_at).toBe("2026-09-26 00:04:07");
+      expect(Object.keys(request).filter((key) => /booking|immediate|instant|status/.test(key))).toEqual(["booking_open_at"]);
+    } finally { vi.useRealTimers(); }
+  });
   it("keeps the selected show date and separate show time in the request Blob", async () => {
     const value = input();
     value.form.date = "2028-02-29";

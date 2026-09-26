@@ -45,10 +45,11 @@ export function formatSeoulDate(
   return `${p.year}-${p.month}-${p.day}`;
 }
 
-/** Instant → `YYYY-MM-DD HH:mm` (Asia/Seoul). 관리자·예매 카드용 */
+/** Instant → `YYYY-MM-DD HH:mm` (Asia/Seoul). 요청용으로 초 포함 가능. */
 export function formatSeoulDateTime(
   value: string | number | null | undefined,
   fallback: string = "-",
+  includeSeconds: boolean = false,
 ): string {
   const ms = resolveMs(value);
   if (ms == null) return fallback;
@@ -58,11 +59,12 @@ export function formatSeoulDateTime(
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    ...(includeSeconds ? { second: "2-digit" as const } : {}),
     hour12: false,
   });
   if (!p.year || !p.month || !p.day || !p.hour || !p.minute) return fallback;
   const hour = p.hour === "24" ? "00" : p.hour;
-  return `${p.year}-${p.month}-${p.day} ${hour}:${p.minute}`;
+  return `${p.year}-${p.month}-${p.day} ${hour}:${p.minute}${includeSeconds ? `:${p.second}` : ""}`;
 }
 
 /** Instant → `ko-KR` + Asia/Seoul 로케일 문자열 */

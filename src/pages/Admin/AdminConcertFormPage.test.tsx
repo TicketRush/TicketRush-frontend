@@ -140,6 +140,108 @@ function formNodes(node: React.ReactNode): FormElement[] {
 
 const bannerFullMessage = "배너 3개가 모두 등록되어 새로운 배너를 등록할 수 없습니다.";
 
+describe("immediate booking", () => {
+  it.each(["create", "edit"])("defaults to unchecked without inferring historical immediate booking (%s)", (mode) => {
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, bookingOpenAt: "2020-01-01 00:00:00" } }, isFetchedAfterMount: true });
+    const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
+    expect(html).toContain("등록 즉시 예매 가능");
+    expect(html.match(/<input[^>]*id="booking-immediate"[^>]*>/)?.[0]).not.toMatch(/checked|disabled/);
+  });
+
+  it.each(["create", "edit"])("submits immediate booking at save time and skips invalid draft validation (%s)", async (mode) => {
+    let step = 0;
+    let save: (() => Promise<void>) | undefined;
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const elements = formNodes(tree);
+      const checkbox = elements.find((node) => node.props.id === "booking-immediate")!;
+      const booking = elements.find((node) => node.type === BookingOpenAtInput)!;
+      if (step++ === 0) {
+        expect(checkbox.props.checked).toBe(false);
+        (booking.props.onChange as (value: string) => void)("202--T25:00");
+        (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+        return;
+      }
+      expect(booking.props).toMatchObject({ disabled: true, value: "202--T25:00", "aria-describedby": "booking-schedule-note" });
+      expect(booking.props["aria-invalid"]).toBeUndefined();
+      expect(elements.some((node) => node.props.id === "booking-open-error")).toBe(false);
+      save = elements.find((node) => node.type === "button" &&
+        React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+    });
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-09-25T14:59:00Z"));
+      vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+      if (mode === "create") render("/admin/concerts/new", { concertDraft: {
+        pathname: "/admin/concerts/new", form: { ...initial.form, bookingOpenAt: "" }, totalSeats: 120,
+        mainImage: new File(["poster"], "poster.png", { type: "image/png" }),
+      } });
+      else render();
+      vi.setSystemTime(new Date("2026-09-25T15:04:07Z"));
+      await save!();
+      const mutation = mode === "create" ? hooks.create : hooks.update;
+      expect(mutation).toHaveBeenCalledOnce();
+      expect(toast.error).not.toHaveBeenCalled();
+      const input = mutation.mock.calls[0][0];
+      const payload = mode === "create"
+        ? JSON.parse(await (createConcertFormData(input).get("request") as Blob).text())
+        : JSON.parse(JSON.stringify(createPerformancePatch(input)));
+      expect(payload.booking_open_at).toBe("2026-09-26 00:04:07");
+      expect(Object.keys(payload).filter((key) => /booking|immediate|status/.test(key))).toEqual(["booking_open_at"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("restores draft seconds and no-change behavior after checking and unchecking", async () => {
+    let step = 0;
+    let save: (() => Promise<void>) | undefined;
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const elements = formNodes(tree);
+      const checkbox = elements.find((node) => node.props.id === "booking-immediate")!;
+      const booking = elements.find((node) => node.type === BookingOpenAtInput)!;
+      expect(booking.props.value).toBe(initial.form.bookingOpenAt);
+      expect(booking.props.disabled).toBe(step === 1);
+      if (step < 2) {
+        (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: step++ === 0 } });
+        return;
+      }
+      save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes("변경사항 저장"))?.props.onClick as typeof save;
+    });
+    render();
+    await save!();
+    expect(hooks.update).toHaveBeenCalledOnce();
+    expect(JSON.parse(JSON.stringify(createPerformancePatch(hooks.update.mock.calls[0][0])))).toEqual({});
+  });
+
+  it.each(["ON_SALE", "CLOSED", "CANCELED"] as const)("locks booking while allowing other edits (%s)", async (status) => {
+    let save: (() => Promise<void>) | undefined;
+    let step = 0;
+    hooks.query.mockReturnValue({ data: { ...initial, status }, isFetchedAfterMount: true });
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const elements = formNodes(tree);
+      expect(elements.some((node) => node.props.id === "booking-immediate")).toBe(false);
+      const booking = elements.find((node) => node.type === BookingOpenAtInput)!;
+      expect(booking.props.disabled).toBe(true);
+      if (step++ === 0) {
+        // Even a stale draft must not block other edits or leak into the request.
+        (booking.props.onChange as (value: string) => void)("invalid");
+        const title = elements.find((node) => node.props.value === initial.form.title)!;
+        (title.props.onChange as (value: string) => void)("제목 수정");
+        return;
+      }
+      expect(booking.props["aria-invalid"]).toBeUndefined();
+      save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes("변경사항 저장"))?.props.onClick as typeof save;
+    });
+    const html = render();
+    expect(html).toContain(status === "CANCELED" ? "취소된 공연" : "예매 오픈됨");
+    for (const part of ["year", "month", "day", "time"]) {
+      expect(html.match(new RegExp(`<(?:input|select)[^>]*id="booking-open-${part}"[^>]*>`))?.[0]).toContain('disabled=""');
+    }
+    await save!();
+    expect(hooks.update).toHaveBeenCalledOnce();
+    expect(JSON.parse(JSON.stringify(createPerformancePatch(hooks.update.mock.calls[0][0])))).toEqual({ title: "제목 수정" });
+  });
+});
+
 it.each([
   ["create", 0, false, false], ["create", 1, false, false],
   ["create", 2, false, false], ["create", 3, false, true], ["create", 4, false, true],
@@ -365,8 +467,9 @@ it.each([["create", true], ["edit", true], ["create", false], ["edit", false]] a
     const input = mutation.mock.calls[0][0];
     expect(input.form).toEqual({ ...initial.form, displayOnBanner: enabled, bannerSubtitle: subtitle });
     expect(Object.keys(input).sort()).toEqual((mode === "create"
-      ? ["form", "totalSeats", "mainImage", "gallery"]
-      : ["form", "original", "mainImage", "model3d", "gallery"]).sort());
+      ? ["form", "totalSeats", "mainImage", "gallery", "immediateBooking"]
+      : ["form", "original", "mainImage", "model3d", "gallery", "immediateBooking", "status"]).sort());
+    expect(input.immediateBooking).toBe(false);
 
     if (mode === "create") {
       const data = createConcertFormData(input);
@@ -519,7 +622,11 @@ it("saves the parent form date after selecting year, month and day on the create
 });
 
 describe.each(["create", "edit"])("show date Enter navigation (%s)", (mode) => {
-  function setup(date: string) {
+  function setup(date: string, immediateBooking = false) {
+    if (immediateBooking) hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const checkbox = formNodes(tree).find((node) => node.props.id === "booking-immediate")!;
+      if (!checkbox.props.checked) (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+    });
     const inputs: Array<{
       props: Record<string, unknown>;
       focus: ReturnType<typeof vi.fn>;
@@ -600,6 +707,21 @@ describe.each(["create", "edit"])("show date Enter navigation (%s)", (mode) => {
       expect(input.props["data-form-focus"]).toBeUndefined();
       expect(input.props.onKeyDown).toBeUndefined();
     }
+  });
+
+  it("preserves Enter navigation with all immediate booking inputs disabled", () => {
+    const ui = setup("2028-02-29", true);
+    const bookingInputs = ui.inputs.filter(({ props }) => String(props.id).startsWith("booking-open-"));
+    expect(bookingInputs).toHaveLength(4);
+    for (const input of bookingInputs) {
+      expect(input.props.disabled).toBe(true);
+      expect(input.props["data-form-focus"]).toBeUndefined();
+    }
+    const duration = ui.inputs.find(({ props }) => props.placeholder === "예: 120")!;
+    const next = ui.inputs.find(({ props }) => props.placeholder === (mode === "create" ? "예: Main Concert Hall" : "예: 서울특별시 송파구 ..."))!;
+    expect(ui.press(duration)).toHaveBeenCalledOnce();
+    expect(next.focus).toHaveBeenCalledOnce();
+    for (const input of bookingInputs) expect(input.focus).not.toHaveBeenCalled();
   });
 });
 

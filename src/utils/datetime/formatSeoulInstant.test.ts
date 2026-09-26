@@ -7,6 +7,13 @@ import {
 } from "./formatSeoulInstant";
 
 describe("formatSeoulInstant", () => {
+  it.each([
+    ["2026-09-25T15:00:07Z", "2026-09-26 00:00:07"],
+    ["2026-12-31T15:04:05Z", "2027-01-01 00:04:05"],
+    ["2028-02-28T15:00:00Z", "2028-02-29 00:00:00"],
+  ])("formats request seconds across the Seoul date boundary (%s)", (instant, expected) => {
+    expect(formatSeoulDateTime(Date.parse(instant), "", true)).toBe(expected);
+  });
   it("UTC ISO를 Asia/Seoul 날짜로 포맷한다", () => {
     expect(formatSeoulDate("2026-09-15T15:00:00.000Z")).toBe("2026-09-16");
   });
