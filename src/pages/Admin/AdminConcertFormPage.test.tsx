@@ -109,6 +109,21 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it.each(["create", "edit"])("explains the required marker once before inputs (%s)", mode => {
+  vi.stubGlobal("sessionStorage", { getItem: () => null });
+  const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
+  const message = "표시는 필수 입력 항목입니다.";
+  expect(html.split(message)).toHaveLength(2);
+  const notice = html.match(/<p[^>]*>(?:(?!<\/p>)[\s\S])*표시는 필수 입력 항목입니다\.<\/p>/)?.[0];
+  expect(notice).toContain('class="text-sm text-admin-text-secondary"');
+  expect(notice).toContain('<span class="text-red-400" aria-hidden="true">*</span>');
+  expect(notice).toContain('<span class="sr-only">별표</span>');
+  expect(notice).not.toContain('role="alert"');
+  expect(html.indexOf(message)).toBeGreaterThan(html.indexOf("</header>"));
+  expect(html.indexOf(message)).toBeLessThan(html.indexOf("기본 정보"));
+  expect(html).toContain('공연명<span class="ml-1 text-red-400">*</span>');
+});
+
 it.each(["create", "edit"])("shows required date labels only in the performance schedule (%s)", (mode) => {
   vi.stubGlobal("sessionStorage", { getItem: () => null });
   const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
