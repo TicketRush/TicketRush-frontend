@@ -8,9 +8,9 @@ import {
 } from "three";
 
 export const CHARACTER_ANIMATIONS = [
-  { id: "wave", label: "인사" },
-  { id: "cute", label: "큐트" },
-  { id: "cover_mouth", label: "입 가리기" },
+  { id: "wave", label: "인사", icon: "👋" },
+  { id: "cute", label: "큐트", icon: "🫰" },
+  { id: "cover_mouth", label: "입 가리기", icon: "🤭" },
 ] as const;
 export type CharacterAnimationId = (typeof CHARACTER_ANIMATIONS)[number]["id"];
 export interface CharacterAnimationRequest {

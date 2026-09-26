@@ -2,7 +2,6 @@ import { CHARACTER_ANIMATIONS, type CharacterAnimationRequest } from "@/componen
 import { toast } from "react-toastify";
 import type {
   CharacterDraft,
-  CharacterPose as Pose,
 } from "@/types/domain/character";
 import {
   CHARACTER_STORAGE_KEY,
@@ -204,14 +203,6 @@ const FANMEET_CARDIGAN_COLORS = createPartColorPresets(DEFAULT_FANMEET_CARDIGAN_
 const FANMEET_INNER_COLORS = createPartColorPresets(DEFAULT_FANMEET_INNER_COLOR);
 const FANMEET_SHORTS_COLORS = createPartColorPresets(DEFAULT_FANMEET_SHORTS_COLOR);
 const FANMEET_SKIRT_COLORS = createPartColorPresets(DEFAULT_FANMEET_SKIRT_COLOR);
-
-const POSES: { value: Pose; label: string; icon: string }[] = [
-  { value: "standing", label: "기본 자세", icon: "🧍" },
-  { value: "wave", label: "손 흔들기", icon: "👋" },
-  { value: "heart", label: "손가락 하트", icon: "🫰" },
-  { value: "dance", label: "춤추기", icon: "💃" },
-  { value: "sing", label: "노래하기", icon: "🎤" },
-];
 
 const BACKGROUNDS: BackgroundPreset[] = [
   { id: "lavender", label: "라벤더", color: "#E9DDFF" },
@@ -2835,24 +2826,22 @@ export default function AdminCharacterCreatorPage() {
               )}
             </CreatorSection>
 
-            <CreatorSection title="포즈">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                {POSES.map((pose) => (
-                  <OptionCard
-                    key={pose.value}
-                    selected={character.pose === pose.value}
-                    onClick={() =>
-                      update("pose", pose.value)
-                    }
+            <CreatorSection title="애니메이션">
+              <p className="mb-3 text-xs text-slate-500">
+                버튼을 누르면 한 번 재생한 뒤 기본 자세로 돌아옵니다.
+              </p>
+              <div className="grid grid-cols-3 gap-3" role="group" aria-label="애니메이션">
+                {CHARACTER_ANIMATIONS.map(({ id, label, icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-label={label}
+                    className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:border-violet-400 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-violet-500 active:bg-violet-100"
+                    onClick={() => setAnimationRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))}
                   >
-                    <div className="text-2xl">
-                      {pose.icon}
-                    </div>
-
-                    <p className="mt-2 text-xs font-bold text-slate-800">
-                      {pose.label}
-                    </p>
-                  </OptionCard>
+                    <span className="block text-2xl" aria-hidden="true">{icon}</span>
+                    <span className="mt-2 block text-xs font-bold text-slate-800">{label}</span>
+                  </button>
                 ))}
               </div>
             </CreatorSection>
@@ -3053,19 +3042,6 @@ export default function AdminCharacterCreatorPage() {
               />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="애니메이션">
-              {CHARACTER_ANIMATIONS.map(({ id, label }) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-100"
-                  onClick={() => setAnimationRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-4 text-xs text-slate-600">
               <p>피부: {character.skinTone}</p>
               <p>
@@ -3148,7 +3124,6 @@ export default function AdminCharacterCreatorPage() {
                 </p>
               )}
 
-              <p>포즈: {character.pose}</p>
               <p>
                 배경:{" "}
                 {character.background.toUpperCase()}

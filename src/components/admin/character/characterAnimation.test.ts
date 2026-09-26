@@ -15,6 +15,32 @@ async function load(path: string) {
 }
 
 describe("shared character animation with real GLBs", () => {
+  it("replaces a playing animation with a fresh clip and restores rest", async () => {
+    const base = await load("chibi-base");
+    const body = clone(base.scene);
+    const reference = clone(base.scene);
+    const timeline = new CharacterAnimation(base.animations);
+    const fresh = new CharacterAnimation(base.animations);
+    timeline.register(body, true);
+    fresh.register(reference, true);
+    timeline.play("wave");
+    timeline.update(0.8);
+    timeline.play("cute");
+    fresh.play("cute");
+    timeline.update(0.4);
+    fresh.update(0.4);
+    body.traverse(object => {
+      const expected = reference.getObjectByName(object.name);
+      if (!expected) return;
+      expect(object.position.toArray()).toEqual(expected.position.toArray());
+      expect(object.quaternion.toArray()).toEqual(expected.quaternion.toArray());
+    });
+    timeline.update(4);
+    expect(body.getObjectByName("Head")!.quaternion.toArray()).toEqual(base.scene.getObjectByName("Head")!.quaternion.toArray());
+    timeline.dispose();
+    fresh.dispose();
+  });
+
   it.each(CHARACTER_ANIMATIONS)(
     "synchronizes $id, restarts, follows the head and returns to rest",
     async ({ id }) => {

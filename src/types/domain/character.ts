@@ -37,6 +37,7 @@ export interface CharacterConfig {
   fanmeetShortsColor: string;
   fanmeetSkirtColor: string;
   accessory: string;
+  /** Legacy storage compatibility only; one-shot animation requests are not saved. */
   pose: CharacterPose;
   background: string;
 }
