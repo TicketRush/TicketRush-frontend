@@ -277,7 +277,12 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
   }
 
   function handleGalleryImageFiles(files: File[]) {
-    setGalleryImages((prev) => [...prev, ...files].slice(0, 3));
+    const existingCount = mode === "edit" ? (form.imageGalleryUrls?.length ?? 0) : 0;
+    const newFileLimit = Math.max(0, 3 - existingCount);
+    if (galleryImages.length + files.length > newFileLimit) {
+      toast.error("서브 이미지는 최대 3장까지 등록할 수 있습니다. 추가하려면 먼저 기존 이미지나 선택한 파일을 삭제해주세요.");
+    }
+    setGalleryImages((prev) => [...prev, ...files].slice(0, newFileLimit));
   }
 
   function removeGalleryImage(index: number) {
@@ -731,54 +736,43 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             {model3d && <button type="button" onClick={() => setModel3d(null)}>파일 선택 취소</button>}
           </Field>}
           <Field label="대표 이미지" required>
-            {mode === "edit" && form.imageMainUrl && <img src={form.imageMainUrl} alt="현재 대표 이미지" className="mb-2 h-32 object-contain" />}
+            {mode === "edit" && !mainImage && form.imageMainUrl && <img src={form.imageMainUrl} alt="현재 대표 이미지" className="mb-2 h-32 object-contain" />}
             <UploadBox
               text={mainImage ? mainImage.name : "대표 이미지 업로드"}
               description="클릭하거나 파일을 끌어다 놓으세요."
               accept="image/*"
               onFilesSelected={handleMainImageFiles}
             />
-            {mode === "edit" && mainImage && <button type="button" onClick={() => setMainImage(null)}>파일 선택 취소</button>}
+            {mainImage && <SelectedImage file={mainImage} label="대표 이미지" onRemove={() => setMainImage(null)} /> }
           </Field>
 
           <Field label="갤러리 이미지 최대 3개">
-            {mode === "edit" && <div className="flex gap-2">{form.imageGalleryUrls?.map((url) => <img key={url} src={url} alt="현재 갤러리 이미지" className="h-24 object-contain" />)}</div>}
+            <p className="text-xs text-admin-text-secondary">대표 이미지 1장과 별도로, 기존 이미지와 새 파일을 합쳐 최대 3장까지 등록할 수 있습니다.</p>
+            {mode === "edit" && <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {form.imageGalleryUrls?.map((url, index) => (
+                <div key={`${url}-${index}`} className="rounded-lg border border-admin-border p-2">
+                  <img src={url} alt={`기존 갤러리 이미지 ${index + 1}`} className="h-24 w-full object-contain" />
+                  <button type="button" aria-label={`기존 갤러리 이미지 ${index + 1} 삭제`}
+                    onClick={() => update("imageGalleryUrls", form.imageGalleryUrls?.filter((_, i) => i !== index))}
+                    className="mt-2 text-xs text-red-400">삭제</button>
+                </div>
+              ))}
+            </div>}
             <UploadBox
               text={
                 galleryImages.length > 0
                   ? `${galleryImages.length}개 선택됨`
                   : "갤러리 이미지 업로드"
               }
-              description={mode === "edit" ? "새 파일을 선택하면 기존 갤러리 전체를 교체합니다. 선택하지 않으면 유지됩니다." : "최대 3개까지 업로드할 수 있습니다."}
+              description={mode === "edit" ? "남겨 둔 기존 이미지 뒤에 새 이미지를 추가합니다. 삭제는 저장할 때 반영됩니다." : "최대 3개까지 업로드할 수 있습니다."}
               accept="image/*"
               multiple
               onFilesSelected={handleGalleryImageFiles}
             />
 
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-              {[0, 1, 2].map((index) => (
-                <div
-                  key={index}
-                  className="flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-admin-border bg-admin-bg px-3 text-center text-xs text-admin-text-secondary"
-                >
-                  {galleryImages[index] ? (
-                    <>
-                      <span className="line-clamp-2">
-                        {galleryImages[index].name}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => removeGalleryImage(index)}
-                        className="mt-2 text-xs text-red-400"
-                      >
-                        삭제
-                      </button>
-                    </>
-                  ) : (
-                    <span>이미지 {index + 1}</span>
-                  )}
-                </div>
+              {galleryImages.map((file, index) => (
+                <SelectedImage key={`${imageFileKey(file)}-${galleryImages.slice(0, index).filter((item) => item === file).length}`} file={file} label={`갤러리 이미지 ${index + 1}`} onRemove={() => removeGalleryImage(index)} />
               ))}
             </div>
           </Field>
@@ -884,6 +878,29 @@ function FormInput({
       max={max}
       className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
     />
+  );
+}
+
+const imageFileKeys = new WeakMap<File, number>();
+let nextImageFileKey = 0;
+function imageFileKey(file: File) {
+  if (!imageFileKeys.has(file)) imageFileKeys.set(file, nextImageFileKey++);
+  return imageFileKeys.get(file)!;
+}
+
+function SelectedImage({ file, label, onRemove }: { file: File; label: string; onRemove: () => void }) {
+  const [preview, setPreview] = useState<{ file: File; url: string } | null>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreview({ file, url });
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return (
+    <div className="mt-2 rounded-lg border border-admin-border p-2">
+      {preview?.file === file && <img src={preview.url} alt={`${label} 미리보기`} className="h-24 w-full object-contain" />}
+      <p className="break-all text-xs">{file.name}</p>
+      <button type="button" aria-label={`${label} 삭제`} onClick={onRemove} className="mt-2 text-xs text-red-400">삭제</button>
+    </div>
   );
 }
 

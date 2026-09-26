@@ -75,6 +75,9 @@ export function createPerformanceRequest({
 }
 
 export function createConcertFormData(input: CreateConcertInput): FormData {
+  if (input.gallery.length > 3) {
+    throw new Error("갤러리는 최대 3개까지 선택해주세요.");
+  }
   const data = new FormData();
   data.append(
     "request",

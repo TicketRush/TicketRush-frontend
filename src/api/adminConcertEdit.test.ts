@@ -291,6 +291,7 @@ describe("admin edit contract", () => {
     expect(config.method).toBe("patch");
     expect(config.url).toBe("/api/v1/performance/admin/42/files");
     expect([...config.data.keys()]).toEqual([
+      "request",
       "mainImage",
       "model3d",
       "gallery",
@@ -298,6 +299,42 @@ describe("admin edit contract", () => {
     expect(config.data.get("mainImage")).toBe(value.mainImage);
     expect(config.data.get("model3d")).toBe(value.model3d);
     expect(config.data.getAll("gallery")).toEqual(value.gallery);
+    expect(JSON.parse(await config.data.get("request").text())).toEqual({ keep_gallery_urls: value.form.imageGalleryUrls });
+  });
+  it.each([
+    ["add without losing existing images", ["g1", "g2"], ["n1"]],
+    ["delete one existing image", ["g1", "g3"], []],
+    ["clear the gallery", [], []],
+    ["keep existing images and the remaining new file", ["g1", "g2"], ["n2"]],
+    ["preserve kept and new order", ["g3"], ["n2", "n1"]],
+  ])("files PATCH: %s", async (_name, kept, names) => {
+    const value = await input();
+    value.original.imageGalleryUrls = ["g1", "g2", "g3"];
+    value.form.imageGalleryUrls = kept as string[];
+    const gallery = (names as string[]).map((name) => new File([name], `${name}.png`));
+    await updateConcertApi(42, { ...value, gallery });
+    expect(adapter).toHaveBeenCalledOnce();
+    const config = adapter.mock.calls[0][0];
+    expect(config.url).toBe("/api/v1/performance/admin/42/files");
+    const body = config.data as FormData;
+    const request = body.get("request") as Blob;
+    expect(request.type).toBe("application/json");
+    expect(JSON.parse(await request.text())).toEqual({ keep_gallery_urls: kept });
+    expect(body.getAll("gallery")).toEqual(gallery);
+    expect([...body.keys()]).toEqual(["request", ...gallery.map(() => "gallery")]);
+  });
+
+  it("omits file PATCH after new gallery and main selections are canceled", async () => {
+    const value = await input();
+    await updateConcertApi(42, { ...value, gallery: [], mainImage: null });
+    expect(adapter).not.toHaveBeenCalled();
+  });
+  it("rejects three existing gallery URLs plus a new file before HTTP", async () => {
+    const value = await input();
+    value.form.imageGalleryUrls = ["g1", "g2", "g3"];
+    value.original.imageGalleryUrls = [...value.form.imageGalleryUrls];
+    await expect(updateConcertApi(42, { ...value, gallery: [new File(["n"], "n.png")] })).rejects.toThrow("최대 3개");
+    expect(adapter).not.toHaveBeenCalled();
   });
   it("omits unselected parts when replacing only a main image", async () => {
     const value = {

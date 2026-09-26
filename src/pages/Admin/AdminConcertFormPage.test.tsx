@@ -6,7 +6,7 @@ import AdminConcertFormPage from "./AdminConcertFormPage";
 import ShowDateInput from "@/components/admin/ShowDateInput";
 import DatePartsInput from "@/components/admin/DatePartsInput";
 import BookingOpenAtInput from "@/components/admin/BookingOpenAtInput";
-import { createPerformancePatch, mapConcertForEdit } from "@/api/adminConcertEdit";
+import { createPerformancePatch, createConcertReplacementFiles, mapConcertForEdit } from "@/api/adminConcertEdit";
 import { createConcertFormData } from "@/api/adminConcertCreate";
 import { toast } from "react-toastify";
 import { ApiError } from "@/api/errors/errorMapper";
@@ -481,6 +481,196 @@ it.each([["create", true], ["edit", true], ["create", false], ["edit", false]] a
   } finally {
     vi.useRealTimers();
   }
+});
+
+it.each(["create", "edit"])("removes selected image files before saving (%s)", async (mode) => {
+  type Element = React.ReactElement<Record<string, unknown>>;
+  function nodes(node: React.ReactNode): Element[] {
+    if (Array.isArray(node)) return node.flatMap(nodes);
+    if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+    return [node, ...nodes(node.props.children as React.ReactNode)];
+  }
+  const mainA = new File(["A"], "a.png", { type: "image/png" });
+  const mainB = new File(["B"], "b.png", { type: "image/png" });
+  const gallery = ["A", "B", "C"].map((value) => new File([value], "same.png", { type: "image/png" }));
+  let step = 0;
+  let saveEmpty: (() => Promise<void>) | undefined;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = nodes(tree);
+    const upload = elements.filter((node) => typeof node.type === "function" && node.type.name === "UploadBox" && node.props.accept === "image/*");
+    const selected = elements.filter((node) => typeof node.type === "function" && node.type.name === "SelectedImage");
+    const submit = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as () => Promise<void>;
+    const choose = (index: number, files: File[]) => (upload[index].props.onFilesSelected as (files: File[]) => void)(files);
+    switch (step++) {
+      case 0: choose(0, [mainA]); break;
+      case 1:
+        expect(selected.map((node) => node.props.file)).toEqual([mainA]);
+        (selected[0].props.onRemove as () => void)(); break;
+      case 2:
+        expect(selected).toHaveLength(0);
+        saveEmpty = submit;
+        choose(0, [mainA]); break;
+      case 3: choose(0, [mainB]); break;
+      case 4: choose(1, gallery); break;
+      case 5:
+        expect(selected.map((node) => node.props.file)).toEqual([mainB, ...gallery]);
+        (selected[2].props.onRemove as () => void)(); break;
+      default:
+        expect(selected.map((node) => node.props.file)).toEqual([mainB, gallery[0], gallery[2]]);
+        save = submit;
+    }
+  });
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2026, 8, 22));
+  try {
+    if (mode === "create") {
+      hooks.query.mockReturnValue({});
+      vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+      const html = render("/admin/concerts/new", { concertDraft: { pathname: "/admin/concerts/new", form: initial.form, totalSeats: 120 } });
+      expect(html).toContain('type="button" aria-label="대표 이미지 삭제"');
+      expect(html).toContain('type="button" aria-label="갤러리 이미지 1 삭제"');
+      await saveEmpty!();
+      expect(hooks.create).not.toHaveBeenCalled();
+    } else {
+      hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, imageGalleryUrls: [] } }, isFetchedAfterMount: true });
+      render();
+    }
+    expect(save).toBeTypeOf("function");
+    await save!();
+    const mutation = mode === "create" ? hooks.create : hooks.update;
+    expect(mutation).toHaveBeenCalledOnce();
+    const input = mutation.mock.calls[0][0];
+    expect(input.mainImage).toBe(mainB);
+    expect(input.gallery).toEqual([gallery[0], gallery[2]]);
+    const data = mode === "create" ? createConcertFormData(input) : createConcertReplacementFiles(input)!;
+    expect(data.get("mainImage")).toBe(mainB);
+    expect(data.getAll("gallery")).toEqual([gallery[0], gallery[2]]);
+  } finally { vi.useRealTimers(); }
+});
+
+it.each([false, true])("removes server gallery images and saves the remaining mixed gallery (clear=%s)", async (clear) => {
+  const urls = ["/g1.png", "/g2.png", "/g3.png"];
+  const files = [new File(["n1"], "n1.png"), new File(["n2"], "n2.png")];
+  hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, imageGalleryUrls: urls } }, isFetchedAfterMount: true });
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = formNodes(tree);
+    const serverImages = elements.filter((node) => node.type === "img" && urls.includes(node.props.src as string));
+    const remove = elements.filter((node) => node.type === "button" && String(node.props["aria-label"]).startsWith("기존 갤러리 이미지"));
+    const selected = elements.filter((node) => typeof node.type === "function" && node.type.name === "SelectedImage");
+    const upload = elements.filter((node) => typeof node.type === "function" && node.type.name === "UploadBox" && node.props.accept === "image/*");
+    if (step === 0) {
+      expect(serverImages.map((node) => node.props.src)).toEqual(urls);
+      expect(selected).toHaveLength(0);
+      for (const button of remove) expect(button.props.type).toBe("button");
+    }
+    if (clear && remove.length) {
+      step++;
+      (remove[0].props.onClick as () => void)();
+      return;
+    }
+    if (!clear) {
+      switch (step++) {
+        case 0: (remove[1].props.onClick as () => void)(); return;
+        case 1:
+          expect(serverImages.map((node) => node.props.src)).toEqual([urls[0], urls[2]]);
+          (upload[1].props.onFilesSelected as (files: File[]) => void)(files); return;
+        case 2:
+          expect(selected.map((node) => node.props.file)).toEqual([files[0]]);
+          (selected[0].props.onRemove as () => void)(); return;
+        case 3:
+          expect(selected).toHaveLength(0);
+          (upload[1].props.onFilesSelected as (files: File[]) => void)([files[1]]); return;
+      }
+    }
+    expect(serverImages.map((node) => node.props.src)).toEqual(clear ? [] : [urls[0], urls[2]]);
+    expect(selected.map((node) => node.props.file)).toEqual(clear ? [] : [files[1]]);
+    save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes("변경사항 저장"))?.props.onClick as typeof save;
+  });
+  render();
+  await save!();
+  expect(hooks.update).toHaveBeenCalledOnce();
+  const input = hooks.update.mock.calls[0][0];
+  expect(JSON.parse(JSON.stringify(createPerformancePatch(input)))).toEqual({});
+  const data = createConcertReplacementFiles(input)!;
+  expect(JSON.parse(await (data.get("request") as Blob).text())).toEqual({ keep_gallery_urls: clear ? [] : [urls[0], urls[2]] });
+  expect(data.getAll("gallery")).toEqual(clear ? [] : [files[1]]);
+});
+
+it("canceling new images restores the existing main image and no-change file policy", async () => {
+  const file = new File(["new"], "new.png");
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = formNodes(tree);
+    const selected = elements.filter((node) => typeof node.type === "function" && node.type.name === "SelectedImage");
+    const upload = elements.filter((node) => typeof node.type === "function" && node.type.name === "UploadBox" && node.props.accept === "image/*");
+    expect(elements.some((node) => node.type === "img" && node.props.src === initial.form.imageMainUrl)).toBe(step !== 1);
+    if (step++ === 0) {
+      for (const node of upload) (node.props.onFilesSelected as (files: File[]) => void)([file]);
+      return;
+    }
+    if (step === 2) {
+      expect(selected).toHaveLength(2);
+      for (const node of selected) (node.props.onRemove as () => void)();
+      return;
+    }
+    expect(selected).toHaveLength(0);
+    save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes("변경사항 저장"))?.props.onClick as typeof save;
+  });
+  render();
+  await save!();
+  expect(hooks.update).toHaveBeenCalledOnce();
+  expect(createConcertReplacementFiles(hooks.update.mock.calls[0][0])).toBeNull();
+});
+
+it.each([
+  ["create", 0, 2, 1, 3, false],
+  ["create", 0, 3, 1, 3, true],
+  ["create", 0, 2, 2, 3, true],
+  ["edit", 3, 0, 1, 0, true],
+  ["edit", 2, 0, 1, 1, false],
+  ["edit", 2, 0, 2, 1, true],
+  ["edit", 2, 1, 1, 1, true],
+] as const)("limits gallery independently of the main image (%s, existing=%i, selected=%i, added=%i)", async (mode, existingCount, selectedCount, addedCount, expectedCount, overflow) => {
+  const urls = Array.from({ length: existingCount }, (_, i) => `/g${i}.png`);
+  const selectedFiles = Array.from({ length: selectedCount }, (_, i) => new File(["old"], `selected${i}.png`));
+  const added = Array.from({ length: addedCount }, (_, i) => new File(["new"], `added${i}.png`));
+  const mainImage = new File(["main"], "main.png");
+  const form = { ...initial.form, imageGalleryUrls: urls };
+  hooks.query.mockReturnValue({ data: { ...initial, form }, isFetchedAfterMount: true });
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = formNodes(tree);
+    if (step++ === 0) {
+      const upload = elements.find((node) => typeof node.type === "function" && node.type.name === "UploadBox" && node.props.multiple)!;
+      (upload.props.onFilesSelected as (files: File[]) => void)(added);
+      return;
+    }
+    const previews = elements.filter((node) => typeof node.type === "function" && node.type.name === "SelectedImage");
+    expect(previews.map((node) => node.props.file)).toEqual([mainImage, ...[...selectedFiles, ...added].slice(0, expectedCount)]);
+    save = elements.find((node) => node.type === "button" && React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+  });
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(new Date("2026-09-25T03:00:00Z"));
+    vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+    const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
+    render(path, { concertDraft: { pathname: path, form, totalSeats: 120, mainImage, galleryImages: selectedFiles } });
+    if (overflow) expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("서브 이미지는 최대 3장"));
+    else expect(toast.error).not.toHaveBeenCalled();
+    await save!();
+    const mutation = mode === "create" ? hooks.create : hooks.update;
+    expect(mutation).toHaveBeenCalledOnce();
+    const input = mutation.mock.calls[0][0];
+    const data = mode === "create" ? createConcertFormData(input) : createConcertReplacementFiles(input)!;
+    expect(data.get("mainImage")).toBe(mainImage);
+    expect(data.getAll("gallery")).toEqual([...selectedFiles, ...added].slice(0, expectedCount));
+    expect(existingCount + data.getAll("gallery").length).toBeLessThanOrEqual(3);
+  } finally { vi.useRealTimers(); }
 });
 
 it.each(["create", "edit"])("validates schedule inputs only after interaction and clears accessible errors (%s)", (mode) => {
