@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildSeatLocationGrid } from "./seatLocationGrid";
+import {
+  buildSeatLocationGrid,
+  resolveSeatLocationMap,
+} from "./seatLocationGrid";
 
 describe("buildSeatLocationGrid", () => {
   it("keeps the default 10 by 12 map when the seat is inside it", () => {
@@ -49,5 +52,57 @@ describe("buildSeatLocationGrid", () => {
       targetRow: null,
       targetCol: null,
     });
+  });
+});
+
+describe("resolveSeatLocationMap", () => {
+  const seats = [
+    { row: "A", col: 1, seatNumber: "A-1" },
+    { row: "A", col: 3, seatNumber: "A-3" },
+    { row: "E", col: 20, seatNumber: "E-20" },
+  ];
+
+  it("keeps gaps and the layout width so the seat is not pushed to the edge", () => {
+    const map = resolveSeatLocationMap("E-20", { seats, maxCols: 24 });
+    const rowA = map.rows.find((row) => row.row === "A");
+    const rowE = map.rows.find((row) => row.row === "E");
+
+    expect(map.source).toBe("venue");
+    expect(rowA?.cells.map((cell) => cell.kind)).toEqual([
+      "seat",
+      "gap",
+      "seat",
+      ...Array(21).fill("gap"),
+    ]);
+    expect(rowE?.cells[19]?.kind).toBe("mine");
+    expect(rowE?.cells).toHaveLength(24);
+  });
+
+  it("keeps empty rows from the layout so the seat stays the same distance from the stage", () => {
+    const map = resolveSeatLocationMap("E-20", {
+      seats: [{ row: "E", col: 20, seatNumber: "E-20" }],
+      maxCols: 20,
+      totalRows: 6,
+    });
+
+    expect(map.rows.map((row) => row.row)).toEqual(["A", "B", "C", "D", "E", "F"]);
+    expect(map.rows[0]?.cells.every((cell) => cell.kind === "gap")).toBe(true);
+    expect(map.rows[4]?.cells[19]?.kind).toBe("mine");
+  });
+
+  it("matches the booked seat by row and column when the label text differs", () => {
+    const map = resolveSeatLocationMap("E-20", {
+      seats: [{ row: "E", col: 20, seatNumber: "E20" }],
+    });
+
+    expect(map.source).toBe("venue");
+    expect(map.rows.find((row) => row.row === "E")?.cells[19]?.kind).toBe(
+      "mine",
+    );
+  });
+
+  it("uses the schematic map when the booked seat is not in the layout", () => {
+    expect(resolveSeatLocationMap("B-4", { seats }).source).toBe("schematic");
+    expect(resolveSeatLocationMap("E-20", null).source).toBe("schematic");
   });
 });

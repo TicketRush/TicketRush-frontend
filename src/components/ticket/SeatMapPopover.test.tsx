@@ -115,6 +115,36 @@ it("restores the previous scroll position when the popover closes", () => {
   expect(window.scrollTo).toHaveBeenCalledWith(0, 240);
 });
 
+it("keeps an empty column from the venue layout", () => {
+  captured.length = 0;
+  const html = renderToStaticMarkup(
+    <SeatMapPopover
+      seatLabel="A-3"
+      venue={{
+        maxCols: 3,
+        seats: [
+          { row: "A", col: 1, seatNumber: "A-1" },
+          { row: "A", col: 3, seatNumber: "A-3" },
+        ],
+      }}
+      onClose={vi.fn()}
+    />,
+  );
+
+  expect(html).toContain('data-my-seat="A-3"');
+  expect(html).toContain("data-seat-gap");
+  expect(html).not.toContain("좌석 배치를 불러오는 중");
+});
+
+it("shows a loading label while the venue layout is still loading", () => {
+  const html = renderToStaticMarkup(
+    <SeatMapPopover seatLabel="E-20" layoutPending onClose={vi.fn()} />,
+  );
+
+  expect(html).toContain("좌석 배치를 불러오는 중");
+  expect(html).not.toContain("data-my-seat");
+});
+
 it("marks a seat past column 12 on the location map", () => {
   captured.length = 0;
   const html = renderToStaticMarkup(
