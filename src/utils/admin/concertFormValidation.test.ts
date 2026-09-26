@@ -32,6 +32,12 @@ const baseForm = {
 
 describe("shared live and submit schedule validation", () => {
   const today = new Date(2026, 8, 22);
+  it("skips only the disabled booking schedule, preserving other validation", () => {
+    const params = { form: { ...baseForm, date: "2028-02-29", bookingOpenAt: "202--T25:00" }, totalSeats: 100, today };
+    expect(validateConcertForm(params)).toBe("올바른 예매 오픈 시각을 입력해주세요.");
+    expect(validateConcertForm({ ...params, skipBookingSchedule: true })).toBeNull();
+    expect(validateConcertForm({ ...params, skipBookingSchedule: true, form: { ...params.form, time: "25:00" } })).toBe("공연 시간은 00:00부터 23:59 사이로 입력해주세요.");
+  });
   it.each(["", "0999--", "10000-01-01", "2028--", "2028-02-", "2027-02-29", "2028-04-31", "2020-01-01", "2035-01-01", "2028-02-29"])("shares date policy for %s", (date) => {
     expect(validateConcertDate(date, undefined, today)).toBe(validateConcertForm({ form: { ...baseForm, date }, totalSeats: 100, today }));
     expect(validateConcertDate(date, undefined, today) === null).toBe(date === "2028-02-29");

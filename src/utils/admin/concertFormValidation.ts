@@ -10,6 +10,7 @@ export const MAX_TICKET_PRICE = 10_000_000;
 export const MAX_TOTAL_SEATS = 100_000;
 
 interface ValidateConcertFormParams {
+  skipBookingSchedule?: boolean;
   original?: ConcertFormData;
   form: ConcertFormData;
   totalSeats: number;
@@ -115,6 +116,7 @@ export function validateBookingOpenAt(value?: string, original?: string): string
 }
 
 export function validateConcertForm({
+  skipBookingSchedule = false,
   original,
   form,
   totalSeats,
@@ -173,7 +175,7 @@ export function validateConcertForm({
     return "공연 상세 설명을 입력해주세요.";
   }
 
-  const bookingError = validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt);
+  const bookingError = skipBookingSchedule ? null : validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt);
   if (bookingError) return bookingError;
 
   return null;

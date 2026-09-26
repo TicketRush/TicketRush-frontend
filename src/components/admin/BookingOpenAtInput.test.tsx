@@ -14,6 +14,17 @@ function nodes(node: React.ReactNode): Element[] {
   if (node.type === DatePartsInput) return nodes(DatePartsInput(node.props as unknown as React.ComponentProps<typeof DatePartsInput>));
   return [node, ...nodes(node.props.children as React.ReactNode)];
 }
+
+it("disables all schedule controls without erasing the draft or its seconds", () => {
+  const onChange = vi.fn();
+  const value = "2028-02-29 20:30:45";
+  const controls = nodes(BookingOpenAtInput({ value, onChange, disabled: true, "aria-describedby": "booking-schedule-note" }))
+    .filter((node) => node.type === "input" || node.type === "select");
+  expect(controls).toHaveLength(4);
+  for (const node of controls) expect(node.props).toMatchObject({ disabled: true, "aria-describedby": "booking-schedule-note" });
+  expect(controls.map((node) => node.props.value)).toEqual(["2028", "02", "29", "20:30:45"]);
+  expect(onChange).not.toHaveBeenCalled();
+});
 // Controlled component: exercise the real input/select onChange adapters in Node.
 function setup(initial = "") {
   let value = initial;

@@ -43,6 +43,7 @@ import {
 } from "@/utils/character/characterConfig";
 import { useBanners } from "@/hooks/queries/useBanners";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
+import { isBookingOpened, isBookingScheduleLocked } from "@/utils/admin/bookingSchedule";
 
 
 const GENRES: { value: Genre; label: string }[] = [
@@ -141,6 +142,10 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
       ? { characterConfig: location.state.characterConfig } : {}),
   }));
   const [interacted, setInteracted] = useState<Partial<Record<"date" | "time" | "bookingOpenAt", boolean>>>({});
+  const [immediateBooking, setImmediateBooking] = useState(false);
+  const bookingStatus = mode === "edit" ? initialData?.status : undefined;
+  const bookingLocked = isBookingScheduleLocked(bookingStatus);
+  const bookingDisabled = bookingLocked || immediateBooking;
   const bannerQuery = useBanners();
   const bannerEnabled = form.displayOnBanner ?? false;
   const bannerSubtitle = form.bannerSubtitle ?? "";
@@ -150,7 +155,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
   const bannerDisabled = !bannerEnabled && !originallyOnBanner && (bannerUnavailable || bannerFull);
   const dateError = interacted.date ? validateConcertDate(form.date, original?.date) : null;
   const timeError = interacted.time ? validateConcertTime(form.time) : null;
-  const bookingError = interacted.bookingOpenAt ? validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt) : null;
+  const bookingError = !bookingDisabled && interacted.bookingOpenAt ? validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt) : null;
   const [totalSeats, setTotalSeats] = useState(draft?.totalSeats ?? initialData?.totalSeats ?? 0);
   const [mainImage, setMainImage] = useState<File | null>(draft?.mainImage ?? null);
   const [model3d, setModel3d] = useState<File | null>(draft?.model3d ?? null);
@@ -343,6 +348,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
       form: sanitizedForm,
       totalSeats,
       original,
+      skipBookingSchedule: bookingDisabled,
     });
 
     if (errorMessage) {
@@ -367,6 +373,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
     try {
       if (mode === "create" && mainImage) {
         await createMutation.mutateAsync({
+          immediateBooking,
           form: {
             ...sanitizedForm,
             characterConfig,
@@ -379,6 +386,8 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
         toast.success("공연이 등록되었습니다.");
       } else {
         await updateMutation.mutateAsync({
+          immediateBooking: !bookingLocked && immediateBooking,
+          status: bookingStatus,
           form: sanitizedForm,
           original: original!,
           mainImage,
@@ -508,11 +517,28 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
         </Section>
 
         <Section title="예매 일정">
+          {bookingLocked ? (
+            <p id="booking-schedule-note" className="text-sm text-admin-text-secondary">
+              {isBookingOpened(bookingStatus) ? "예매 오픈됨" : "취소된 공연은 예매 일정을 변경할 수 없습니다."}
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-sm">
+              <input id="booking-immediate" type="checkbox" checked={immediateBooking}
+                onChange={(event) => setImmediateBooking(event.target.checked)}
+                className="h-4 w-4 accent-primary" />
+              등록 즉시 예매 가능
+            </label>
+          )}
+          {!bookingLocked && immediateBooking && (
+            <p id="booking-schedule-note" className="text-xs text-admin-text-secondary">
+              저장 시각으로 예매 오픈을 요청합니다. 반영까지 약 10초가 걸릴 수 있습니다.
+            </p>
+          )}
           <Field label="예매 오픈 시각 (한국 시간)">
             {bookingError && <p id="booking-open-error" className="text-sm text-red-400">{bookingError}</p>}
-            <BookingOpenAtInput aria-invalid={bookingError ? true : undefined}
-              aria-describedby={bookingError ? "booking-open-error" : undefined} value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
-            {mode === "edit" && <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>}
+            <BookingOpenAtInput disabled={bookingDisabled} aria-invalid={bookingError ? true : undefined}
+              aria-describedby={bookingError ? "booking-open-error" : bookingDisabled ? "booking-schedule-note" : undefined} value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
+            {mode === "edit" && !bookingDisabled && <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>}
           </Field>
         </Section>
 

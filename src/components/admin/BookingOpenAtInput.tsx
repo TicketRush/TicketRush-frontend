@@ -3,6 +3,7 @@ import { formatTimeInput, timeInputClass } from "@/utils/admin/timeInput";
 import type { DateParts } from "@/utils/datetime/dateParts";
 
 interface Props {
+  disabled?: boolean;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
   value: string;

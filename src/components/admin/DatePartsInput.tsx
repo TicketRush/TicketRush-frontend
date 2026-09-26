@@ -2,6 +2,7 @@ import type { KeyboardEventHandler } from "react";
 import { changeDatePart, getDaysInMonth, isValidYear, type DateParts } from "@/utils/datetime/dateParts";
 
 interface Props {
+  disabled?: boolean;
   id: string;
   value: DateParts;
   onChange: (value: DateParts) => void;
@@ -14,14 +15,14 @@ interface Props {
 
 const inputClass = "w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50 xl:px-4 xl:py-3 xl:text-base";
 
-export default function DatePartsInput({ id, value, onChange, showRequiredIndicator = false, ...navigationProps }: Props) {
+export default function DatePartsInput({ id, value, onChange, disabled, showRequiredIndicator = false, ...navigationProps }: Props) {
   const validYear = isValidYear(value.year);
   const days = validYear ? getDaysInMonth(Number(value.year), Number(value.month)) : 0;
   return (
     <div className="grid grid-cols-3 gap-3">
       <label htmlFor={`${id}-year`} className="space-y-1 text-sm">
         <span>연도{showRequiredIndicator && <span className="ml-1 text-red-400" aria-hidden="true">*</span>}</span>
-        <input {...navigationProps} id={`${id}-year`} className={inputClass} type="text" inputMode="numeric" maxLength={4}
+        <input {...navigationProps} disabled={disabled} id={`${id}-year`} className={inputClass} type="text" inputMode="numeric" maxLength={4}
           placeholder="YYYY" value={value.year}
           onChange={(event) => {
             if (/^\d{0,4}$/.test(event.target.value)) onChange(changeDatePart(value, "year", event.target.value));
@@ -29,7 +30,7 @@ export default function DatePartsInput({ id, value, onChange, showRequiredIndica
       </label>
       <label htmlFor={`${id}-month`} className="space-y-1 text-sm">
         <span>월{showRequiredIndicator && <span className="ml-1 text-red-400" aria-hidden="true">*</span>}</span>
-        <select {...navigationProps} id={`${id}-month`} className={inputClass} value={value.month} disabled={!validYear}
+        <select {...navigationProps} id={`${id}-month`} className={inputClass} value={value.month} disabled={disabled || !validYear}
           onChange={(event) => onChange(changeDatePart(value, "month", event.target.value))}>
           <option value="">월 선택</option>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
@@ -39,7 +40,7 @@ export default function DatePartsInput({ id, value, onChange, showRequiredIndica
       </label>
       <label htmlFor={`${id}-day`} className="space-y-1 text-sm">
         <span>일{showRequiredIndicator && <span className="ml-1 text-red-400" aria-hidden="true">*</span>}</span>
-        <select {...navigationProps} id={`${id}-day`} className={inputClass} value={value.day} disabled={!days}
+        <select {...navigationProps} id={`${id}-day`} className={inputClass} value={value.day} disabled={disabled || !days}
           onChange={(event) => onChange(changeDatePart(value, "day", event.target.value))}>
           <option value="">일 선택</option>
           {Array.from({ length: days }, (_, i) => i + 1).map((day) => (
