@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   counts: vi.fn(),
   detail: vi.fn(),
   release: vi.fn(),
-  concertDetail: vi.fn(),
+  concertTitle: vi.fn(),
   stream: vi.fn(),
 }));
 
@@ -29,13 +29,11 @@ vi.mock("@/hooks/admin/useAdmin", async (importOriginal) => {
     useAdminSeatMonitoring: mocks.monitoring,
     useAdminSeatDetail: mocks.detail,
     useAdminReleaseSeat: mocks.release,
+    useAdminConcertTitle: mocks.concertTitle,
   };
 });
 vi.mock("@/hooks/queries/useSeats", () => ({
   useSeatCounts: mocks.counts,
-}));
-vi.mock("@/hooks/queries/useConcertDetail", () => ({
-  useConcertDetail: mocks.concertDetail,
 }));
 vi.mock("@/hooks/seat/useSeatEventStream", () => ({
   useSeatEventStream: mocks.stream,
@@ -122,8 +120,10 @@ beforeEach(() => {
     mutateAsync: vi.fn(),
     isPending: false,
   });
-  mocks.concertDetail.mockReturnValue({
-    data: { title: "테스트 공연" },
+  mocks.concertTitle.mockReturnValue({
+    data: "테스트 공연",
+    isFetched: true,
+    isError: false,
   });
   mocks.stream.mockReturnValue({ connectionStatus: "live" });
 });
@@ -235,6 +235,77 @@ describe("AdminSeatMonitoringPage live updates (#336 / #361)", () => {
     const html = renderAt("/admin/seat-monitoring/abc");
     expect(html).not.toContain("새로고침");
     expect(useSeatEventStream).not.toHaveBeenCalled();
+  });
+
+  it("목록 state 제목이 있으면 관리자 제목 조회를 열지 않는다", () => {
+    mocks.concertTitle.mockReturnValue({
+      data: undefined,
+      isFetched: false,
+      isError: false,
+    });
+    const html = renderToStaticMarkup(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/admin/seat-monitoring/12",
+            state: { concert },
+          },
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/admin/seat-monitoring/:performanceId"
+            element={<AdminSeatMonitoringPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(html).toContain('value="테스트 공연"');
+    expect(mocks.concertTitle).toHaveBeenCalledWith(12, { enabled: false });
+  });
+
+  it("목록 state에 제목이 없어도 맵이 깨지지 않고 관리자 제목을 조회한다", () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/admin/seat-monitoring/12",
+            state: { concert: { ...concert, title: undefined } },
+          },
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/admin/seat-monitoring/:performanceId"
+            element={<AdminSeatMonitoringPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(html).toContain('value="테스트 공연"');
+    expect(mocks.concertTitle).toHaveBeenCalledWith(12, { enabled: true });
+  });
+
+  it("새로고침처럼 state가 없어도 관리자 공연 제목을 보여 준다", () => {
+    const html = renderAt("/admin/seat-monitoring/12");
+    expect(html).toContain('value="테스트 공연"');
+    expect(mocks.concertTitle).toHaveBeenCalledWith(12, { enabled: true });
+  });
+
+  it("관리자 제목을 못 찾으면 공연 ID로 채우고, 조회 중에는 비워 둔다", () => {
+    mocks.concertTitle.mockReturnValue({
+      data: null,
+      isFetched: true,
+      isError: true,
+    });
+    expect(renderAt("/admin/seat-monitoring/12")).toContain('value="공연 12"');
+
+    mocks.concertTitle.mockReturnValue({
+      data: undefined,
+      isFetched: false,
+      isError: false,
+    });
+    expect(renderAt("/admin/seat-monitoring/12")).toContain('value=""');
   });
 
   it("맵 URL이면 같은 공연 맵을 열고 SSE로 관리자 맵 캐시를 패치한다", () => {

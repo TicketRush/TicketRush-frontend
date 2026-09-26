@@ -5,6 +5,7 @@
 // #336: 공개 SSE(seat-status/stream)로 맵·KPI 캐시를 패치. 재조회 중에도 기존 화면 유지.
 // #361: 연결 상태, /admin/seat-monitoring/:id URL, 목록 숫자 재조회, HOLD 만료 시 맵 유지.
 // #386: 목록 페이지는 ?page= 에 둔다. 번호는 화면에 보이는 쪽(1부터)이고 첫 페이지는 쿼리를 생략한다.
+// #388: 맵 제목은 목록 state와 관리자 공연 목록에서 받는다. 공개 상세에는 의존하지 않는다.
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Navigate,
@@ -24,9 +25,9 @@ import {
   useAdminSeatDetail,
   useAdminReleaseSeat,
   useAdminConcerts,
+  useAdminConcertTitle,
 } from "@/hooks/admin/useAdmin";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
-import { useConcertDetail } from "@/hooks/queries/useConcertDetail";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
 import { LEGACY_HOLD_BOOKING_NUMBER } from "@/api/admin";
 import { ERROR_CODES } from "@/api/errors/errorCodes";
@@ -335,13 +336,16 @@ function AdminSeatMonitoringMapRoute({
     ?.concert;
   const concertFromState =
     stateConcert?.id === performanceId ? stateConcert : undefined;
-  const { data: concertDetail, isError: concertDetailError } = useConcertDetail(
-    concertFromState ? undefined : performanceId,
-  );
+  const stateTitle = concertFromState?.title?.trim() ?? "";
+  const titleLookup = useAdminConcertTitle(performanceId, {
+    enabled: stateTitle.length === 0,
+  });
   const concertTitle =
-    concertFromState?.title ??
-    concertDetail?.title ??
-    (concertDetailError ? `공연 ${performanceId}` : "");
+    stateTitle ||
+    titleLookup.data ||
+    (titleLookup.isFetched && (titleLookup.isError || titleLookup.data == null)
+      ? `공연 ${performanceId}`
+      : "");
 
   return (
     <AdminSeatMonitoringMap

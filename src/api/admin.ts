@@ -80,6 +80,7 @@ export async function fetchAdminDashboard(
 
 export async function fetchAdminConcerts(
   params: AdminConcertListParams = {},
+  signal?: AbortSignal,
 ): Promise<AdminConcertListResponse> {
   if (USE_MOCK) return mocks.mockGetAdminConcerts(params);
 
@@ -87,7 +88,7 @@ export async function fetchAdminConcerts(
   const size = Math.min(params.size ?? 10, 50);
   const res = await apiClient.get<PerformanceAdminSummaryResponse[]>(
     "/api/v1/performance/admin",
-    { params: { page, size } },
+    { params: { page, size }, signal },
   );
   const pagination =
     res.pagination && isPageInfo(res.pagination)
