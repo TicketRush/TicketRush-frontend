@@ -144,6 +144,50 @@ it.each(["create", "edit"])("shows required date labels only in the performance 
 });
 
 type FormElement = React.ReactElement<Record<string, unknown>>;
+it.each(["create", "edit"])("hides only duration and price spinners and preserves numeric requests (%s)", async (mode) => {
+  let step = 0;
+  let save: (() => Promise<void>) | undefined;
+  hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+    const elements = formNodes(tree);
+    const numeric = elements.filter((node) => node.props.type === "number");
+    if (step++ === 0) {
+      for (const [index, value] of [[0, "135"], [1, "99000"]] as const) {
+        (numeric[index].props.onChange as (value: string) => void)(value);
+      }
+      return;
+    }
+    save = elements.find((node) => node.type === "button" &&
+      React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+  });
+  vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+  const path = "/admin/concerts/new";
+  render(mode === "create" ? path : undefined, mode === "create" ? { concertDraft: {
+    pathname: path, form: initial.form, totalSeats: 120,
+    mainImage: new File(["poster"], "poster.png", { type: "image/png" }),
+  } } : undefined);
+  const numeric = hooks.control.mock.calls.map(([props]) => props).filter((props) => props.type === "number");
+  expect(numeric).toHaveLength(3);
+  const spinnerClasses = ["[appearance:textfield]", "[&::-webkit-inner-spin-button]:appearance-none", "[&::-webkit-outer-spin-button]:appearance-none"];
+  for (const input of numeric.slice(0, 2)) {
+    expect(input.className.split(/\s+/)).toEqual(expect.arrayContaining(spinnerClasses));
+    for (const constraint of ["min", "max", "step"]) expect(input[constraint]).toBeUndefined();
+    expect(input.disabled).toBeUndefined();
+    expect(input["data-form-focus"]).toBe("true");
+    expect(input.onKeyDown).toEqual(expect.any(Function));
+  }
+  for (const token of spinnerClasses) expect(numeric[2].className.split(/\s+/)).not.toContain(token);
+  expect(numeric[2].max).toBe(100_000);
+  expect(numeric[2].disabled).toBe(mode === "edit");
+  await save!();
+  const mutation = mode === "create" ? hooks.create : hooks.update;
+  expect(mutation).toHaveBeenCalledOnce();
+  const input = mutation.mock.calls[0][0];
+  const payload = mode === "create"
+    ? JSON.parse(await (createConcertFormData(input).get("request") as Blob).text())
+    : JSON.parse(JSON.stringify(createPerformancePatch(input)));
+  expect(payload).toMatchObject({ duration_minutes: 135, price: 99000 });
+});
+
 function formNodes(node: React.ReactNode): FormElement[] {
   if (Array.isArray(node)) return node.flatMap(formNodes);
   if (!React.isValidElement<Record<string, unknown>>(node)) return [];

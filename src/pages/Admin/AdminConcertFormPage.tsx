@@ -513,6 +513,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             <Field label="러닝타임(분)" required schedule>
               <FormInput
                 type="number"
+                hideNumberSpinner
                 value={
                   form.durationMinutes === 0
                     ? ""
@@ -578,6 +579,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             <Field label="티켓 가격" required>
               <FormInput
                 type="number"
+                hideNumberSpinner
                 value={form.price === 0 ? "" : String(form.price)}
                 onChange={(v) => update("price", Number(v || 0))}
                 onKeyDown={handleEnterMoveNext}
@@ -856,6 +858,7 @@ function FormInput({
   onChange,
   onKeyDown,
   type = "text",
+  hideNumberSpinner = false,
   placeholder,
   maxLength,
   max,
@@ -865,6 +868,7 @@ function FormInput({
   onChange: (value: string) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   type?: string;
+  hideNumberSpinner?: boolean;
   placeholder?: string;
   maxLength?: number;
   max?: number;
@@ -881,7 +885,7 @@ function FormInput({
       disabled={disabled}
       maxLength={maxLength}
       max={max}
-      className="w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base"
+      className={`w-full rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm outline-none focus:border-primary xl:px-4 xl:py-3 xl:text-base${hideNumberSpinner ? " [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" : ""}`}
     />
   );
 }
