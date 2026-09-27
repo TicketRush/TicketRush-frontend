@@ -245,6 +245,43 @@ function formNodes(node: React.ReactNode): FormElement[] {
 const bannerFullMessage = "배너 3개가 모두 등록되어 새로운 배너를 등록할 수 없습니다.";
 
 describe("immediate booking", () => {
+  describe.each(["create", "edit"])("required booking submit (%s)", mode => {
+    it.each([
+      ["", false, false], ["2028-10-10T", false, false], ["--T18:30", false, false],
+      ["2028-10-10T18:30", false, true], ["", true, true],
+    ] as const)("validates %j with immediate=%s (allowed=%s)", async (bookingOpenAt, immediate, allowed) => {
+      let step = 0;
+      let save: (() => Promise<void>) | undefined;
+      hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+        const elements = formNodes(tree);
+        if (step++ === 0 && immediate) {
+          const checkbox = elements.find(node => node.props.id === "booking-immediate")!;
+          (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+          return;
+        }
+        save = elements.find(node => node.type === "button" &&
+          React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+      });
+      vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+      // The server's existing empty UPCOMING schedule must also require input.
+      hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, bookingOpenAt: "" } }, isFetchedAfterMount: true });
+      const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
+      render(path, { concertDraft: { pathname: path, form: { ...initial.form, bookingOpenAt }, totalSeats: 120,
+        mainImage: new File(["poster"], "poster.png", { type: "image/png" }),
+      } });
+      await save!();
+      const mutation = mode === "create" ? hooks.create : hooks.update;
+      expect(mutation).toHaveBeenCalledTimes(allowed ? 1 : 0);
+      if (!allowed) expect(toast.error).toHaveBeenCalledWith(bookingOpenAt ? "올바른 예매 오픈 시각을 입력해주세요." : "예매 날짜와 시간을 입력해주세요.");
+      else {
+        expect(toast.error).not.toHaveBeenCalled();
+        const input = mutation.mock.calls[0][0];
+        const payload = mode === "create" ? JSON.parse(await (createConcertFormData(input).get("request") as Blob).text()) : createPerformancePatch(input);
+        if (!immediate) expect(payload.booking_open_at).toBe("2028-10-10 18:30:00");
+        else expect(payload.booking_open_at).toBeTruthy();
+      }
+    });
+  });
   it.each([
     ["create", true], ["create", false], ["edit", true], ["edit", false],
   ] as const)("conditionally renders booking controls and preserves entered values (%s, hidden=%s)", (mode, hidden) => {
@@ -857,7 +894,7 @@ it.each(["create", "edit"])("validates schedule inputs only after interaction an
       ["booking-open-day", "", "booking-open-error"],
       ["booking-open-month", "", "booking-open-error"],
       ["booking-open-year", "", "booking-open-error"],
-      ["booking-open-time", "", ""],
+      ["booking-open-time", "", "booking-open-error"],
     ] : []),
   ];
   let step = 0;
@@ -1126,7 +1163,7 @@ describe("admin edit initial rendering", () => {
     expect(input).toContain('value="120"');
   });
 
-  it.each([undefined, "2026-09-30T20:00"])("renders the shared optional booking input in create mode (%s)", (bookingOpenAt) => {
+  it.each([undefined, "2026-09-30T20:00"])("renders the shared booking input in create mode (%s)", (bookingOpenAt) => {
     hooks.query.mockReturnValue({});
     vi.stubGlobal("sessionStorage", { getItem: () => null });
     const state = bookingOpenAt ? {
