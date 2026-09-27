@@ -21,6 +21,7 @@ const baseForm = {
   genre: "MUSICAL",
   date: "2026-09-10",
   time: "19:30",
+  bookingOpenAt: "2026-09-01T19:00",
   durationMinutes: 120,
   venue: "테스트 공연장",
   address: "서울시 어딘가",
@@ -46,9 +47,15 @@ describe("shared live and submit schedule validation", () => {
     expect(validateConcertTime(time)).toBe(validateConcertForm({ form: { ...baseForm, date: "2028-02-29", time }, totalSeats: 100, today }));
     expect(validateConcertTime(time) === null).toBe(time === "19:30");
   });
-  it.each(["", "--T20:30", "2028--T", "2028-02-T", "2028-02-29T", "2028-02-29T20:30", "2028-02-29 20:30:45"])("shares optional booking policy for %s", (bookingOpenAt) => {
+  it.each(["", "--T20:30", "2028--T", "2028-02-T", "2028-02-29T", "2028-02-29T20:30", "2028-02-29 20:30:45"])("shares required booking policy for %s", (bookingOpenAt) => {
     expect(validateBookingOpenAt(bookingOpenAt)).toBe(validateConcertForm({ form: { ...baseForm, date: "2028-02-29", bookingOpenAt }, totalSeats: 100, today }));
-    expect(validateBookingOpenAt(bookingOpenAt) === null).toBe(!bookingOpenAt || bookingOpenAt.includes("20:30") && bookingOpenAt.startsWith("2028-02-29"));
+    expect(validateBookingOpenAt(bookingOpenAt) === null).toBe(bookingOpenAt.includes("20:30") && bookingOpenAt.startsWith("2028-02-29"));
+  });
+  it.each([undefined, "", "   "])("requires an empty booking schedule even when unchanged (%j)", bookingOpenAt => {
+    expect(validateBookingOpenAt(bookingOpenAt, bookingOpenAt)).toBe("예매 날짜와 시간을 입력해주세요.");
+    const params = { form: { ...baseForm, date: "2028-02-29", bookingOpenAt }, totalSeats: 100, today };
+    expect(validateConcertForm(params)).toBe("예매 날짜와 시간을 입력해주세요.");
+    expect(validateConcertForm({ ...params, skipBookingSchedule: true })).toBeNull();
   });
   it("preserves unchanged edit exceptions", () => {
     expect(validateConcertDate("2020-01-01", "2020-01-01", today)).toBeNull();
@@ -113,8 +120,8 @@ describe("validateConcertForm", () => {
     expect(validateConcertForm({ form: { ...baseForm, date }, totalSeats: 100, today })).toBeNull();
   });
 
-  it.each([undefined, "", "2026-09-30T20:00", "2026-09-30T20:00:45", "2020-01-01T00:00"])(
-    "allows optional valid booking time without date ordering rules (%s)", (bookingOpenAt) => {
+  it.each(["2026-09-30T20:00", "2026-09-30T20:00:45", "2020-01-01T00:00"])(
+    "allows complete valid booking time without date ordering rules (%s)", (bookingOpenAt) => {
       expect(validateConcertForm({ form: { ...baseForm, bookingOpenAt }, totalSeats: 100, today })).toBeNull();
     },
   );

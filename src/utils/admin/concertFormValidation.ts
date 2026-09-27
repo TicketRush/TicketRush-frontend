@@ -111,7 +111,8 @@ export function validateConcertTime(value: string): string | null {
 }
 
 export function validateBookingOpenAt(value?: string, original?: string): string | null {
-  return value && value !== original && !isValidBookingOpenAt(value)
+  if (!value?.trim()) return "예매 날짜와 시간을 입력해주세요.";
+  return value !== original && !isValidBookingOpenAt(value)
     ? "올바른 예매 오픈 시각을 입력해주세요." : null;
 }
 

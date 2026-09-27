@@ -245,11 +245,87 @@ function formNodes(node: React.ReactNode): FormElement[] {
 const bannerFullMessage = "배너 3개가 모두 등록되어 새로운 배너를 등록할 수 없습니다.";
 
 describe("immediate booking", () => {
+  describe.each(["create", "edit"])("required booking submit (%s)", mode => {
+    it.each([
+      ["", false, false], ["2028-10-10T", false, false], ["--T18:30", false, false],
+      ["2028-10-10T18:30", false, true], ["", true, true],
+    ] as const)("validates %j with immediate=%s (allowed=%s)", async (bookingOpenAt, immediate, allowed) => {
+      let step = 0;
+      let save: (() => Promise<void>) | undefined;
+      hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+        const elements = formNodes(tree);
+        if (step++ === 0 && immediate) {
+          const checkbox = elements.find(node => node.props.id === "booking-immediate")!;
+          (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+          return;
+        }
+        save = elements.find(node => node.type === "button" &&
+          React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+      });
+      vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+      // The server's existing empty UPCOMING schedule must also require input.
+      hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, bookingOpenAt: "" } }, isFetchedAfterMount: true });
+      const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
+      render(path, { concertDraft: { pathname: path, form: { ...initial.form, bookingOpenAt }, totalSeats: 120,
+        mainImage: new File(["poster"], "poster.png", { type: "image/png" }),
+      } });
+      await save!();
+      const mutation = mode === "create" ? hooks.create : hooks.update;
+      expect(mutation).toHaveBeenCalledTimes(allowed ? 1 : 0);
+      if (!allowed) expect(toast.error).toHaveBeenCalledWith(bookingOpenAt ? "올바른 예매 오픈 시각을 입력해주세요." : "예매 날짜와 시간을 입력해주세요.");
+      else {
+        expect(toast.error).not.toHaveBeenCalled();
+        const input = mutation.mock.calls[0][0];
+        const payload = mode === "create" ? JSON.parse(await (createConcertFormData(input).get("request") as Blob).text()) : createPerformancePatch(input);
+        if (!immediate) expect(payload.booking_open_at).toBe("2028-10-10 18:30:00");
+        else expect(payload.booking_open_at).toBeTruthy();
+      }
+    });
+  });
+  it.each([
+    ["create", true], ["create", false], ["edit", true], ["edit", false],
+  ] as const)("conditionally renders booking controls and preserves entered values (%s, hidden=%s)", (mode, hidden) => {
+    const value = "2028-10-10T18:30:45";
+    let step = 0;
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      const elements = formNodes(tree);
+      const checkbox = elements.find(node => node.props.id === "booking-immediate")!;
+      const booking = elements.find(node => node.type === BookingOpenAtInput);
+      if (step === 0) {
+        (booking!.props.onChange as (value: string) => void)(value);
+        (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+        step++;
+      } else if (step === 1) {
+        expect(booking).toBeUndefined();
+        if (!hidden) {
+          (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: false } });
+          step++;
+        }
+      } else expect(booking!.props.value).toBe(value);
+    });
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
+    const heading = html.match(/<h2[^>]*>예매 일정([\s\S]*?)<\/h2>/)?.[1];
+    expect(heading).toBeDefined();
+    if (hidden) {
+      expect(heading).not.toContain("*");
+      expect(html).not.toContain("예매 오픈 시각 (한국 시간)");
+      expect(html).toContain("저장 시각으로 예매 오픈을 요청합니다.");
+      for (const part of ["year", "month", "day", "time"]) expect(html).not.toContain(`id="booking-open-${part}"`);
+    } else {
+      expect(heading).toContain('<span class="ml-1 text-red-400">*</span>');
+      for (const part of ["year", "month", "day", "time"]) expect(html).toContain(`id="booking-open-${part}"`);
+      expect(html.match(/<input[^>]*id="booking-open-year"[^>]*>/)?.[0]).toContain('value="2028"');
+      expect(html.match(/<input[^>]*id="booking-open-time"[^>]*>/)?.[0]).toContain('value="18:30:45"');
+    }
+  });
+
   it.each(["create", "edit"])("defaults to unchecked without inferring historical immediate booking (%s)", (mode) => {
     vi.stubGlobal("sessionStorage", { getItem: () => null });
     hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, bookingOpenAt: "2020-01-01 00:00:00" } }, isFetchedAfterMount: true });
     const html = render(mode === "create" ? "/admin/concerts/new" : undefined);
     expect(html).toContain("등록 즉시 예매 가능");
+    expect(html.match(/<h2[^>]*>예매 일정([\s\S]*?)<\/h2>/)?.[1]).toContain('<span class="ml-1 text-red-400">*</span>');
     expect(html.match(/<input[^>]*id="booking-immediate"[^>]*>/)?.[0]).not.toMatch(/checked|disabled/);
   });
 
@@ -266,8 +342,7 @@ describe("immediate booking", () => {
         (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: true } });
         return;
       }
-      expect(booking.props).toMatchObject({ disabled: true, value: "202--T25:00", "aria-describedby": "booking-schedule-note" });
-      expect(booking.props["aria-invalid"]).toBeUndefined();
+      expect(booking).toBeUndefined();
       expect(elements.some((node) => node.props.id === "booking-open-error")).toBe(false);
       save = elements.find((node) => node.type === "button" &&
         React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
@@ -302,8 +377,11 @@ describe("immediate booking", () => {
       const elements = formNodes(tree);
       const checkbox = elements.find((node) => node.props.id === "booking-immediate")!;
       const booking = elements.find((node) => node.type === BookingOpenAtInput)!;
-      expect(booking.props.value).toBe(initial.form.bookingOpenAt);
-      expect(booking.props.disabled).toBe(step === 1);
+      if (step === 1) expect(booking).toBeUndefined();
+      else {
+        expect(booking.props.value).toBe(initial.form.bookingOpenAt);
+        expect(booking.props.disabled).toBe(false);
+      }
       if (step < 2) {
         (checkbox.props.onChange as (event: unknown) => void)({ target: { checked: step++ === 0 } });
         return;
@@ -337,6 +415,7 @@ describe("immediate booking", () => {
     });
     const html = render();
     expect(html).toContain(status === "CANCELED" ? "취소된 공연" : "예매 오픈됨");
+    expect(html.match(/<h2[^>]*>예매 일정([\s\S]*?)<\/h2>/)?.[1]).not.toContain("*");
     for (const part of ["year", "month", "day", "time"]) {
       expect(html.match(new RegExp(`<(?:input|select)[^>]*id="booking-open-${part}"[^>]*>`))?.[0]).toContain('disabled=""');
     }
@@ -815,7 +894,7 @@ it.each(["create", "edit"])("validates schedule inputs only after interaction an
       ["booking-open-day", "", "booking-open-error"],
       ["booking-open-month", "", "booking-open-error"],
       ["booking-open-year", "", "booking-open-error"],
-      ["booking-open-time", "", ""],
+      ["booking-open-time", "", "booking-open-error"],
     ] : []),
   ];
   let step = 0;
@@ -1003,14 +1082,10 @@ describe.each(["create", "edit"])("show date Enter navigation (%s)", (mode) => {
     }
   });
 
-  it("preserves Enter navigation with all immediate booking inputs disabled", () => {
+  it("preserves Enter navigation with immediate booking inputs unmounted", () => {
     const ui = setup("2028-02-29", true);
     const bookingInputs = ui.inputs.filter(({ props }) => String(props.id).startsWith("booking-open-"));
-    expect(bookingInputs).toHaveLength(4);
-    for (const input of bookingInputs) {
-      expect(input.props.disabled).toBe(true);
-      expect(input.props["data-form-focus"]).toBeUndefined();
-    }
+    expect(bookingInputs).toHaveLength(0);
     const duration = ui.inputs.find(({ props }) => props.placeholder === "예: 120")!;
     const next = ui.inputs.find(({ props }) => props.placeholder === (mode === "create" ? "예: Main Concert Hall" : "예: 서울특별시 송파구 ..."))!;
     expect(ui.press(duration)).toHaveBeenCalledOnce();
@@ -1088,7 +1163,7 @@ describe("admin edit initial rendering", () => {
     expect(input).toContain('value="120"');
   });
 
-  it.each([undefined, "2026-09-30T20:00"])("renders the shared optional booking input in create mode (%s)", (bookingOpenAt) => {
+  it.each([undefined, "2026-09-30T20:00"])("renders the shared booking input in create mode (%s)", (bookingOpenAt) => {
     hooks.query.mockReturnValue({});
     vi.stubGlobal("sessionStorage", { getItem: () => null });
     const state = bookingOpenAt ? {
