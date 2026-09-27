@@ -1,7 +1,7 @@
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimationProvider, CharacterFace } from "./CharacterAnimationProvider";
 import { useCharacterAnimationPart } from "./useCharacterAnimationPart";
-import type { CharacterAnimationRequest } from "./characterAnimation";
+import type { CharacterAnimationRequest, CharacterAnimationId, CharacterPlaybackMode } from "./characterAnimation";
 import { applyJazzPartColor } from "./jazzOutfitColor";
 import { findConcertPartColor, cloneConcertMaterialWithColor } from "./concertOutfitColor";
 import {
@@ -43,6 +43,8 @@ export type { EyeStyle } from "@/components/admin/character/characterEye";
 export type { OutfitModelId } from "@/components/admin/character/characterOutfit";
 
 interface CharacterModelViewerProps {
+  playbackMode?: CharacterPlaybackMode;
+  animationId?: CharacterAnimationId;
   animationRequest?: CharacterAnimationRequest;
   modelUrl?: string;
   /** Used when centered is false. */
@@ -704,6 +706,8 @@ function OutfitModel({
 }
 
 function CharacterModel({
+  playbackMode,
+  animationId,
   animationRequest,
   modelPosition = [0, -0.4, 0],
   modelScale = 0.8,
@@ -735,6 +739,8 @@ function CharacterModel({
   fanmeetSkirtColor = DEFAULT_FANMEET_SKIRT_COLOR,
 }: Pick<
   CharacterModelViewerProps,
+  | "playbackMode"
+  | "animationId"
   | "animationRequest"
   | "modelPosition"
   | "modelScale"
@@ -793,7 +799,7 @@ function CharacterModel({
   ) : null;
 
   return (
-    <CharacterAnimationProvider modelUrl={modelUrl} request={animationRequest}>
+    <CharacterAnimationProvider modelUrl={modelUrl} request={animationRequest} playbackMode={playbackMode} animationId={animationId}>
       <Center
         cacheKey={
           centered
@@ -843,6 +849,8 @@ function CharacterModel({
 }
 
 export default function CharacterModelViewer({
+  playbackMode = "one-shot",
+  animationId = "wave",
   animationRequest,
   modelPosition = [0, -0.4, 0],
   modelScale = 0.8,
@@ -893,6 +901,8 @@ export default function CharacterModelViewer({
 
         <Suspense fallback={<CharacterModelLoadingFallback />}>
           <CharacterModel
+            playbackMode={playbackMode}
+            animationId={animationId}
             animationRequest={animationRequest}
             modelPosition={modelPosition}
             modelScale={modelScale}

@@ -50,6 +50,7 @@ import ImageViewer from "@/components/common/ImageViewer";
 import GenreBadge from "@/components/concert/GenreBadge";
 import BookingSidebar from "@/components/concert/BookingSidebar";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
+import { resolvePerformanceAnimation } from "@/components/admin/character/characterAnimation";
 import ErrorBoundary from "@/components/common/ErrorBoundary/ErrorBoundary";
 import type { CharacterDraft } from "@/types/domain/character";
 import { restoreCharacterForDisplay } from "@/utils/character/characterConfig";
@@ -508,6 +509,8 @@ function CharacterPreviewCard({
         >
           <CharacterModelViewer
             {...characterConfig}
+            playbackMode="repeat"
+            animationId={resolvePerformanceAnimation(characterConfig.animation)}
             centered
             modelScale={0.9}
           />

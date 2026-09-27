@@ -183,6 +183,20 @@ describe("detail empty states (#322)", () => {
 });
 
 describe("detail character API data", () => {
+  it.each(["wave", "cute", "cover_mouth", undefined, "invalid"])("repeats config animation %s independently of legacy pose", animation => {
+    render({ characterConfig: { ...config, animation, pose: "dance" } });
+    expect(mocks.viewer).toHaveBeenLastCalledWith(expect.objectContaining({
+      playbackMode: "repeat", animationId: animation === "cute" || animation === "cover_mouth" ? animation : "wave",
+    }), undefined);
+  });
+  it("uses continuous playback when the character loads and on performance re-entry", () => {
+    render({ characterConfig: null });
+    expect(mocks.viewer).not.toHaveBeenCalled();
+    for (const outfitModelId of ["classic", "theater", "classic"]) {
+      render({ characterConfig: { ...config, outfitModelId, pose: "wave" } });
+      expect(mocks.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ outfitModelId, playbackMode: "repeat", animationId: "wave" }), undefined);
+    }
+  });
   it("forwards independent jazz colors and legacy fallback to the viewer", () => {
     const colors = { jazzShirtColor: "#FF0000", jazzInnerColor: "#00FF00", jazzPantsColor: "#0000FF" };
     render({ characterConfig: { ...config, outfitModelId: "rainbow-blouse", ...colors } });

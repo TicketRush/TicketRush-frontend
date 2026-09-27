@@ -5,6 +5,8 @@ import { Group } from "three";
 import {
   CharacterAnimation,
   type CharacterAnimationRequest,
+  type CharacterAnimationId,
+  type CharacterPlaybackMode,
 } from "./characterAnimation";
 
 import { AnimationContext } from "./useCharacterAnimationPart";
@@ -12,10 +14,14 @@ import { AnimationContext } from "./useCharacterAnimationPart";
 export function CharacterAnimationProvider({
   modelUrl,
   request,
+  playbackMode = "one-shot",
+  animationId = "wave",
   children,
 }: {
   modelUrl: string;
   request?: CharacterAnimationRequest;
+  playbackMode?: CharacterPlaybackMode;
+  animationId?: CharacterAnimationId;
   children: ReactNode;
 }) {
   const { animations } = useGLTF(modelUrl);
@@ -25,8 +31,10 @@ export function CharacterAnimationProvider({
   );
   useLayoutEffect(() => () => animation.dispose(), [animation]);
   useLayoutEffect(() => {
-    if (request) animation.play(request.id);
-  }, [animation, request]);
+    if (playbackMode === "repeat") animation.play(animationId, "repeat");
+    else if (request) animation.play(request.id);
+    else animation.stop();
+  }, [animation, request, playbackMode, animationId]);
   useFrame((_, delta) => animation.update(delta));
   return (
     <AnimationContext.Provider value={animation}>

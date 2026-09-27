@@ -243,6 +243,7 @@ describe("createConcertApi with the real axios interceptors", () => {
     const characterConfig = {
       ...createCharacterConfig(restoreCharacterDraft({
         outfitModelId,
+        animation: "cover_mouth",
         fanmeetCardiganColor: "#ABCDEF",
         jazzShirtColor: "#FF0000",
         jazzInnerColor: "#00FF00",
@@ -263,12 +264,14 @@ describe("createConcertApi with the real axios interceptors", () => {
     expect(request.character_config).toEqual(characterConfig);
     expect(request.character_config).toMatchObject({
       outfitModelId,
+      animation: "cover_mouth",
       fanmeetCardiganColor: "#ABCDEF",
       fanmeetInnerColor: "#123456",
       fanmeetShortsColor: "#654321",
       fanmeetSkirtColor: "#FEDCBA",
     });
     expect(request).not.toHaveProperty("characterConfig");
+    expect(request.character_config).not.toHaveProperty("animationRequest");
   });
 
   it.each([undefined, null])(

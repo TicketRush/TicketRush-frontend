@@ -6,7 +6,7 @@ import { Mesh, MeshStandardMaterial, Texture, type Object3D } from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import CharacterModelViewer from "./CharacterModelViewer";
 
-const harness = vi.hoisted(() => ({ assets: new Map<string, GLTF>(), roots: [] as Object3D[] }));
+const harness = vi.hoisted(() => ({ assets: new Map<string, GLTF>(), roots: [] as Object3D[], provider: vi.fn() }));
 // Keep the real GLBs, cloning and material code; replace only WebGL rendering/asset transport.
 vi.mock("@react-three/fiber", () => ({ Canvas: ({ children }: { children: React.ReactNode }) => children, useFrame: () => {} }));
 vi.mock("@react-three/drei", () => ({
@@ -22,6 +22,7 @@ vi.mock("react/jsx-dev-runtime", async original => {
   const actual = await original<typeof import("react/jsx-dev-runtime")>();
   return { ...actual, jsxDEV: (...args: Parameters<typeof actual.jsxDEV>) => {
     const [type, props] = args;
+    if (typeof type === "function" && type.name === "CharacterAnimationProvider") harness.provider(props);
     if (type === "primitive") {
       harness.roots.push(props.object);
       return actual.jsxDEV(React.Fragment, { children: props.children }, args[2], args[3]);
@@ -43,10 +44,10 @@ beforeAll(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function render(outfitModelId: "classic" | "rainbow-blouse", color: string) {
+function render(outfitModelId: "classic" | "rainbow-blouse", color: string, playbackMode?: "one-shot" | "repeat") {
   vi.stubGlobal("React", React);
   harness.roots = [];
-  renderToStaticMarkup(<CharacterModelViewer outfitModelId={outfitModelId} outfitColor={color} skinColor="#DDAA88" hairColor="#123456" hairStyle="short" eyeStyle="default" />);
+  renderToStaticMarkup(<CharacterModelViewer playbackMode={playbackMode} outfitModelId={outfitModelId} outfitColor={color} skinColor="#DDAA88" hairColor="#123456" hairStyle="short" eyeStyle="default" />);
   return [...harness.roots];
 }
 function mesh(roots: Object3D[], name: string) {
@@ -54,6 +55,13 @@ function mesh(roots: Object3D[], name: string) {
   expect(found).toBeInstanceOf(Mesh);
   return found as Mesh;
 }
+
+it("forwards repeat only when explicitly requested, keeping the creator default one-shot", () => {
+  render("classic", "#123456");
+  expect(harness.provider).toHaveBeenLastCalledWith(expect.objectContaining({ playbackMode: "one-shot", request: undefined }));
+  render("classic", "#123456", "repeat");
+  expect(harness.provider).toHaveBeenLastCalledWith(expect.objectContaining({ playbackMode: "repeat", animationId: "wave" }));
+});
 
 it("renders classic through the existing viewer and isolates changed colors from cached assets and other parts", () => {
   const cached = mesh([harness.assets.get("/models/outfits/classic_outfit.glb")!.scene], "classic_dress");

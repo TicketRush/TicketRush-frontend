@@ -250,6 +250,7 @@ const DEFAULT_CHARACTER: CharacterDraft = {
   fanmeetSkirtColor: DEFAULT_FANMEET_SKIRT_COLOR,
   accessory: "none",
   pose: "standing",
+  animation: "wave",
   background: "#E9DDFF",
 };
 
@@ -2836,8 +2837,12 @@ export default function AdminCharacterCreatorPage() {
                     key={id}
                     type="button"
                     aria-label={label}
+                    aria-pressed={character.animation === id}
                     className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:border-violet-400 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-violet-500 active:bg-violet-100"
-                    onClick={() => setAnimationRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))}
+                    onClick={() => {
+                      update("animation", id);
+                      setAnimationRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }));
+                    }}
                   >
                     <span className="block text-2xl" aria-hidden="true">{icon}</span>
                     <span className="mt-2 block text-xs font-bold text-slate-800">{label}</span>

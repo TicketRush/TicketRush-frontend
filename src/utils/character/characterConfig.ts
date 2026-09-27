@@ -1,4 +1,5 @@
 import { resolveStoredHairStyle } from "@/components/admin/character/characterHair";
+import { resolvePerformanceAnimation } from "@/components/admin/character/characterAnimation";
 import { resolveStoredEyeStyle } from "@/components/admin/character/characterEye";
 import { resolveStoredMouthStyle } from "@/components/admin/character/characterMouth";
 import {
@@ -196,6 +197,7 @@ export function restoreCharacterDraft(value: unknown): CharacterDraft | null {
     fanmeetSkirtColor: resolvedFanmeetSkirtColor ?? DEFAULT_FANMEET_SKIRT_COLOR,
     accessory: typeof parsed.accessory === "string" ? parsed.accessory : "none",
     pose: resolvePose(parsed.pose),
+    animation: resolvePerformanceAnimation(parsed.animation),
   };
 }
 
@@ -260,6 +262,7 @@ export function createCharacterConfig(
     fanmeetSkirtColor: character.fanmeetSkirtColor,
     accessory: character.accessory,
     pose: character.pose,
+    animation: resolvePerformanceAnimation(character.animation),
     background: character.background,
   };
 }

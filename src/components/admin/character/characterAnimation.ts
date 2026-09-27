@@ -1,6 +1,7 @@
 import {
   AnimationMixer,
   LoopOnce,
+  LoopRepeat,
   Matrix4,
   type AnimationAction,
   type AnimationClip,
@@ -13,6 +14,12 @@ export const CHARACTER_ANIMATIONS = [
   { id: "cover_mouth", label: "입 가리기", icon: "🤭" },
 ] as const;
 export type CharacterAnimationId = (typeof CHARACTER_ANIMATIONS)[number]["id"];
+export type CharacterPlaybackMode = "one-shot" | "repeat";
+
+/** Missing or unsupported persisted animation selections use the performance default. */
+export function resolvePerformanceAnimation(value: unknown): CharacterAnimationId {
+  return CHARACTER_ANIMATIONS.find(animation => animation.id === value)?.id ?? "wave";
+}
 export interface CharacterAnimationRequest {
   id: CharacterAnimationId;
   sequence: number;
@@ -32,6 +39,7 @@ export class CharacterAnimation {
   private faces = new Set<Object3D>();
   private clip?: AnimationClip;
   private elapsed = 0;
+  private mode: CharacterPlaybackMode = "one-shot";
   private inverseRoot = new Matrix4();
   private headDelta = new Matrix4();
 
@@ -73,7 +81,8 @@ export class CharacterAnimation {
     };
   }
 
-  play(id: CharacterAnimationId) {
+  play(id: CharacterAnimationId, mode: CharacterPlaybackMode = "one-shot") {
+    this.mode = mode === "repeat" ? "repeat" : "one-shot";
     this.clip = this.clips.find((clip) => clip.name === id);
     this.elapsed = 0;
     for (const part of this.parts) {
@@ -86,6 +95,7 @@ export class CharacterAnimation {
 
   private weight() {
     if (!this.clip) return 0;
+    if (this.mode === "repeat") return Math.min(1, this.elapsed / 0.15);
     return Math.max(
       0,
       Math.min(
@@ -97,14 +107,14 @@ export class CharacterAnimation {
   }
 
   private start(part: Part) {
-    if (!this.clip || this.elapsed >= this.clip.duration) return;
+    if (!this.clip || this.clip.duration <= 0 || (this.mode !== "repeat" && this.elapsed >= this.clip.duration)) return;
     const action = part.mixer.clipAction(this.clip);
     action
       .reset()
-      .setLoop(LoopOnce, 1)
+      .setLoop(this.mode === "repeat" ? LoopRepeat : LoopOnce, this.mode === "repeat" ? Infinity : 1)
       .setEffectiveWeight(this.weight())
       .play();
-    action.time = this.elapsed;
+    action.time = this.mode === "repeat" ? this.elapsed % this.clip.duration : this.elapsed;
     part.action = action;
     part.mixer.update(0);
   }
@@ -113,7 +123,7 @@ export class CharacterAnimation {
     if (this.clip) {
       this.elapsed += delta;
       for (const part of this.parts) {
-        if (this.elapsed >= this.clip.duration) {
+        if (this.mode !== "repeat" && this.elapsed >= this.clip.duration) {
           part.mixer.stopAllAction();
           part.action = undefined;
         } else {
@@ -121,7 +131,7 @@ export class CharacterAnimation {
           part.mixer.update(delta);
         }
       }
-      if (this.elapsed >= this.clip.duration) this.clip = undefined;
+      if (this.mode !== "repeat" && this.elapsed >= this.clip.duration) this.clip = undefined;
     }
     this.updateFaces();
   }
@@ -141,6 +151,15 @@ export class CharacterAnimation {
       }
       break;
     }
+  }
+
+  stop() {
+    for (const part of this.parts) {
+      part.mixer.stopAllAction();
+      part.action = undefined;
+    }
+    this.clip = undefined;
+    this.updateFaces();
   }
 
   dispose() {

@@ -89,6 +89,20 @@ async function input() {
   return { form: { ...form }, original: form };
 }
 
+it.each(["wave", "cute", "cover_mouth"] as const)("reads and PATCHes animation %s with the complete opaque config", async animation => {
+  adapter.mockResolvedValueOnce({ config: {} as InternalAxiosRequestConfig, status: 200, statusText: "OK", headers: new AxiosHeaders(),
+    data: JSON.stringify({ is_success: true, result: { ...detail, character_config: { ...character, animation, pose: "sing" } } }) });
+  const loaded = await fetchConcertDetail(42);
+  expect(restoreCharacterDraft(loaded.characterConfig)).toMatchObject({ animation, pose: "sing" });
+  const value = await input();
+  value.form.characterConfig = { ...value.form.characterConfig!, animation };
+  if (animation === "wave") value.original = { ...value.original, characterConfig: { ...character, animation: "cute" } };
+  await updateConcertApi(42, value);
+  const payload = JSON.parse(adapter.mock.calls[0][0].data);
+  expect(payload.character_config).toEqual({ ...character, animation });
+  expect(payload.character_config).not.toHaveProperty("animationRequest");
+});
+
 describe("admin edit contract", () => {
   it("sends an immediate PATCH even when the original equals the submission second", async () => {
     const value = await input();

@@ -46,6 +46,18 @@ const config = createCharacterConfig(draft);
 afterEach(() => vi.unstubAllGlobals());
 
 describe("character config and legacy restoration", () => {
+  it.each(["wave", "cute", "cover_mouth", undefined, "invalid", null])("restores animation %s independently of legacy pose and excludes requests", animation => {
+    for (const pose of ["standing", "wave", "heart", "dance", "sing"] as const) {
+      const restored = restoreCharacterDraft({ ...config, pose, animation })!;
+      const expected = ["wave", "cute", "cover_mouth"].includes(animation as string) ? animation : "wave";
+      expect(restored.animation).toBe(expected);
+      expect(restored.pose).toBe(pose);
+      const saved = createCharacterConfig({ ...restored, animationRequest: { id: "cute", sequence: 2 } } as typeof restored);
+      expect(saved).toEqual({ ...config, pose, animation: expected });
+      expect(saved).not.toHaveProperty("animationRequest");
+      expect(restoreCharacterForDisplay(saved)?.animation).toBe(expected);
+    }
+  });
   it("restores fanmeet parts from legacy and versioned localStorage", () => {
     const fanmeet = { ...draft, outfitModelId: "theater" };
     const restored = restoreCharacterDraft(fanmeet)!;
