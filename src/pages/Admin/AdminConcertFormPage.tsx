@@ -528,7 +528,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
           </div>
         </Section>
 
-        <Section title="예매 일정">
+        <Section title={<>예매 일정{!bookingDisabled && <span className="ml-1 text-red-400">*</span>}</>}>
           {bookingLocked ? (
             <p id="booking-schedule-note" className="text-sm text-admin-text-secondary">
               {isBookingOpened(bookingStatus) ? "예매 오픈됨" : "취소된 공연은 예매 일정을 변경할 수 없습니다."}
@@ -546,12 +546,12 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
               저장 시각으로 예매 오픈을 요청합니다. 반영까지 약 10초가 걸릴 수 있습니다.
             </p>
           )}
-          <Field label="예매 오픈 시각 (한국 시간)">
+          {!immediateBooking && <Field label="예매 오픈 시각 (한국 시간)">
             {bookingError && <p id="booking-open-error" className="text-sm text-red-400">{bookingError}</p>}
             <BookingOpenAtInput disabled={bookingDisabled} aria-invalid={bookingError ? true : undefined}
               aria-describedby={bookingError ? "booking-open-error" : bookingDisabled ? "booking-schedule-note" : undefined} value={form.bookingOpenAt ?? ""} onChange={(v) => update("bookingOpenAt", v)} />
             {mode === "edit" && !bookingDisabled && <p className="text-xs">기존 예매 오픈 시각 해제는 지원하지 않습니다.</p>}
-          </Field>
+          </Field>}
         </Section>
 
         <Section title="장소 정보">
@@ -820,7 +820,7 @@ function Section({
   title,
   children,
 }: {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
 }) {
   return (
