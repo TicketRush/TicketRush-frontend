@@ -189,7 +189,7 @@ it.each(["create", "edit"])("shows required date labels only in the performance 
 });
 
 type FormElement = React.ReactElement<Record<string, unknown>>;
-it.each(["create", "edit"])("hides only duration and price spinners and preserves numeric requests (%s)", async (mode) => {
+it.each(["create", "edit"])("hides duration, price and total seat spinners and preserves numeric requests (%s)", async (mode) => {
   let step = 0;
   let save: (() => Promise<void>) | undefined;
   hooks.formRender.mockImplementation((tree: React.ReactNode) => {
@@ -198,6 +198,9 @@ it.each(["create", "edit"])("hides only duration and price spinners and preserve
     if (step++ === 0) {
       for (const [index, value] of [[0, "135"], [1, "99000"]] as const) {
         (numeric[index].props.onChange as (value: string) => void)(value);
+      }
+      if (mode === "create") {
+        (numeric[2].props.onChange as (value: string) => void)("456");
       }
       return;
     }
@@ -213,16 +216,19 @@ it.each(["create", "edit"])("hides only duration and price spinners and preserve
   const numeric = hooks.control.mock.calls.map(([props]) => props).filter((props) => props.type === "number");
   expect(numeric).toHaveLength(3);
   const spinnerClasses = ["[appearance:textfield]", "[&::-webkit-inner-spin-button]:appearance-none", "[&::-webkit-outer-spin-button]:appearance-none"];
-  for (const input of numeric.slice(0, 2)) {
+  for (const input of numeric) {
     expect(input.className.split(/\s+/)).toEqual(expect.arrayContaining(spinnerClasses));
-    for (const constraint of ["min", "max", "step"]) expect(input[constraint]).toBeUndefined();
-    expect(input.disabled).toBeUndefined();
+    for (const constraint of ["min", "step"]) expect(input[constraint]).toBeUndefined();
     expect(input["data-form-focus"]).toBe("true");
     expect(input.onKeyDown).toEqual(expect.any(Function));
   }
-  for (const token of spinnerClasses) expect(numeric[2].className.split(/\s+/)).not.toContain(token);
+  for (const input of numeric.slice(0, 2)) {
+    expect(input.max).toBeUndefined();
+    expect(input.disabled).toBeUndefined();
+  }
   expect(numeric[2].max).toBe(100_000);
   expect(numeric[2].disabled).toBe(mode === "edit");
+  expect(numeric[2].value).toBe(mode === "create" ? "456" : "120");
   await save!();
   const mutation = mode === "create" ? hooks.create : hooks.update;
   expect(mutation).toHaveBeenCalledOnce();
@@ -231,6 +237,13 @@ it.each(["create", "edit"])("hides only duration and price spinners and preserve
     ? JSON.parse(await (createConcertFormData(input).get("request") as Blob).text())
     : JSON.parse(JSON.stringify(createPerformancePatch(input)));
   expect(payload).toMatchObject({ duration_minutes: 135, price: 99000 });
+  if (mode === "create") {
+    expect(input.totalSeats).toBe(456);
+    expect(payload.total_seats).toBe(456);
+  } else {
+    expect(input).not.toHaveProperty("totalSeats");
+    expect(payload).not.toHaveProperty("total_seats");
+  }
 });
 
 function formNodes(node: React.ReactNode): FormElement[] {

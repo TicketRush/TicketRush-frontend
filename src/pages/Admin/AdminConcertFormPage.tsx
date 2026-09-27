@@ -591,6 +591,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             <Field label="총 좌석 수" required>
               <FormInput
                 type="number"
+                hideNumberSpinner
                 max={MAX_TOTAL_SEATS}
                 disabled={mode === "edit"}
                 value={totalSeats === 0 ? "" : String(totalSeats)}
