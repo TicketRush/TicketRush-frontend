@@ -441,6 +441,7 @@ describe("immediate booking", () => {
 it.each([
   ["create", 0, false, false], ["create", 1, false, false],
   ["create", 2, false, false], ["create", 3, false, true], ["create", 4, false, true],
+  ["edit", 0, false, false], ["edit", 1, false, false], ["edit", 2, false, false],
   ["edit", 3, false, true], ["edit", 3, true, false],
 ] as const)("applies banner capacity using the initial server state (%s, %i, %s)", (mode, count, enabled, disabled) => {
   hooks.banners.mockReturnValue({ data: Array.from({ length: count }, (_, performanceId) => ({ performanceId })) });
@@ -453,6 +454,19 @@ it.each([
   expect(html.includes('id="banner-subtitle"')).toBe(enabled);
   if (enabled) expect(html).toContain('value="재즈"');
   expect(html.includes(bannerFullMessage)).toBe(disabled);
+  const label = html.match(/<label\b[^>]*>\s*<span\b[^>]*>\s*<input[^>]*id="banner-enabled"[\s\S]*?<\/label>/)![0];
+  const labelClasses = label.match(/class="([^"]*)"/)![1].split(/\s+/);
+  const checkboxClasses = checkbox.match(/class="([^"]*)"/)![1].split(/\s+/);
+  for (const token of ["cursor-not-allowed", "text-admin-text-secondary"]) {
+    expect(labelClasses.includes(token)).toBe(disabled);
+  }
+  for (const token of ["appearance-none", "border-admin-text-secondary/50", "bg-admin-text-secondary/20", "cursor-not-allowed"]) {
+    expect(checkboxClasses.includes(token)).toBe(disabled);
+  }
+  const slash = label.match(/<span\b[^>]*aria-hidden="true"[^>]*>\/<\/span>/)?.[0];
+  expect(Boolean(slash)).toBe(disabled);
+  if (slash) expect(slash).toContain("pointer-events-none");
+  expect(label).toContain("메인 배너에 등록");
   expect(checkbox).toContain('aria-describedby="banner-settings-note"');
   expect(html).toContain('id="banner-settings-note"');
   expect(hooks.update).not.toHaveBeenCalled();
@@ -463,6 +477,8 @@ it.each(["loading", "error"])("does not describe cached full data as current cap
   vi.stubGlobal("sessionStorage", { getItem: () => null });
   const html = render("/admin/concerts/new");
   expect(html).not.toContain(bannerFullMessage);
+  expect(html).not.toMatch(/<span\b[^>]*aria-hidden="true"[^>]*>\/<\/span>/);
+  expect(html.match(/<input[^>]*id="banner-enabled"[^>]*>/)?.[0]).not.toContain("appearance-none");
   expect(html).toContain(state === "loading" ? "배너 등록 상태를 확인하는 중입니다." : "배너 수를 확인하지 못했습니다.");
   expect(html.match(/<input[^>]*id="banner-enabled"[^>]*>/)?.[0]).toContain('disabled=""');
 });
@@ -477,6 +493,8 @@ it.each(["full", "error"])("allows an existing banner to uncheck and recheck wit
     const checkbox = elements.find((node) => node.props.id === "banner-enabled")!;
     expect(checkbox.props.disabled).toBe(false);
     expect(checkbox.props.checked).toBe(step !== 1);
+    expect(checkbox.props.className).not.toContain("appearance-none");
+    expect(elements.some((node) => node.props["aria-hidden"] === "true" && node.props.children === "/")).toBe(false);
     expect(elements.find((node) => node.props.id === "banner-settings-note")?.props.children).not.toBe(bannerFullMessage);
     const subtitle = elements.find((node) => node.props.id === "banner-subtitle");
     if (step !== 1) expect(subtitle?.props.value).toBe("재즈");
