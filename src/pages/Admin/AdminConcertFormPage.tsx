@@ -154,6 +154,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
   const bannerUnavailable = bannerQuery.isPending || bannerQuery.isError || !bannerQuery.data;
   const bannerFull = (bannerQuery.data?.length ?? 0) >= 3;
   const bannerDisabled = !bannerEnabled && !originallyOnBanner && (bannerUnavailable || bannerFull);
+  const bannerLimitReachedForNewSelection = !bannerUnavailable && bannerFull && bannerDisabled;
   const dateError = interacted.date ? validateConcertDate(form.date, original?.date) : null;
   const timeError = interacted.time ? validateConcertTime(form.time) : null;
   const bookingError = !bookingDisabled && interacted.bookingOpenAt ? validateBookingOpenAt(form.bookingOpenAt, original?.bookingOpenAt) : null;
@@ -651,20 +652,25 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
             {bannerQuery.isError
               ? "배너 수를 확인하지 못했습니다. 새 배너 등록은 잠시 사용할 수 없지만, 공연은 저장할 수 있습니다."
               : bannerQuery.isPending ? "배너 등록 상태를 확인하는 중입니다."
-              : !bannerUnavailable && bannerFull && bannerDisabled
+              : bannerLimitReachedForNewSelection
                 ? "배너 3개가 모두 등록되어 새로운 배너를 등록할 수 없습니다."
               : "메인 배너는 최대 3개까지 등록할 수 있습니다."}
           </p>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              id="banner-enabled"
-              type="checkbox"
-              checked={bannerEnabled}
-              disabled={bannerDisabled}
-              onChange={(e) => update("displayOnBanner", e.target.checked)}
-              aria-describedby="banner-settings-note"
-              className="h-4 w-4 accent-primary"
-            />
+          <label className={`flex items-center gap-2 text-sm${bannerLimitReachedForNewSelection ? " cursor-not-allowed text-admin-text-secondary" : ""}`}>
+            <span className="relative inline-flex h-4 w-4 shrink-0">
+              <input
+                id="banner-enabled"
+                type="checkbox"
+                checked={bannerEnabled}
+                disabled={bannerDisabled}
+                onChange={(e) => update("displayOnBanner", e.target.checked)}
+                aria-describedby="banner-settings-note"
+                className={`h-4 w-4 accent-primary${bannerLimitReachedForNewSelection ? " appearance-none rounded border border-admin-text-secondary/50 bg-admin-text-secondary/20 cursor-not-allowed" : ""}`}
+              />
+              {bannerLimitReachedForNewSelection && (
+                <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center text-admin-text-secondary">/</span>
+              )}
+            </span>
             메인 배너에 등록
           </label>
           {bannerEnabled && (
