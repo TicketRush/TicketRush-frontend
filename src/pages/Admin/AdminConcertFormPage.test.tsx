@@ -22,6 +22,7 @@ const hooks = vi.hoisted(() => ({
   update: vi.fn(),
   control: vi.fn(),
   formRender: vi.fn(),
+  viewer: vi.fn(),
 }));
 vi.mock("react/jsx-dev-runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react/jsx-dev-runtime")>();
@@ -54,9 +55,10 @@ vi.mock("@/hooks/admin/useAdmin", () => ({
   useUpdateConcert: () => ({ mutateAsync: hooks.update, isPending: false }),
 }));
 vi.mock("@/components/admin/character/CharacterModelViewer", () => ({
-  default: (props: { fanmeetCardiganColor: string; jazzShirtColor: string; jazzInnerColor: string; jazzPantsColor: string }) => (
-    <span>{props.fanmeetCardiganColor} {props.jazzShirtColor} {props.jazzInnerColor} {props.jazzPantsColor}</span>
-  ),
+  default: (props: { fanmeetCardiganColor: string; jazzShirtColor: string; jazzInnerColor: string; jazzPantsColor: string }) => {
+    hooks.viewer(props);
+    return <span>{props.fanmeetCardiganColor} {props.jazzShirtColor} {props.jazzInnerColor} {props.jazzPantsColor}</span>;
+  },
 }));
 vi.mock("@/hooks/common/useDocumentTitle", () => ({
   useDocumentTitle: vi.fn(),
@@ -122,6 +124,49 @@ it.each(["create", "edit"])("explains the required marker once before inputs (%s
   expect(html.indexOf(message)).toBeGreaterThan(html.indexOf("</header>"));
   expect(html.indexOf(message)).toBeLessThan(html.indexOf("기본 정보"));
   expect(html).toContain('공연명<span class="ml-1 text-red-400">*</span>');
+});
+
+it.each(["create", "edit"])("autoplays the hydrated performance character in repeat mode (%s)", mode => {
+  vi.stubGlobal("sessionStorage", { getItem: () => null });
+  render(mode === "create" ? "/admin/concerts/new" : undefined);
+  expect(hooks.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ playbackMode: "repeat", animationId: "wave" }));
+  expect(hooks.viewer.mock.lastCall![0].animationRequest).toBeUndefined();
+});
+
+it.each(["create", "edit"])("restores saved animation and submits a full config after returning from the creator (%s)", async mode => {
+  for (const animation of ["cute", "cover_mouth"] as const) {
+    hooks.create.mockClear();
+    hooks.update.mockClear();
+    const config = { ...initial.form.characterConfig!, animation, pose: "heart" as const };
+    vi.stubGlobal("sessionStorage", { getItem: () => null, removeItem: vi.fn() });
+    vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(config) });
+    hooks.query.mockReturnValue({ data: { ...initial, form: { ...initial.form, characterConfig: config } }, isFetchedAfterMount: true });
+    render(mode === "create" ? "/admin/concerts/new" : undefined);
+    expect(hooks.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ playbackMode: "repeat", animationId: animation }));
+    let save: (() => Promise<void>) | undefined;
+    hooks.formRender.mockImplementation((tree: React.ReactNode) => {
+      save = formNodes(tree).find(node => node.type === "button" &&
+        React.Children.toArray(node.props.children as React.ReactNode).includes(mode === "create" ? "공연 등록하기" : "변경사항 저장"))?.props.onClick as typeof save;
+    });
+    const path = mode === "create" ? "/admin/concerts/new" : "/admin/concerts/42/edit";
+    const savedConfig = { ...config, animation: "wave", customSettings: { original_key: "keep" } };
+    render(path, { concertDraft: {
+      pathname: path, form: { ...initial.form, characterConfig: savedConfig }, totalSeats: 120,
+      mainImage: new File(["poster"], "poster.png", { type: "image/png" }),
+    }, characterConfig: config });
+    expect(hooks.viewer).toHaveBeenLastCalledWith(expect.objectContaining({ playbackMode: "repeat", animationId: animation }));
+    await save!();
+    const mutation = mode === "create" ? hooks.create : hooks.update;
+    expect(mutation).toHaveBeenCalledOnce();
+    const input = mutation.mock.calls[0][0];
+    if (mode === "create") {
+      const payload = JSON.parse(await (createConcertFormData(input).get("request") as Blob).text());
+      expect(payload.character_config).toEqual(config);
+    } else {
+      expect(createPerformancePatch(input).character_config).toEqual({ ...savedConfig, animation });
+    }
+    hooks.formRender.mockReset();
+  }
 });
 
 it.each(["create", "edit"])("shows required date labels only in the performance schedule (%s)", (mode) => {

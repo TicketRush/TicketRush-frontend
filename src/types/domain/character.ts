@@ -3,6 +3,7 @@ import type { EyeStyle } from "@/components/admin/character/characterEye";
 import type { MouthStyle } from "@/components/admin/character/characterMouth";
 import type { SkinToneSelection } from "@/components/admin/character/characterSkin";
 import type { OutfitModelId } from "@/components/admin/character/characterOutfit";
+import type { CharacterAnimationId } from "@/components/admin/character/characterAnimation";
 
 export const CHARACTER_CONFIG_SCHEMA_VERSION = 1;
 export const MAX_CHARACTER_CONFIG_BYTES = 4096;
@@ -39,6 +40,7 @@ export interface CharacterConfig {
   accessory: string;
   /** Legacy storage compatibility only; one-shot animation requests are not saved. */
   pose: CharacterPose;
+  animation: CharacterAnimationId;
   background: string;
 }
 

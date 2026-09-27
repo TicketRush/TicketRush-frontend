@@ -1,9 +1,54 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import AdminCharacterCreatorPage from "./AdminCharacterCreatorPage";
 import { createCharacterConfig, loadSavedCharacter, restoreCharacterDraft } from "@/utils/character/characterConfig";
+
+const hooks = vi.hoisted(() => ({ drive: vi.fn() }));
+function DriveCreator() {
+  const tree = AdminCharacterCreatorPage();
+  hooks.drive(tree);
+  return tree;
+}
+beforeEach(() => { hooks.drive.mockReset(); });
+
+function nodes(node: React.ReactNode): React.ReactElement<Record<string, unknown>>[] {
+  if (Array.isArray(node)) return node.flatMap(nodes);
+  if (!React.isValidElement<Record<string, unknown>>(node)) return [];
+  return [node, ...nodes(node.props.children as React.ReactNode)];
+}
+
+it.each(["wave", "cute", "cover_mouth"] as const)("persists %s separately from repeatable one-shot requests", id => {
+  vi.stubGlobal("React", React);
+  const original = createCharacterConfig(restoreCharacterDraft({ outfitModelId: "classic", pose: "dance", animation: "cute" })!);
+  const setItem = vi.fn();
+  vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(original), setItem });
+  let step = 0;
+  let apply: (() => void) | undefined;
+  hooks.drive.mockImplementation((tree: React.ReactNode) => {
+    const elements = nodes(tree);
+    const viewer = elements.find(node => "animationRequest" in node.props)!;
+    expect(viewer.props.playbackMode ?? "one-shot").toBe("one-shot");
+    const buttons = elements.filter(node => node.type === "button" && "aria-pressed" in node.props);
+    const button = buttons.find(node => node.props["aria-label"] === ({ wave: "인사", cute: "큐트", cover_mouth: "입 가리기" }[id]))!;
+    if (step === 0) {
+      expect(viewer.props.animationRequest).toBeUndefined();
+      expect(buttons.find(node => node.props["aria-label"] === "큐트")?.props["aria-pressed"]).toBe(true);
+    } else {
+      expect(button.props["aria-pressed"]).toBe(true);
+      expect(viewer.props.animationRequest).toEqual({ id, sequence: step });
+    }
+    if (step++ < 2) (button.props.onClick as () => void)();
+    else apply = elements.find(node => node.type === "button" && String(node.props.children).includes("캐릭터 제작값 적용"))?.props.onClick as typeof apply;
+  });
+  renderToStaticMarkup(<MemoryRouter><DriveCreator /></MemoryRouter>);
+  expect(apply).toEqual(expect.any(Function));
+  apply!();
+  const saved = JSON.parse(setItem.mock.calls[0][1]);
+  expect(saved).toEqual({ ...original, animation: id });
+  expect(saved).not.toHaveProperty("animationRequest");
+});
 
 vi.mock("@/components/admin/character/CharacterModelViewer", () => ({
   default: () => <span>3D preview</span>,

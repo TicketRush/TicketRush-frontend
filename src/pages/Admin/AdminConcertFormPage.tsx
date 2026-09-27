@@ -32,6 +32,7 @@ import {
   validateBookingOpenAt,
 } from "@/utils/admin/concertFormValidation";
 import CharacterModelViewer from "@/components/admin/character/CharacterModelViewer";
+import { resolvePerformanceAnimation } from "@/components/admin/character/characterAnimation";
 import { MOUTH_STYLE_LABELS } from "@/components/admin/character/characterMouth";
 import type { CharacterDraft } from "@/types/domain/character";
 import {
@@ -139,7 +140,7 @@ function ConcertForm({ mode, concertId, initialData }: Props & {
   const [form, setForm] = useState<ConcertFormData>(() => ({
     ...(draft?.form ?? original ?? INITIAL_FORM),
     ...(draft && location.state?.concertDraft?.pathname === location.pathname && location.state?.characterConfig
-      ? { characterConfig: location.state.characterConfig } : {}),
+      ? { characterConfig: { ...draft.form.characterConfig, ...location.state.characterConfig } } : {}),
   }));
   const [interacted, setInteracted] = useState<Partial<Record<"date" | "time" | "bookingOpenAt", boolean>>>({});
   const [immediateBooking, setImmediateBooking] = useState(false);
@@ -1039,6 +1040,8 @@ function CharacterCreatorLinkBox({
         style={{ backgroundColor: character.background }}
       >
         <CharacterModelViewer
+          playbackMode="repeat"
+          animationId={resolvePerformanceAnimation(character.animation)}
           modelUrl="/models/chibi-base.glb"
           skinColor={character.skinColor}
           hairColor={character.hairColor}

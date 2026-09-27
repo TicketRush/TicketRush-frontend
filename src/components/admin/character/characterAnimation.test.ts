@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { AnimationMixer, Group, Matrix4, SkinnedMesh } from "three";
+import { AnimationMixer, Group, Matrix4, SkinnedMesh, AnimationAction, LoopOnce, LoopRepeat, Mesh } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { CHARACTER_ANIMATIONS, CharacterAnimation } from "./characterAnimation";
+import { CHARACTER_ANIMATIONS, CharacterAnimation, resolvePerformanceAnimation, type CharacterPlaybackMode } from "./characterAnimation";
 import { getOutfitModelUrl } from "./characterOutfit";
 
 async function load(path: string) {
@@ -15,6 +15,57 @@ async function load(path: string) {
 }
 
 describe("shared character animation with real GLBs", () => {
+  it.each(CHARACTER_ANIMATIONS)("repeats $id across boundaries, synchronizes replacements and stops on cleanup", async ({ id }) => {
+    const base = await load("chibi-base");
+    const body = clone(base.scene);
+    const hair = clone((await load("hair/hair_short")).scene);
+    const classic = clone((await load("outfits/classic_outfit")).scene);
+    const dress = classic.getObjectByName("classic_dress")!;
+    const originalMaterial = (dress as Mesh).material;
+    const timeline = new CharacterAnimation(base.animations);
+    timeline.register(body, true);
+    timeline.register(classic);
+    const loop = vi.spyOn(AnimationAction.prototype, "setLoop");
+    timeline.play(id, "repeat");
+    expect(loop).toHaveBeenCalledWith(LoopRepeat, Infinity);
+    const duration = base.animations.find(clip => clip.name === id)!.duration;
+    timeline.update(0.7);
+    const pose = body.getObjectByName("Head")!.quaternion.clone();
+    timeline.update(duration * 3);
+    body.getObjectByName("Head")!.quaternion.toArray().forEach((value, i) => expect(value).toBeCloseTo(pose.toArray()[i], 6));
+    const remove = timeline.register(hair);
+    hair.getObjectByName("Head")!.quaternion.toArray().forEach((value, i) => expect(value).toBeCloseTo(pose.toArray()[i], 6));
+    expect(dress.visible).toBe(true);
+    expect((dress as Mesh).material).toBe(originalMaterial);
+    const uncache = vi.spyOn(AnimationMixer.prototype, "uncacheRoot");
+    remove();
+    expect(uncache).toHaveBeenCalledWith(hair);
+    timeline.play("cute", "repeat");
+    timeline.update(0.4);
+    timeline.dispose();
+    expect(uncache).toHaveBeenCalledWith(body);
+    const stopped = body.getObjectByName("Head")!.quaternion.clone();
+    timeline.update(20);
+    expect(body.getObjectByName("Head")!.quaternion.toArray()).toEqual(stopped.toArray());
+    loop.mockRestore();
+    uncache.mockRestore();
+  });
+
+  it.each([undefined, "invalid"])("defaults mode %s to one-shot", async mode => {
+    const base = await load("chibi-base");
+    const timeline = new CharacterAnimation(base.animations);
+    timeline.register(clone(base.scene));
+    const loop = vi.spyOn(AnimationAction.prototype, "setLoop");
+    timeline.play("wave", mode as CharacterPlaybackMode);
+    expect(loop).toHaveBeenCalledWith(LoopOnce, 1);
+    timeline.dispose();
+    loop.mockRestore();
+  });
+
+  it("resolves persisted animation selections and defaults missing or invalid values", () => {
+    for (const { id } of CHARACTER_ANIMATIONS) expect(resolvePerformanceAnimation(id)).toBe(id);
+    for (const value of [undefined, null, "", "unknown", 123, {}]) expect(resolvePerformanceAnimation(value)).toBe("wave");
+  });
   it.each(CHARACTER_ANIMATIONS)("keeps the authored static classic dress visible during $id and replacement", async ({ id }) => {
     const base = await load("chibi-base");
     const classic = await load("outfits/classic_outfit");
