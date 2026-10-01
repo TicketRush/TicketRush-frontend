@@ -118,11 +118,11 @@ function ConcertCard({ concert }: ConcertCardProps) {
         }
       }}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-b from-poster-fallback to-poster-fallback-end shrink-0">
+      <div className="relative w-full aspect-[4/3] overflow-hidden bg-gradient-to-b from-poster-fallback to-poster-fallback-end shrink-0">
         <img
           src={concert.imageMainUrl || samplePoster}
           alt={`${concert.title} 포스터`}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="absolute inset-0 block w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
           onError={(e) => {
             (e.target as HTMLImageElement).src = samplePoster;
