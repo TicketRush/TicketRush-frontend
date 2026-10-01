@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import BannerSlide from "./BannerSlide";
 import { useBanners } from "@/hooks/queries/useBanners";
 
 const AUTO_SLIDE_INTERVAL = 4000;
+const ARROW_CLASS = "absolute top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white transition-colors hover:bg-black/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:h-10 sm:w-10";
 
 export default function BannerSlider() {
   const { data: banners, isPending, isError, isFetching } = useBanners();
@@ -10,15 +12,19 @@ export default function BannerSlider() {
   const [isPaused, setIsPaused] = useState(false);
 
   const totalSlides = banners?.length ?? 0;
+  const moveSlide = useCallback((direction: number) => {
+    if (totalSlides <= 1) return;
+    setCurrentIndex((index) => (index + direction + totalSlides) % totalSlides);
+  }, [totalSlides]);
 
   // 자동 슬라이드 + hover/focus pause
   useEffect(() => {
     if (isPaused || totalSlides <= 1) return;
     const interval = setInterval(() => {
-      setCurrentIndex((p) => (p + 1) % totalSlides);
+      moveSlide(1);
     }, AUTO_SLIDE_INTERVAL);
     return () => clearInterval(interval);
-  }, [isPaused, totalSlides]);
+  }, [isPaused, totalSlides, moveSlide]);
 
   // 슬라이드 수가 바뀌었을 때 인덱스 초과 방지
   const safeIndex = totalSlides > 0 ? currentIndex % totalSlides : 0;
@@ -49,7 +55,21 @@ export default function BannerSlider() {
         }
       }}
     >
-      <BannerSlide key={current.performanceId} banner={current} posterUrl={current.imageUrl} />
+      <div className="relative">
+        <BannerSlide key={current.performanceId} banner={current} posterUrl={current.imageUrl} />
+        {totalSlides > 1 && (
+          <>
+            <button type="button" aria-label="이전 배너" onClick={() => moveSlide(-1)}
+              className={`${ARROW_CLASS} left-1 sm:left-2 lg:left-3`}>
+              <ChevronLeft size={20} aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="다음 배너" onClick={() => moveSlide(1)}
+              className={`${ARROW_CLASS} right-1 sm:right-2 lg:right-3`}>
+              <ChevronRight size={20} aria-hidden="true" />
+            </button>
+          </>
+        )}
+      </div>
 
       {banners.length > 1 && (
         <div className="flex justify-center gap-2 mt-4">
