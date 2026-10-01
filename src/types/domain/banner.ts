@@ -1,3 +1,5 @@
+export const MAX_BANNERS = 3;
+
 /** GET /api/v1/banner after shared snake_case conversion. */
 export interface BannerItem {
   performanceId: number;

@@ -11,6 +11,11 @@ vi.mock("react-router-dom", async (original) => ({
 vi.mock("@/stores/global/authStore", () => ({ default: (select: (state: typeof mocks.auth) => unknown) => select(mocks.auth) }));
 vi.mock("@/hooks/queries/useBanners", () => ({ useBanners: () => ({ data: [], isPending: false }) }));
 vi.mock("@/hooks/common/useDocumentTitle", () => ({ useDocumentTitle: vi.fn() }));
+vi.mock("@/hooks/admin/useAdminBanners", () => ({ useUpdateConcertBanner: () => ({ isPending: false }) }));
+vi.mock("@/hooks/admin/useAdmin", async original => ({
+  ...await original<typeof import("@/hooks/admin/useAdmin")>(),
+  useAdminConcerts: () => ({ data: { items: [], pagination: { totalPages: 1 } } }),
+}));
 
 beforeEach(async () => {
   vi.stubGlobal("React", React);
