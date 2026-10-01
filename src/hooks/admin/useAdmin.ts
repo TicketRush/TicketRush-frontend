@@ -261,8 +261,14 @@ export function useAdminReleaseSeat(performanceId: number) {
       );
 
       recordSeatLivePatch(performanceId, seatId);
-      qc.setQueryData<SeatMapData>(mapKey, (old) =>
-        patchSeatMapStatus(old, seatId, "AVAILABLE"),
+      const markAvailable = (old: SeatMapData | undefined) =>
+        patchSeatMapStatus(old, seatId, "AVAILABLE");
+      qc.setQueryData<SeatMapData>(mapKey, markAvailable);
+      // counts 재조회는 공개 맵이 있으면 그 집계를 쓴다.
+      // 관리자 맵만 고치면 같은 세션의 HOLD가 임시 예매 수를 되돌린다 (#485).
+      qc.setQueryData<SeatMapData>(
+        queryKeys.seats.byPerformance(performanceId),
+        markAvailable,
       );
       if (previousStatus && previousStatus !== "AVAILABLE") {
         qc.setQueryData<SeatCounts>(countsKey, (old) =>
@@ -275,6 +281,9 @@ export function useAdminReleaseSeat(performanceId: number) {
         queryKey: ["admin", "seat-detail", performanceId],
       });
       qc.invalidateQueries({ queryKey: countsKey });
+      // 서버는 PENDING을 EXPIRED로 바꾼다. 목록은 그 상태를 다시 받는다.
+      qc.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      qc.invalidateQueries({ queryKey: ["admin", "booking"] });
     },
   });
 }

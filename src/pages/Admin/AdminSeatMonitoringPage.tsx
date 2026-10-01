@@ -29,9 +29,11 @@ import {
 } from "@/hooks/admin/useAdmin";
 import { useSeatCounts } from "@/hooks/queries/useSeats";
 import { useSeatEventStream } from "@/hooks/seat/useSeatEventStream";
-import { LEGACY_HOLD_BOOKING_NUMBER } from "@/api/admin";
-import { ERROR_CODES } from "@/api/errors/errorCodes";
 import { ApiError } from "@/api/errors/errorMapper";
+import {
+  adminReleaseBookingNumber,
+  resolveAdminSeatReleaseFailure,
+} from "@/utils/admin/adminSeatRelease";
 import type { SeatStatus, SeatWithStatus } from "@/types/domain/seat";
 import type { AdminConcertItem } from "@/types/domain/admin";
 import type { ConcertStatus, Genre } from "@/types/domain/concert";
@@ -483,31 +485,31 @@ export function AdminSeatMonitoringMap({
   }
 
   async function handleRelease(seatId: number, bookingNumber?: string) {
-    const trimmed = bookingNumber?.trim();
-    const releaseBookingNumber = trimmed || LEGACY_HOLD_BOOKING_NUMBER;
-
     try {
       await releaseMutation.mutateAsync({
         seatId,
-        bookingNumber: releaseBookingNumber,
+        bookingNumber: adminReleaseBookingNumber(bookingNumber),
       });
       toast.success("예약이 해제되었습니다.");
       setSelectedSeatId(null);
     } catch (error: unknown) {
       const err = ApiError.fromUnknown(error);
       // mutationCache.onError가 서버 메시지를 한 번만 토스트한다.
+      const failure = resolveAdminSeatReleaseFailure(err.code, bookingNumber);
 
-      if (err.code === ERROR_CODES.SEAT_NOT_HELD) {
+      if (failure.kind === "clear-selection") {
         handleRefresh();
         setSelectedSeatId(null);
         return;
       }
-      if (err.code === ERROR_CODES.SEAT_SOLD_NOT_RELEASABLE) {
+      if (failure.kind === "open-refund") {
         handleRefresh();
-        if (trimmed) goToBookings(trimmed, "refund");
+        if (failure.bookingNumber) {
+          goToBookings(failure.bookingNumber, "refund");
+        }
         return;
       }
-      if (err.code === ERROR_CODES.SEAT_RELEASE_CONFLICT) {
+      if (failure.kind === "keep-selection") {
         handleRefresh();
       }
     }
