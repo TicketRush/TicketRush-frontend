@@ -26,7 +26,7 @@ export default function BannerSlide({ banner, posterUrl }: Props) {
         />
       )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/10" />
-      <div className="relative flex min-h-48 items-center gap-4 p-5 text-white sm:gap-6 sm:p-8">
+      <div className="relative flex min-h-48 items-center gap-4 px-10 py-5 text-white sm:gap-6 sm:px-14 sm:py-8 lg:px-16">
         <div className="min-w-0 flex-1 break-words">
           <h2 className="mb-1 text-xl font-bold sm:text-3xl">
             {banner.title}
