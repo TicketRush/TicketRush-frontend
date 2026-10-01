@@ -16,6 +16,7 @@
 
 import { mockDelay, mockError } from "./_helpers";
 import { MOCK_CONCERTS } from "./concerts";
+import { updateMockBanner } from "./banners";
 import {
   _findMockBookingBySeat,
   _findMockBooking,
@@ -474,13 +475,14 @@ export async function mockCreateConcert(
 
 export async function mockUpdateConcert(
   id: number,
-  _data: ConcertFormData,
+  data: ConcertFormData,
 ): Promise<void> {
   await mockDelay(500);
   const concert = MOCK_CONCERTS.find((c) => c.id === id);
   if (!concert) {
     await mockError("CONCERT_NOT_FOUND", "공연을 찾을 수 없습니다.");
   }
+  updateMockBanner(id, data);
 }
 
 export async function mockDeleteConcert(_id: number): Promise<void> {

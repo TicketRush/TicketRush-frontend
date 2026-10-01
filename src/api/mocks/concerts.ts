@@ -40,6 +40,7 @@
  */
 import type { ConcertSummary, ConcertDetail } from "@/types/domain/concert";
 import { mockDelay } from "./_helpers";
+import { getMockBannerSettings } from "./banners";
 import samplePoster from "@/assets/images/sample-poster.svg";
 
 const POSTER = samplePoster;
@@ -253,6 +254,7 @@ export function getMockConcertDetail(id: number): ConcertDetail | null {
 
   return {
     ...rest,
+    ...getMockBannerSettings(id),
     totalSeats,
     // 상세 API에만 있는 bookingOpenAt (목록 mock에는 없음)
     // Seoul(+09:00) offset 명시 — formatBookingOpenAt이 Asia/Seoul 벽시계로 표시
