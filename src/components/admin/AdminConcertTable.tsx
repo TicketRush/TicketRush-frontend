@@ -1,244 +1,309 @@
-// 전체 공연 목록 테이블 (TanStack Table) — 대시보드 하단
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  type ColumnDef,
-} from "@tanstack/react-table";
+// 관리자 공연 목록. 컬럼·매진·상태 우선순위는 같고, 색은 variant로 나눈다.
+import { Fragment, type MouseEvent } from "react";
 import { Edit, Trash2 } from "lucide-react";
 import type { AdminConcertItem } from "@/types/domain/admin";
-import type { ConcertStatus, Genre } from "@/types/domain/concert";
 import {
   formatAdminOccupancy,
   formatAdminSeats,
   formatAdminShowSchedule,
   formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
+import {
+  formatAdminConcertGenre,
+  formatAdminConcertId,
+  getAdminConcertStatusView,
+  getAdminOccupancyClass,
+  isAdminConcertRowActionTarget,
+  type AdminConcertListVariant,
+} from "@/utils/admin/adminConcertRow";
 
 interface AdminConcertTableProps {
   data: AdminConcertItem[];
-  onEdit: (id: number) => void;
-  onDelete: (id: number) => void;
+  variant?: AdminConcertListVariant;
+  onEdit?: (id: number) => void;
+  onDelete?: (id: number) => void;
+  onRowClick?: (concert: AdminConcertItem) => void;
 }
 
-const GENRE_LABELS: Record<Genre, string> = {
-  MUSICAL: "뮤지컬",
-  CONCERT: "콘서트",
-  CLASSIC: "클래식",
-  JAZZ: "재즈",
-  FESTIVAL: "페스티벌",
-  FANMEETING: "팬미팅",
-  BALLET: "발레",
-};
+type ColumnId =
+  | "id"
+  | "title"
+  | "genre"
+  | "date"
+  | "sales"
+  | "occupancy"
+  | "revenue"
+  | "status"
+  | "actions";
 
-const CENTERED_COLUMN_IDS = new Set([
-  "id",
-  "genre",
-  "date",
-  "sales",
-  "occupancyRate",
-  "revenue",
-  "status",
-  "actions",
-]);
+const DATA_COLUMNS: { id: Exclude<ColumnId, "actions">; header: string }[] = [
+  { id: "id", header: "ID" },
+  { id: "title", header: "공연명" },
+  { id: "genre", header: "장르" },
+  { id: "date", header: "날짜" },
+  { id: "sales", header: "판매/총" },
+  { id: "occupancy", header: "점유율" },
+  { id: "revenue", header: "매출" },
+  { id: "status", header: "상태" },
+];
 
-const NUMERIC_COLUMN_IDS = new Set(["date", "sales", "occupancyRate", "revenue"]);
-
-function columnAlignClass(columnId: string) {
-  return CENTERED_COLUMN_IDS.has(columnId) ? "text-center" : "text-left";
-}
-
-function columnNumericClass(columnId: string) {
-  return NUMERIC_COLUMN_IDS.has(columnId) ? " tabular-nums whitespace-nowrap" : "";
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  판매중: "bg-green-100 text-green-700",
-  매진: "bg-red-100 text-red-700",
-  예정: "bg-blue-100 text-blue-700",
-  종료: "bg-gray-100 text-gray-600",
-  취소: "bg-red-100 text-red-700",
-};
-
-/** Figma: 초록 판매중 / 빨강 매진. 매진은 enum이 아니라 잔여 0. */
-function statusBadge(row: AdminConcertItem): { label: string; color: string } {
-  if (row.status === "CANCELED") {
-    return { label: "취소", color: STATUS_STYLES.취소 };
+function headerClass(variant: AdminConcertListVariant, columnId: ColumnId) {
+  if (variant === "monitoring") {
+    return columnId === "title"
+      ? "py-3 px-3 text-left"
+      : "py-3 px-3 text-center whitespace-nowrap";
   }
-  const soldOut =
-    row.soldOut === true ||
-    (row.totalSeats != null &&
-      row.soldSeats != null &&
-      row.totalSeats > 0 &&
-      row.soldSeats >= row.totalSeats);
-  if (soldOut) {
-    return { label: "매진", color: STATUS_STYLES.매진 };
+  const align = columnId === "title" ? "text-left" : "text-center";
+  return `py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap ${align}`;
+}
+
+function dashboardCellClass(columnId: ColumnId) {
+  const align = columnId === "title" ? "text-left" : "text-center";
+  const numeric =
+    columnId === "date" ||
+    columnId === "sales" ||
+    columnId === "occupancy" ||
+    columnId === "revenue"
+      ? " tabular-nums whitespace-nowrap"
+      : "";
+  return `py-3 px-3 text-gray-800 ${align}${numeric}`;
+}
+
+function stopRowClick(event: { stopPropagation: () => void }, action: () => void) {
+  event.stopPropagation();
+  action();
+}
+
+function renderCell(
+  concert: AdminConcertItem,
+  columnId: Exclude<ColumnId, "actions">,
+  variant: AdminConcertListVariant,
+) {
+  if (variant === "monitoring") {
+    switch (columnId) {
+      case "id":
+        return (
+          <td className="py-3 px-3 text-center font-mono text-xs whitespace-nowrap">
+            {formatAdminConcertId(concert.id)}
+          </td>
+        );
+      case "title":
+        return (
+          <td className="py-3 px-3 text-left font-bold">{concert.title}</td>
+        );
+      case "genre":
+        return (
+          <td className="py-3 px-3 text-center whitespace-nowrap">
+            {formatAdminConcertGenre(concert)}
+          </td>
+        );
+      case "date":
+        return (
+          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
+            {formatAdminShowSchedule(concert.date, concert.showTime)}
+          </td>
+        );
+      case "sales":
+        return (
+          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
+            {formatAdminSeats(concert.soldSeats, concert.totalSeats)}
+          </td>
+        );
+      case "occupancy":
+        return (
+          <td
+            className={`py-3 px-3 text-center font-bold tabular-nums whitespace-nowrap ${getAdminOccupancyClass(concert.occupancyRate, "monitoring")}`}
+          >
+            {formatAdminOccupancy(concert.occupancyRate)}
+          </td>
+        );
+      case "revenue":
+        return (
+          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
+            {formatAdminWon(concert.revenue)}
+          </td>
+        );
+      case "status": {
+        const status = getAdminConcertStatusView(concert, "monitoring");
+        return (
+          <td className="py-3 px-3 text-center whitespace-nowrap">
+            <span
+              className={status.className}
+              style={{ backgroundColor: status.backgroundColor }}
+            >
+              {status.label}
+            </span>
+          </td>
+        );
+      }
+    }
   }
-  const byStatus: Record<ConcertStatus, string> = {
-    UPCOMING: "예정",
-    ON_SALE: "판매중",
-    CLOSED: "종료",
-    CANCELED: "취소",
-  };
-  const label = byStatus[row.status] ?? "판매중";
-  return { label, color: STATUS_STYLES[label] ?? STATUS_STYLES.판매중 };
+
+  switch (columnId) {
+    case "id":
+      return (
+        <td className={dashboardCellClass("id")}>
+          <span className="font-mono text-xs">
+            {formatAdminConcertId(concert.id)}
+          </span>
+        </td>
+      );
+    case "title":
+      return (
+        <td className={dashboardCellClass("title")}>
+          <span className="font-bold text-sm">{concert.title}</span>
+        </td>
+      );
+    case "genre":
+      return (
+        <td className={dashboardCellClass("genre")}>
+          {formatAdminConcertGenre(concert)}
+        </td>
+      );
+    case "date":
+      return (
+        <td className={dashboardCellClass("date")}>
+          {formatAdminShowSchedule(concert.date, concert.showTime)}
+        </td>
+      );
+    case "sales":
+      return (
+        <td className={dashboardCellClass("sales")}>
+          {formatAdminSeats(concert.soldSeats, concert.totalSeats)}
+        </td>
+      );
+    case "occupancy": {
+      const rate = concert.occupancyRate;
+      const color = getAdminOccupancyClass(rate, "dashboard");
+      return (
+        <td className={dashboardCellClass("occupancy")}>
+          {rate == null ? (
+            <span className={color}>{formatAdminOccupancy(rate)}</span>
+          ) : (
+            <span className={`font-bold ${color}`}>
+              {formatAdminOccupancy(rate)}
+            </span>
+          )}
+        </td>
+      );
+    }
+    case "revenue":
+      return (
+        <td className={dashboardCellClass("revenue")}>
+          {formatAdminWon(concert.revenue)}
+        </td>
+      );
+    case "status": {
+      const status = getAdminConcertStatusView(concert, "dashboard");
+      return (
+        <td className={dashboardCellClass("status")}>
+          <span className={status.className}>{status.label}</span>
+        </td>
+      );
+    }
+  }
 }
 
 export default function AdminConcertTable({
   data,
+  variant = "dashboard",
   onEdit,
   onDelete,
+  onRowClick,
 }: AdminConcertTableProps) {
-  const columns: ColumnDef<AdminConcertItem>[] = [
-    {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs">
-          E{String(row.original.id).padStart(3, "0")}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "title",
-      header: "공연명",
-      cell: ({ getValue }) => (
-        <span className="font-bold text-sm">{getValue() as string}</span>
-      ),
-    },
-    {
-      accessorKey: "genre",
-      header: "장르",
-      cell: ({ row }) =>
-        row.original.genreName ??
-        GENRE_LABELS[row.original.genre] ??
-        row.original.genre,
-    },
-    {
-      accessorKey: "date",
-      header: "날짜",
-      cell: ({ row }) =>
-        formatAdminShowSchedule(row.original.date, row.original.showTime),
-    },
-    {
-      id: "sales",
-      header: "판매/총",
-      cell: ({ row }) => (
-        <span>
-          {formatAdminSeats(row.original.soldSeats, row.original.totalSeats)}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "occupancyRate",
-      header: "점유율",
-      cell: ({ row }) => {
-        const rate = row.original.occupancyRate;
-        if (rate == null) {
-          return <span className="text-gray-400">-</span>;
-        }
-        const pct = rate * 100;
-        const color =
-          pct >= 90
-            ? "text-green-600"
-            : pct >= 50
-              ? "text-blue-600"
-              : "text-gray-500";
-        return (
-          <span className={`font-bold ${color}`}>
-            {formatAdminOccupancy(rate)}
-          </span>
-        );
-      },
-    },
-    {
-      accessorKey: "revenue",
-      header: "매출",
-      cell: ({ row }) => formatAdminWon(row.original.revenue),
-    },
-    {
-      accessorKey: "status",
-      header: "상태",
-      cell: ({ row }) => {
-        const s = statusBadge(row.original);
-        return (
-          <span
-            className={`px-2 py-1 rounded text-xs font-semibold ${s.color}`}
-          >
-            {s.label}
-          </span>
-        );
-      },
-    },
-    {
-      id: "actions",
-      header: "관리",
-      cell: ({ row }) => (
-        <div className="flex justify-center gap-1">
-          <button
-            type="button"
-            onClick={() => onEdit(row.original.id)}
-            className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 text-xs flex items-center gap-1"
-          >
-            <Edit size={12} /> 수정
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(row.original.id)}
-            className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-red-50 text-xs flex items-center gap-1"
-          >
-            <Trash2 size={12} /> 삭제
-          </button>
-        </div>
-      ),
-    },
-  ];
-
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
-  if (data.length === 0) {
+  if (variant === "dashboard" && data.length === 0) {
     return (
       <div className="py-12 text-center text-sm text-gray-500">
         등록된 공연이 없습니다.
       </div>
     );
   }
+  if (data.length === 0) return null;
+
+  const showActions = onEdit != null || onDelete != null;
+  const columns: { id: ColumnId; header: string }[] = showActions
+    ? [...DATA_COLUMNS, { id: "actions", header: "관리" }]
+    : DATA_COLUMNS;
+
+  function openRow(event: MouseEvent<HTMLTableRowElement>, concert: AdminConcertItem) {
+    if (!onRowClick || isAdminConcertRowActionTarget(event.target)) return;
+    onRowClick(concert);
+  }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left">
-        <thead>
-          {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-gray-200 bg-gray-50">
-              {hg.headers.map((h) => (
-                <th
-                  key={h.id}
-                  className={`py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap ${columnAlignClass(h.column.id)}`}
-                >
-                  {flexRender(h.column.columnDef.header, h.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
+      <table
+        className={
+          variant === "monitoring"
+            ? "w-full text-sm admin-table"
+            : "w-full text-sm text-left"
+        }
+      >
+        <thead
+          className={
+            variant === "monitoring" ? "border-b border-admin-border" : undefined
+          }
+        >
+          <tr
+            className={
+              variant === "monitoring"
+                ? "text-xs text-admin-text-secondary"
+                : "border-b border-gray-200 bg-gray-50"
+            }
+          >
+            {columns.map((column) => (
+              <th key={column.id} className={headerClass(variant, column.id)}>
+                {column.header}
+              </th>
+            ))}
+          </tr>
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
+          {data.map((concert) => (
             <tr
-              key={row.id}
-              className="border-b border-gray-100 hover:bg-gray-50"
+              key={concert.id}
+              onClick={
+                onRowClick ? (event) => openRow(event, concert) : undefined
+              }
+              className={
+                variant === "monitoring"
+                  ? "border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
+                  : "border-b border-gray-100 hover:bg-gray-50"
+              }
             >
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  className={`py-3 px-3 text-gray-800 ${columnAlignClass(cell.column.id)}${columnNumericClass(cell.column.id)}`}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
+              {DATA_COLUMNS.map((column) => (
+                <Fragment key={column.id}>
+                  {renderCell(concert, column.id, variant)}
+                </Fragment>
               ))}
+              {showActions ? (
+                <td className={dashboardCellClass("actions")}>
+                  <div className="flex justify-center gap-1">
+                    {onEdit ? (
+                      <button
+                        type="button"
+                        onClick={(event) =>
+                          stopRowClick(event, () => onEdit(concert.id))
+                        }
+                        className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 text-xs flex items-center gap-1"
+                      >
+                        <Edit size={12} /> 수정
+                      </button>
+                    ) : null}
+                    {onDelete ? (
+                      <button
+                        type="button"
+                        onClick={(event) =>
+                          stopRowClick(event, () => onDelete(concert.id))
+                        }
+                        className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-800 hover:bg-red-50 text-xs flex items-center gap-1"
+                      >
+                        <Trash2 size={12} /> 삭제
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
