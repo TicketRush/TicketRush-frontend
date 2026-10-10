@@ -16,6 +16,7 @@ import {
 } from "react-router-dom";
 import { Users, Square, Clock, ArrowLeft, RefreshCcw } from "lucide-react";
 import { toast } from "react-toastify";
+import AdminConcertTable from "@/components/admin/AdminConcertTable";
 import StatCard from "@/components/admin/StatCard";
 import AdminSeatMap from "@/components/admin/AdminSeatMap";
 import AdminSeatDetailPanel from "@/components/admin/AdminSeatDetailPanel";
@@ -36,7 +37,6 @@ import {
 } from "@/utils/admin/adminSeatRelease";
 import type { SeatStatus, SeatWithStatus } from "@/types/domain/seat";
 import type { AdminConcertItem } from "@/types/domain/admin";
-import type { ConcertStatus, Genre } from "@/types/domain/concert";
 import Pagination from "@/components/admin/Pagination";
 import { resolveSelectedSeatLiveUpdate } from "@/utils/admin/adminSeatLiveUpdate";
 import { parseAdminPerformanceId } from "@/utils/admin/parseAdminPerformanceId";
@@ -50,34 +50,11 @@ import {
   SEAT_STREAM_CONNECTION_LABEL,
   type SeatStreamConnectionStatus,
 } from "@/utils/seat/seatStreamConnection";
-import {
-  formatAdminCount,
-  formatAdminOccupancy,
-  formatAdminSeats,
-  formatAdminShowSchedule,
-  formatAdminWon,
-} from "@/utils/admin/formatAdminMetric";
+import { formatAdminCount } from "@/utils/admin/formatAdminMetric";
 import { isInitialQueryPending } from "@/utils/query/isInitialQueryPending";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const MONITORING_PAGE_SIZE = 50;
-
-const STATUS_LABELS: Record<ConcertStatus, string> = {
-  UPCOMING: "예정",
-  ON_SALE: "판매중",
-  CLOSED: "종료",
-  CANCELED: "취소",
-};
-
-const GENRE_LABELS: Record<Genre, string> = {
-  CONCERT: "콘서트",
-  MUSICAL: "뮤지컬",
-  CLASSIC: "클래식",
-  JAZZ: "재즈",
-  FESTIVAL: "페스티벌",
-  FANMEETING: "팬미팅",
-  BALLET: "발레",
-};
 
 interface MonitoringLocationState {
   concert?: AdminConcertItem;
@@ -221,94 +198,11 @@ function AdminSeatMonitoringList() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-            <table className="w-full text-sm admin-table">
-              <thead className="border-b border-admin-border">
-                <tr className="text-xs text-admin-text-secondary">
-                  <th className="py-3 px-3 text-center whitespace-nowrap">ID</th>
-                  <th className="py-3 px-3 text-left">공연명</th>
-                  <th className="py-3 px-3 text-center whitespace-nowrap">장르</th>
-                  <th className="py-3 px-3 text-center whitespace-nowrap">날짜</th>
-                  <th className="py-3 px-3 text-center whitespace-nowrap">판매/총</th>
-                  <th className="py-3 px-3 text-center whitespace-nowrap">점유율</th>
-                  <th className="py-3 px-3 text-center whitespace-nowrap">매출</th>
-                  <th className="py-3 px-3 text-center whitespace-nowrap">상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {concertList.map((c) => {
-                  const rate =
-                    c.occupancyRate == null ? null : c.occupancyRate * 100;
-                  const rateColor =
-                    rate == null
-                      ? "text-admin-text-secondary"
-                      : rate >= 100
-                        ? "text-[#00C950]"
-                        : rate >= 80
-                          ? "text-[#1D7DFF]"
-                          : "text-admin-text";
-                  const isSoldOut =
-                    c.soldOut === true ||
-                    (c.totalSeats != null &&
-                      c.soldSeats != null &&
-                      c.totalSeats > 0 &&
-                      c.soldSeats >= c.totalSeats);
-                  const isCanceled = c.status === "CANCELED";
-                  const statusLabel = isCanceled
-                    ? "취소"
-                    : isSoldOut
-                      ? "매진"
-                      : (STATUS_LABELS[c.status] ?? "판매중");
-                  const statusColor = isCanceled
-                    ? "#FB2C36"
-                    : isSoldOut
-                      ? "#FB2C36"
-                      : c.status === "ON_SALE"
-                        ? "#00C950"
-                        : "#6B7280";
-                  return (
-                    <tr
-                      key={c.id}
-                      onClick={() => openConcert(c)}
-                      className="border-b border-admin-border/50 hover:bg-admin-border/30 cursor-pointer transition"
-                    >
-                      <td className="py-3 px-3 text-center font-mono text-xs whitespace-nowrap">
-                        E{String(c.id).padStart(3, "0")}
-                      </td>
-                      <td className="py-3 px-3 text-left font-bold">{c.title}</td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {c.genreName ?? GENRE_LABELS[c.genre] ?? c.genre}
-                      </td>
-                      <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
-                        {formatAdminShowSchedule(c.date, c.showTime)}
-                      </td>
-                      <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
-                        {formatAdminSeats(c.soldSeats, c.totalSeats)}
-                      </td>
-                      <td
-                        className={`py-3 px-3 text-center font-bold tabular-nums whitespace-nowrap ${rateColor}`}
-                      >
-                        {formatAdminOccupancy(c.occupancyRate)}
-                      </td>
-                      <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
-                        {formatAdminWon(c.revenue)}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span
-                          className="px-3 py-1 rounded-md text-xs font-bold text-white"
-                          style={{
-                            backgroundColor: statusColor,
-                          }}
-                        >
-                          {statusLabel}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
+            <AdminConcertTable
+              data={concertList}
+              variant="monitoring"
+              onRowClick={openConcert}
+            />
             {concerts?.pagination ? (
               <Pagination
                 pageIndex={listPage}

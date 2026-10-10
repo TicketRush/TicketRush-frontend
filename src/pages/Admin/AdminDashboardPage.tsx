@@ -294,6 +294,7 @@ export default function AdminDashboardPage() {
             </h3>
             <AdminConcertTable
               data={concertItems}
+              variant="dashboard"
               onEdit={(id) => navigate(`/admin/concerts/${id}/edit`)}
               onDelete={(id) => setDeleteTarget(id)}
             />
