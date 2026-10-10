@@ -45,12 +45,12 @@ describe("AdminConcertTable variants (#373)", () => {
     );
 
     expect(html).toMatch(
-      /<th class="py-3 px-3 text-center whitespace-nowrap">ID<\/th>/,
+      /<th class="py-3 px-3 text-left whitespace-nowrap">ID<\/th>/,
     );
     expect(html).toMatch(/<th class="py-3 px-3 text-left">공연명<\/th>/);
     expect(html).toContain("cursor-pointer");
     expect(html).toContain(
-      "py-3 px-3 text-center font-bold tabular-nums whitespace-nowrap text-admin-text",
+      "py-3 px-3 font-bold text-right tabular-nums whitespace-nowrap text-admin-text",
     );
     expect(html).not.toContain("수정");
     expect(html).not.toContain("bg-blue-100");
@@ -101,28 +101,25 @@ describe("AdminConcertTable variants (#373)", () => {
   });
 });
 
-describe("AdminConcertTable alignment (#346)", () => {
-  it("공연명만 왼쪽, 나머지 컬럼은 가운데 정렬한다", () => {
+describe("AdminConcertTable alignment (#372)", () => {
+  it("텍스트는 왼쪽, 수량·금액은 오른쪽, 날짜·상태·관리는 가운데다", () => {
     const html = renderTable();
 
-    expect(headerClass(html, "공연명")).toContain("text-left");
-    expect(headerClass(html, "공연명")).not.toContain("text-center");
+    for (const label of ["ID", "공연명", "장르"]) {
+      expect(headerClass(html, label)).toContain("text-left");
+      expect(headerClass(html, label)).not.toContain("text-right");
+    }
 
-    for (const label of [
-      "ID",
-      "장르",
-      "날짜",
-      "판매/총",
-      "점유율",
-      "매출",
-      "상태",
-      "관리",
-    ]) {
+    for (const label of ["판매/총", "점유율", "매출"]) {
+      expect(headerClass(html, label)).toContain("text-right");
+      expect(headerClass(html, label)).toContain("tabular-nums");
+    }
+
+    for (const label of ["날짜", "상태", "관리"]) {
       expect(headerClass(html, label)).toContain("text-center");
-      expect(headerClass(html, label)).not.toContain("text-left");
+      expect(headerClass(html, label)).not.toContain("text-right");
     }
 
     expect(html).toContain("flex justify-center gap-1");
-    expect(html).toContain("tabular-nums");
   });
 });

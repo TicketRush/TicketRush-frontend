@@ -36,6 +36,10 @@ import {
   formatAdminText,
   formatAdminWon,
 } from "@/utils/admin/formatAdminMetric";
+import {
+  adminTableAlignClass,
+  type AdminTableAlign,
+} from "@/utils/admin/adminTableAlign";
 import { useDocumentTitle } from "@/hooks/common/useDocumentTitle";
 
 const PAGE_SIZE = 10;
@@ -185,6 +189,21 @@ export default function AdminRefundsPage() {
   );
 }
 
+const REFUND_COLUMNS: { label: string; align: AdminTableAlign }[] = [
+  { label: "예매번호", align: "text" },
+  { label: "공연명", align: "text" },
+  { label: "공연 일시", align: "center" },
+  { label: "예매일시", align: "center" },
+  { label: "예매자", align: "text" },
+  { label: "결제 금액", align: "numeric" },
+  { label: "상태", align: "center" },
+  { label: "재시도", align: "center" },
+];
+
+function refundCellAlign(align: AdminTableAlign) {
+  return adminTableAlignClass(align, { nowrap: align !== "text" });
+}
+
 function RefundTable({
   isLoading,
   isError,
@@ -235,24 +254,15 @@ function RefundTable({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-center">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-admin-border">
-                  {[
-                    "예매번호",
-                    "공연명",
-                    "공연 일시",
-                    "예매일시",
-                    "예매자",
-                    "결제 금액",
-                    "상태",
-                    "재시도",
-                  ].map((label) => (
+                  {REFUND_COLUMNS.map((column) => (
                     <th
-                      key={label}
-                      className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center"
+                      key={column.label}
+                      className={`py-3 px-3 text-xs font-semibold text-admin-text-secondary ${adminTableAlignClass(column.align, { nowrap: true })}`}
                     >
-                      {label}
+                      {column.label}
                     </th>
                   ))}
                 </tr>
@@ -265,28 +275,40 @@ function RefundTable({
                       key={item.bookingNumber}
                       className="border-b border-admin-border/50 hover:bg-admin-border/30"
                     >
-                      <td className="py-3 px-3 font-mono text-xs text-blue-400">
+                      <td
+                        className={`py-3 px-3 font-mono text-xs text-blue-400 ${refundCellAlign("text")}`}
+                      >
                         {item.bookingNumber}
                       </td>
-                      <td className="py-3 px-3 font-bold text-admin-text">
+                      <td
+                        className={`py-3 px-3 font-bold text-admin-text ${refundCellAlign("text")}`}
+                      >
                         {formatAdminText(item.performanceTitle)}
                       </td>
-                      <td className="py-3 px-3 text-xs text-admin-text-secondary">
+                      <td
+                        className={`py-3 px-3 text-xs text-admin-text-secondary ${refundCellAlign("center")}`}
+                      >
                         {formatAdminRefundPerformance(
                           item.performanceDate,
                           item.performanceTime,
                         )}
                       </td>
-                      <td className="py-3 px-3 text-xs text-admin-text-secondary">
+                      <td
+                        className={`py-3 px-3 text-xs text-admin-text-secondary ${refundCellAlign("center")}`}
+                      >
                         {formatAdminDateTime(item.bookedAt)}
                       </td>
-                      <td className="py-3 px-3 text-admin-text">
+                      <td
+                        className={`py-3 px-3 text-admin-text ${refundCellAlign("text")}`}
+                      >
                         {formatAdminText(item.bookerName)}
                       </td>
-                      <td className="py-3 px-3 text-admin-text">
+                      <td
+                        className={`py-3 px-3 text-admin-text ${refundCellAlign("numeric")}`}
+                      >
                         {formatAdminWon(item.paymentAmount)}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className={`py-3 px-3 ${refundCellAlign("center")}`}>
                         <span
                           className="inline-block px-3 py-1 rounded-md text-xs font-bold text-white"
                           style={{ backgroundColor: style.bg }}
@@ -294,7 +316,7 @@ function RefundTable({
                           {REFUND_PROCESS_STATUS_LABEL[item.refundStatus]}
                         </span>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className={`py-3 px-3 ${refundCellAlign("center")}`}>
                         {canRetryAdminRefund(item.refundStatus) ? (
                           <button
                             type="button"

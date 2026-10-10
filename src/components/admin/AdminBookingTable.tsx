@@ -17,6 +17,10 @@ import {
   formatAdminWon,
   UNAVAILABLE_METRIC,
 } from "@/utils/admin/formatAdminMetric";
+import {
+  adminTableAlignClass,
+  type AdminTableAlign,
+} from "@/utils/admin/adminTableAlign";
 
 interface AdminBookingTableProps {
   data: AdminBookingItem[];
@@ -34,6 +38,29 @@ const STATUS_STYLES: Record<string, { label: string; bg: string }> = {
   REFUNDING: { label: "환불 중", bg: "#2B7FFF" },
   REFUNDED: { label: "환불 완료", bg: "#6B7280" },
 };
+
+const BOOKING_COLUMN_ALIGN: Record<string, AdminTableAlign> = {
+  bookingNumber: "text",
+  concertTitle: "text",
+  concertDate: "center",
+  bookedAt: "center",
+  userName: "text",
+  totalAmount: "numeric",
+  status: "center",
+  expand: "center",
+};
+
+function bookingHeadClass(columnId: string) {
+  const align = BOOKING_COLUMN_ALIGN[columnId] ?? "text";
+  return `py-3 px-3 text-xs font-semibold text-admin-text-secondary ${adminTableAlignClass(align, { nowrap: true })}`;
+}
+
+function bookingCellClass(columnId: string) {
+  const align = BOOKING_COLUMN_ALIGN[columnId] ?? "text";
+  return `py-3 px-3 text-admin-text ${adminTableAlignClass(align, {
+    nowrap: align !== "text",
+  })}`;
+}
 
 const SECTION_BADGE =
   "text-[10px] font-bold tracking-wider bg-admin-dark-border text-admin-text px-2 py-0.5 rounded inline-block mb-3";
@@ -133,14 +160,14 @@ export default function AdminBookingTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-center">
+      <table className="w-full text-sm">
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-admin-border">
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
-                  className="py-3 px-3 text-xs font-semibold text-admin-text-secondary text-center"
+                  className={bookingHeadClass(h.column.id)}
                 >
                   {flexRender(h.column.columnDef.header, h.getContext())}
                 </th>
@@ -164,7 +191,7 @@ export default function AdminBookingTable({
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className="py-3 px-3 text-admin-text text-center"
+                      className={bookingCellClass(cell.column.id)}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

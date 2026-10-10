@@ -165,27 +165,27 @@ function renderMap() {
 }
 
 describe("AdminSeatMonitoringPage live updates (#336 / #361)", () => {
-  it("공연 목록의 ID·장르·날짜·판매 지표는 가운데, 공연명은 왼쪽 정렬이다", () => {
+  it("공연 목록은 텍스트를 왼쪽, 수량·금액을 오른쪽, 날짜·상태를 가운데 둔다", () => {
     const html = renderList();
     expect(html).toContain(">ID</th>");
     expect(html).toMatch(
-      /<th class="py-3 px-3 text-center whitespace-nowrap">ID<\/th>/,
+      /<th class="py-3 px-3 text-left whitespace-nowrap">ID<\/th>/,
     );
     expect(html).toMatch(/<th class="py-3 px-3 text-left">공연명<\/th>/);
     expect(html).toMatch(
-      /<th class="py-3 px-3 text-center whitespace-nowrap">장르<\/th>/,
+      /<th class="py-3 px-3 text-left whitespace-nowrap">장르<\/th>/,
     );
     expect(html).toMatch(
       /<th class="py-3 px-3 text-center whitespace-nowrap">날짜<\/th>/,
     );
     expect(html).toMatch(
-      /<th class="py-3 px-3 text-center whitespace-nowrap">판매\/총<\/th>/,
+      /<th class="py-3 px-3 text-right tabular-nums whitespace-nowrap">판매\/총<\/th>/,
     );
     expect(html).toMatch(
-      /<th class="py-3 px-3 text-center whitespace-nowrap">점유율<\/th>/,
+      /<th class="py-3 px-3 text-right tabular-nums whitespace-nowrap">점유율<\/th>/,
     );
     expect(html).toMatch(
-      /<th class="py-3 px-3 text-center whitespace-nowrap">매출<\/th>/,
+      /<th class="py-3 px-3 text-right tabular-nums whitespace-nowrap">매출<\/th>/,
     );
     expect(html).toMatch(
       /<th class="py-3 px-3 text-center whitespace-nowrap">상태<\/th>/,
