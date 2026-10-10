@@ -100,6 +100,28 @@ describe("AdminRefundsPage (#397)", () => {
     expect(html).toContain("2026-07-20 18:00");
     expect(html).not.toContain("좌석");
     expect(html).not.toContain("현재 페이지");
+    expect(html).toContain("text-sm\"");
+    expect(html).not.toContain("text-sm text-center");
+    expect(html).toMatch(
+      /<th class="[^"]*text-left[^"]*">공연명<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="[^"]*text-right tabular-nums whitespace-nowrap[^"]*">결제 금액<\/th>/,
+    );
+    expect(html).toMatch(
+      /<th class="[^"]*text-center[^"]*">재시도<\/th>/,
+    );
+  });
+
+  it("빈 목록 문구는 가운데를 유지한다", () => {
+    refundState.items = [];
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AdminRefundsPage />
+      </MemoryRouter>,
+    );
+    expect(html).toContain("text-center py-12 text-admin-text-secondary");
+    expect(html).toContain("해당하는 환불이 없습니다.");
   });
 
   it("미해결 실패만 재시도 버튼이 있고 완료 건에는 없다", () => {

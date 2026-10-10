@@ -16,6 +16,10 @@ import {
   isAdminConcertRowActionTarget,
   type AdminConcertListVariant,
 } from "@/utils/admin/adminConcertRow";
+import {
+  adminTableAlignClass,
+  type AdminTableAlign,
+} from "@/utils/admin/adminTableAlign";
 
 interface AdminConcertTableProps {
   data: AdminConcertItem[];
@@ -36,6 +40,18 @@ type ColumnId =
   | "status"
   | "actions";
 
+const CONCERT_COLUMN_ALIGN: Record<ColumnId, AdminTableAlign> = {
+  id: "text",
+  title: "text",
+  genre: "text",
+  date: "center",
+  sales: "numeric",
+  occupancy: "numeric",
+  revenue: "numeric",
+  status: "center",
+  actions: "center",
+};
+
 const DATA_COLUMNS: { id: Exclude<ColumnId, "actions">; header: string }[] = [
   { id: "id", header: "ID" },
   { id: "title", header: "공연명" },
@@ -48,25 +64,21 @@ const DATA_COLUMNS: { id: Exclude<ColumnId, "actions">; header: string }[] = [
 ];
 
 function headerClass(variant: AdminConcertListVariant, columnId: ColumnId) {
+  const align = CONCERT_COLUMN_ALIGN[columnId];
   if (variant === "monitoring") {
-    return columnId === "title"
-      ? "py-3 px-3 text-left"
-      : "py-3 px-3 text-center whitespace-nowrap";
+    return `py-3 px-3 ${adminTableAlignClass(align, {
+      nowrap: columnId !== "title",
+    })}`;
   }
-  const align = columnId === "title" ? "text-left" : "text-center";
-  return `py-3 px-3 text-xs font-semibold text-gray-500 whitespace-nowrap ${align}`;
+  const headerNowrap = align === "numeric" ? "" : " whitespace-nowrap";
+  return `py-3 px-3 text-xs font-semibold text-gray-500${headerNowrap} ${adminTableAlignClass(align)}`;
 }
 
 function dashboardCellClass(columnId: ColumnId) {
-  const align = columnId === "title" ? "text-left" : "text-center";
-  const numeric =
-    columnId === "date" ||
-    columnId === "sales" ||
-    columnId === "occupancy" ||
-    columnId === "revenue"
-      ? " tabular-nums whitespace-nowrap"
-      : "";
-  return `py-3 px-3 text-gray-800 ${align}${numeric}`;
+  const align = CONCERT_COLUMN_ALIGN[columnId];
+  const dateChrome =
+    columnId === "date" ? " tabular-nums whitespace-nowrap" : "";
+  return `py-3 px-3 text-gray-800 ${adminTableAlignClass(align)}${dateChrome}`;
 }
 
 function stopRowClick(event: { stopPropagation: () => void }, action: () => void) {
@@ -83,50 +95,60 @@ function renderCell(
     switch (columnId) {
       case "id":
         return (
-          <td className="py-3 px-3 text-center font-mono text-xs whitespace-nowrap">
+          <td
+            className={`py-3 px-3 font-mono text-xs ${adminTableAlignClass("text", { nowrap: true })}`}
+          >
             {formatAdminConcertId(concert.id)}
           </td>
         );
       case "title":
         return (
-          <td className="py-3 px-3 text-left font-bold">{concert.title}</td>
+          <td className={`py-3 px-3 ${adminTableAlignClass("text")} font-bold`}>
+            {concert.title}
+          </td>
         );
       case "genre":
         return (
-          <td className="py-3 px-3 text-center whitespace-nowrap">
+          <td
+            className={`py-3 px-3 ${adminTableAlignClass("text", { nowrap: true })}`}
+          >
             {formatAdminConcertGenre(concert)}
           </td>
         );
       case "date":
         return (
-          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
+          <td
+            className={`py-3 px-3 tabular-nums ${adminTableAlignClass("center", { nowrap: true })}`}
+          >
             {formatAdminShowSchedule(concert.date, concert.showTime)}
           </td>
         );
       case "sales":
         return (
-          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
+          <td className={`py-3 px-3 ${adminTableAlignClass("numeric")}`}>
             {formatAdminSeats(concert.soldSeats, concert.totalSeats)}
           </td>
         );
       case "occupancy":
         return (
           <td
-            className={`py-3 px-3 text-center font-bold tabular-nums whitespace-nowrap ${getAdminOccupancyClass(concert.occupancyRate, "monitoring")}`}
+            className={`py-3 px-3 font-bold ${adminTableAlignClass("numeric")} ${getAdminOccupancyClass(concert.occupancyRate, "monitoring")}`}
           >
             {formatAdminOccupancy(concert.occupancyRate)}
           </td>
         );
       case "revenue":
         return (
-          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap">
+          <td className={`py-3 px-3 ${adminTableAlignClass("numeric")}`}>
             {formatAdminWon(concert.revenue)}
           </td>
         );
       case "status": {
         const status = getAdminConcertStatusView(concert, "monitoring");
         return (
-          <td className="py-3 px-3 text-center whitespace-nowrap">
+          <td
+            className={`py-3 px-3 ${adminTableAlignClass("center", { nowrap: true })}`}
+          >
             <span
               className={status.className}
               style={{ backgroundColor: status.backgroundColor }}
