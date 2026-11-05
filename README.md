@@ -9,7 +9,7 @@
 
 ### 🗓️ 프로젝트 기간
 
-- 2026년 3월 ~ 진행중
+- 2026년 3월 ~ 10월
 
 ### 👥 프로젝트 팀원 소개
 
@@ -18,7 +18,7 @@ TicketRush는 **5인 팀(프론트엔드 2 · 백엔드 3)** 으로 진행됩니
 |                            프로필                            | 이름  |                                          GitHub                                          | 담당 파트                                                                                                                                                                    |
 |:---------------------------------------------------------:|:---:|:----------------------------------------------------------------------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | <img src="https://github.com/cheiwonlee.png" width="80"> | 이채원 | [@cheiwonlee](https://github.com/cheiwonlee)<br/>([@lxvxxu](https://github.com/lxvxxu)) | 공통 컴포넌트/라우팅 · 인증(auth) · 회원(user) · 공연(performance) · 좌석(seat) · 예매(booking) · 결제(payment) · 티켓(ticket) · 관리자(대시보드 · 예매/환불 관리 · 좌석 모니터링) · API 연동/상태 관리 · CI/CD(Vercel)|
-|  <img src="https://github.com/hannavii.png" width="80">  | 이예랑 |                        [@hannavii](https://github.com/hannavii)                         | 관리자(공연 등록/수정) · 관리자 3D 캐릭터 제작소 · 3D 모델(GLB) 에셋 제작/적용                                                                                             |
+|  <img src="https://github.com/hannavii.png" width="80">  | 이예랑 |                        [@hannavii](https://github.com/hannavii)                         | 관리자 공연 관리 · React Three Fiber 기반 3D 캐릭터 커스터마이징/애니메이션 · GLB 에셋 파이프라인 · 배너 관리/메인 UI |
 
 > 💡 **`@lxvxxu`와 `@cheiwonlee`는 동일 인물(이채원)의 GitHub 계정**입니다. 커밋 기록에는 두 계정이 함께 표시됩니다.
 
@@ -92,6 +92,7 @@ flowchart LR
 - 메인 배너 슬라이더
 - 무한 스크롤 공연 목록 (스켈레톤 로딩)
 - 공연 상세: 잔여 좌석 게이지, 예매 오픈 상태에 따른 예매 버튼 문구/활성화 분기
+- 공연별 3D 캐릭터 렌더링 및 저장된 캐릭터 애니메이션 반복 재생
 
 **(3) 좌석 · 예매**
 
@@ -120,8 +121,10 @@ flowchart LR
 - 예매 내역 관리
 - 환불 모니터링: 환불 실패 / 환불 지연 건 조회 및 재시도
 - 좌석 모니터링: 공연별 좌석 현황, 좌석 상세 확인 및 선점 강제 해제
-- 공연 등록 · 수정
-- 3D 캐릭터 제작소 — 피부 · 헤어 · 눈 · 입 · 의상 · 포즈 · 배경을 조합해 공연용 캐릭터 제작
+- 공연 등록 · 수정 — 공연 정보 · 예매 일정 · 이미지 · 3D 캐릭터 설정 관리
+- 즉시 예매 설정 및 공연 상태에 따른 수정 제한 처리
+- 배너 관리 — 최대 3개 제한, 기존 공연 추가 · 제거 및 상태 동기화
+- 3D 캐릭터 제작소 — 피부 · 헤어 · 눈 · 입 · 의상 · 색상 · 애니메이션을 조합해 공연용 캐릭터 제작
 
 ---
 
@@ -296,7 +299,7 @@ flowchart LR
 | Styling           | Tailwind CSS 3 · clsx · Pretendard                                 |
 | Payment           | Toss Payments SDK v2                                               |
 | Chart / Table     | Recharts · TanStack Table                                          |
-| 3D                | three.js · React Three Fiber · drei                                |
+| 3D                | three.js · React Three Fiber · drei · blender                      |
 | UI Utilities      | Swiper · lucide-react · react-toastify · focus-trap-react · qrcode.react · html2canvas |
 | Test              | Vitest                                                             |
 | Code Quality      | ESLint 9 · Prettier · Git Hooks(commit-msg)                        |
@@ -426,14 +429,44 @@ export const USE_MOCK =
 - mock 좌석 SSE는 시뮬레이터로 다른 사용자의 선점 이벤트를 흉내 내 실시간 UI를 백엔드 없이 개발
 - `import.meta.env.DEV` 가드로 **production 빌드에서는 mock 경로가 원천 차단**
 
-### 7️⃣ 3D 캐릭터 제작소
+### 7️⃣ 3D 캐릭터 커스터마이징 및 애니메이션
 
 **해결** — [`AdminCharacterCreatorPage.tsx`](src/pages/Admin/AdminCharacterCreatorPage.tsx) · [`CharacterModelViewer.tsx`](src/components/admin/character/CharacterModelViewer.tsx)
 
-- React Three Fiber + drei(`useGLTF`, `OrbitControls`)로 브라우저에서 3D 캐릭터를 렌더링하고 회전하며 확인
-- 헤어 · 눈 · 입 · 의상을 **파츠별 GLB 모델**로 분리해 조합하고, 장르(콘서트 · 뮤지컬 · 페스티벌 · 발레)별 의상과 파트별 색상 커스터마이징 지원
-- 모델 로딩 UI, HEX 색상 입력 검증 및 복원 처리
-- 제작한 캐릭터 설정을 공연 등록 폼으로 전달해 공연 등록 흐름과 연결
+- React Three Fiber + three.js + drei(`useGLTF`, `OrbitControls`)로 GLB 기반 3D 캐릭터 렌더링
+- 헤어 · 눈 · 입 · 의상을 파츠별 GLB로 분리해 조합하고 파트별 색상 커스터마이징 지원
+- `wave` · `cute` · `cover_mouth` 애니메이션을 Three.js `AnimationMixer`로 재생
+- 제작소에서는 클릭 시 1회 재생, 공연 등록/수정 미리보기와 공연 상세에서는 선택 애니메이션을 반복 재생
+- 캐릭터 설정과 애니메이션을 `character_config`로 직렬화해 공연 등록 · 수정 · 상세 화면에서 동일하게 복원
+- GLB의 node transform · bounding box · material을 비교해 모델 크기/위치 문제를 분석하고 Blender 재export로 에셋 문제 해결
+
+  ### 8️⃣ 관리자 공연 등록 · 수정과 안전한 부분 업데이트
+
+**문제**
+공연 수정은 예매 일정 · 이미지 · 캐릭터 설정 등 여러 데이터를 함께 다루기 때문에, 일부 설정만 변경할 때 기존 값이 유실되지 않도록 API 계약을 정확히 유지해야 했습니다.
+
+**해결**
+
+- 등록/수정 공통 폼에서 공연 정보 · 예매 일정 · 가격 · 좌석 · 캐릭터 설정을 관리
+- `등록 즉시 예매 가능` 선택 시 일정 입력을 숨기고, 요청 시점의 KST 현재 시각을 `booking_open_at`으로 저장
+- 일반 예매 모드에서는 날짜·시간을 필수 입력으로 검증하고 공연 상태에 따른 수정 잠금 정책 유지
+- 변경된 필드만 전송하는 부분 PATCH를 사용해 수정하지 않은 공연 데이터 보존
+- 이미지 · 갤러리 · 3D 모델 파일 변경과 일반 공연 정보 PATCH를 분리해 파일 데이터 유실 방지
+- 필수 입력 안내, 숫자 입력 UX 등 관리자 폼 사용성 개선
+
+### 9️⃣ 배너 관리 및 메인 배너 UX
+
+**문제**
+배너는 최대 3개라는 제한이 있지만 기존에는 공연 수정 화면에서만 설정할 수 있었고, 선택 불가 이유나 배너 간 직접 이동 UI도 부족했습니다.
+
+**해결**
+
+- 관리자 배너 관리 화면에서 기존 공연을 배너로 추가 · 제거하도록 구현
+- 기존 공연 수정 API의 부분 PATCH를 재사용해 `display_on_banner`, `banner_subtitle`만 변경
+- `character_config`, `booking_open_at`, 이미지 등 다른 공연 데이터는 요청에서 제외해 기존 정보 보존
+- 최대 3개 제한 · 중복 추가 · 연속 요청 · stale 상태를 방어하고 성공/실패 후 서버 상태 재동기화
+- 최대 개수 도달 시 체크박스 비활성 사유와 시각적 안내 제공
+- 사용자 메인 배너에 이전/다음 화살표, 순환 이동, dot 동기화 및 기존 4초 자동 재생 유지
 
 ---
 
@@ -630,6 +663,8 @@ npm test
 | 공연 예매 가능 판단 | 예매 가능 여부, 예매 버튼 문구, 오픈 시각 포맷, 좌석 게이지 계산 |
 | API 매퍼 | 관리자 대시보드 · 예매 · 좌석 응답 변환 |
 | 인증 · 에러 | 로그인 후 리다이렉트 경로, 에러 코드 → 메시지 매핑 |
+| 관리자 공연 · 배너 | 공연 등록/수정 validation, 부분 PATCH payload, 배너 최대 3개 · 추가/삭제 · 실패 복구 |
+| 3D 캐릭터 | GLB 에셋 계약, 캐릭터 설정 직렬화/복원, 애니메이션 재생 · 반복 · cleanup |
 
 ### CI
 
